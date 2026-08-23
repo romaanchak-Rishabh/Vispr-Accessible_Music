@@ -1,0 +1,142 @@
+import { useState } from 'react';
+import type { JSX } from 'react';
+import { usePlayer } from '../store/player';
+import { useLibrary } from '../store/library';
+import { useUI } from '../store/ui';
+import { Artwork } from './Artwork';
+
+export function ActionSheet(): JSX.Element | null {
+  const trackId = useUI((s) => s.actionSheetTrackId);
+  const setActionSheet = useUI((s) => s.setActionSheet);
+  const track = useLibrary((s) => (trackId ? s.byId[trackId] : undefined));
+  const playlists = useLibrary((s) => s.playlists);
+
+  const [submenu, setSubmenu] = useState<'main' | 'playlist' | 'new-playlist'>('main');
+  const [newName, setNewName] = useState('');
+
+  if (!trackId || !track) return null;
+
+  const close = (): void => {
+    setSubmenu('main');
+    setNewName('');
+    setActionSheet(null);
+  };
+
+  const player = usePlayer.getState();
+  const lib = useLibrary.getState();
+
+  const actions: { label: string; fn: () => void }[] =
+    submenu === 'playlist'
+      ? [
+          {
+            label: 'New Playlist…',
+            fn: () => setSubmenu('new-playlist')
+          },
+          ...playlists.map((p) => ({
+            label: `Add to “${p.name}”`,
+            fn: () => {
+              lib.addToPlaylist(p.id, [track.id]);
+              close();
+            }
+          }))
+        ]
+      : [
+          {
+            label: 'Play Next',
+            fn: () => {
+              player.playTrackNext(track);
+              close();
+            }
+          },
+          {
+            label: 'Play Last',
+            fn: () => {
+              player.playTrackLater(track);
+              close();
+            }
+          },
+          {
+            label: 'Add to a Playlist…',
+            fn: () => setSubmenu('playlist')
+          },
+          {
+            label: 'Delete from Library',
+            fn: () => {
+              if (!window.confirm(`Delete “${track.title}” and its downloaded audio?\nThis cannot be undone.`)) return;
+              const p = usePlayer.getState();
+              const wasCurrent = p.queue[p.index]?.id === track.id;
+              if (wasCurrent) p.pause();
+              usePlayer.setState((s) => {
+                const before = s.queue.filter((q, i) => q.id === track.id && i < s.index).length;
+                return {
+                  queue: s.queue.filter((q) => q.id !== track.id),
+                  originalQueue: s.originalQueue.filter((q) => q.id !== track.id),
+                  index: Math.max(0, s.index - before),
+                  isPlaying: false
+                };
+              });
+              void lib.removeTrackFromLibrary(track.id);
+              close();
+            }
+          }
+        ];
+
+  return (
+    <div className="sheet-overlay" style={{ alignItems: 'flex-end', justifyContent: 'center' }} onClick={close}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }} onClick={(e) => e.stopPropagation()}>
+        <div className="action-sheet">
+          {submenu === 'new-playlist' ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newName.trim()) return;
+                const id = lib.createPlaylist(newName.trim());
+                lib.addToPlaylist(id, [track.id]);
+                close();
+              }}
+            >
+              <div className="action-sheet-head">
+                <span style={{ fontSize: 17, fontWeight: 600 }}>New Playlist</span>
+              </div>
+              <input
+                autoFocus
+                className="search-input"
+                style={{ margin: 14, width: 'calc(100% - 28px)', padding: '9px 12px' }}
+                placeholder="Playlist name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+              <button type="submit" className="action-item">
+                Create & Add Song
+              </button>
+            </form>
+          ) : (
+            <>
+              <div className="action-sheet-head">
+                <Artwork src={track.artwork} className="row-artwork" placeholderSize={18} alt="" />
+                <div style={{ minWidth: 0 }}>
+                  <div className="row-title">{track.title}</div>
+                  <div className="row-subtitle">{track.artist}</div>
+                </div>
+              </div>
+              {actions.map((a) => (
+                <button
+                  key={a.label}
+                  className="action-item"
+                  onClick={() => {
+                    a.fn();
+                  }}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+        <button className="action-cancel" onClick={close}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
