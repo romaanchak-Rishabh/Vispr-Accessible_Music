@@ -41,11 +41,17 @@ def clean_err(msg):
 PORT = int(os.environ.get("PORT", "8080"))
 AUDIO_FORMAT = "bestaudio[ext=m4a]/bestaudio[acodec!=none]/best"
 MAX_PLAYLIST = 300
+# Player clients tried in order (after the default) when YouTube bot-checks us.
+# tv / web_safari are currently the least-challenged clients on datacenter IPs;
+# visionos (JS-less, no PO token needed) is already tried by yt-dlp's default.
 FALLBACK_CLIENTS = [
     c.strip()
     for c in os.environ.get("YTDLP_PLAYER_CLIENT", "tv,web_safari,mweb,android_vr").split(",")
     if c.strip()
 ]
+# Optional anti-bot-check credentials:
+#   YTDLP_PO_TOKEN      comma-separated "CLIENT.CONTEXT+TOKEN" entries (e.g. "mweb.gvs+abc123")
+#   YTDLP_VISITOR_DATA  visitor_data value captured from a logged-in browser session
 
 
 def check_auth(headers):
@@ -72,13 +78,31 @@ def _cookie_opts():
     return opts
 
 
+def _po_token_opts():
+    """PO token / visitor data extractor args from env (yt-dlp matches them per client itself)."""
+    ea = {}
+    po = os.environ.get("YTDLP_PO_TOKEN", "").strip()
+    if po:
+        tokens = [t.strip() for t in po.split(",") if "+" in t]
+        if tokens:
+            ea["po_token"] = tokens
+    vd = os.environ.get("YTDLP_VISITOR_DATA", "").strip()
+    if vd:
+        ea["visitor_data"] = [vd]
+    return ea
+
+
 def _opts_for(client, extra=None):
-    opts = {"quiet": True, "no_warnings": True}
+    opts = {"quiet": True, "no_warnings": True, "ignoreconfig": True}
     opts.update(_cookie_opts())
     extra = dict(extra or {})
+    client_list = [client] if client else None
     ea = extra.pop("extractor_args", {})
-    if client:
-        ea["youtube"] = {**ea.get("youtube", {}), "player_client": [client]}
+    youtube_ea = _po_token_opts()
+    if client_list:
+        youtube_ea["player_client"] = client_list
+    if youtube_ea:
+        ea["youtube"] = {**ea.get("youtube", {}), **youtube_ea}
     if ea:
         opts["extractor_args"] = ea
     opts.update(extra)
@@ -105,7 +129,8 @@ def _run_with_fallback(fn):
     raise RuntimeError(
         "YouTube rejected all player clients (bot-check). "
         "Fix: set YTDLP_COOKIES_FROM_BROWSER=chrome (or firefox/edge), "
-        "or provide cookies.txt via YTDLP_COOKIES_FILE. Details: " + " | ".join(errors[-2:])
+        "provide cookies.txt via YTDLP_COOKIES_FILE, or pass a PO token via "
+        "YTDLP_PO_TOKEN + YTDLP_VISITOR_DATA. Details: " + " | ".join(errors[-2:])
     )
 
 
