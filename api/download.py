@@ -1,6 +1,11 @@
 """POST /api/download — download a single YouTube video's audio and stream it back."""
 
-import _ytbridge as b
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import _ytbridge as b  # noqa: E402
 
 
 def app(environ, start_response):
