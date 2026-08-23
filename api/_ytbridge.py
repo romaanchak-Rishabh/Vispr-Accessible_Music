@@ -60,6 +60,24 @@ def _cookie_opts():
     return opts
 
 
+def _log_config():
+    """One-time diagnostic so deployments can be verified from function logs."""
+    parts = []
+    raw = os.environ.get("YTDLP_COOKIES", "").strip()
+    if raw:
+        expanded = raw.replace("\\n", "\n")
+        n_cookies = sum(1 for ln in expanded.splitlines() if "\t" in ln)
+        has_header = expanded.startswith("#")
+        parts.append(f"YTDLP_COOKIES set ({len(raw)} chars, {n_cookies} cookie lines, header={'yes' if has_header else 'MISSING'})")
+    if os.environ.get("YTDLP_COOKIES_FILE"):
+        parts.append("YTDLP_COOKIES_FILE set")
+    if os.environ.get("YTDLP_COOKIES_FROM_BROWSER"):
+        parts.append("YTDLP_COOKIES_FROM_BROWSER set")
+    if _po_token_opts():
+        parts.append("PO token/visitor_data set")
+    print("[ytbridge] config:", "; ".join(parts) if parts else "NO CREDENTIALS CONFIGURED")
+
+
 def _po_token_opts():
     """PO token / visitor data extractor args from env (yt-dlp matches them per client itself)."""
     ea = {}
@@ -72,6 +90,9 @@ def _po_token_opts():
     if vd:
         ea["visitor_data"] = [vd]
     return ea
+
+
+_log_config()
 
 
 def _opts_for(client, extra=None):
