@@ -7,10 +7,11 @@ export type Page =
   | { type: 'search' }
   | { type: 'album'; key: string }
   | { type: 'artist'; name: string }
-  | { type: 'playlist'; id: string };
+  | { type: 'playlist'; id: string }
+  | { type: 'settings' };
 
 interface UIState {
-  tab: 'listen' | 'browse' | 'library' | 'search';
+  tab: 'listen' | 'browse' | 'library' | 'search' | 'settings';
   pageStack: Page[];
   showNowPlaying: boolean;
   showQueue: boolean;
@@ -41,7 +42,17 @@ export const useUI = create<UIState>((set, get) => ({
   setTab: (tab) =>
     set({
       tab,
-      pageStack: [tab === 'listen' ? { type: 'listen' } : tab === 'browse' ? { type: 'browse' } : tab === 'library' ? { type: 'library' } : { type: 'search' }]
+      pageStack: [
+        tab === 'listen'
+          ? { type: 'listen' }
+          : tab === 'browse'
+            ? { type: 'browse' }
+            : tab === 'library'
+              ? { type: 'library' }
+              : tab === 'settings'
+                ? { type: 'settings' }
+                : { type: 'search' }
+      ]
     }),
 
   navigate: (page) => {

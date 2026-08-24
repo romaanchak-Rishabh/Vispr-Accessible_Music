@@ -40,6 +40,8 @@ function pageTitle(): string {
       const pl = lib.playlists.find((p) => p.id === page.id);
       return pl?.name ?? 'Playlist';
     }
+    case 'settings':
+      return 'Settings';
   }
 }
 

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- OPTION 1 - NIGHT -->
+  <defs>
+    <linearGradient id="bg1n" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a1420"/>
+      <stop offset="1" stop-color="#12080b"/>
+    </linearGradient>
+    <radialGradient id="disc1n" cx="0.38" cy="0.32" r="0.9">
+      <stop offset="0" stop-color="#33222b"/>
+      <stop offset="0.6" stop-color="#191218"/>
+      <stop offset="1" stop-color="#0c090c"/>
+    </radialGradient>
+    <linearGradient id="label1n" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fb5c74"/>
+      <stop offset="1" stop-color="#fa233b"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="16" y="16" width="480" height="480" rx="118" fill="url(#bg1n)"/>
+
+  <circle cx="256" cy="256" r="176" fill="url(#disc1n)"/>
+  <g stroke="#ff8ba0" fill="none">
+    <circle cx="256" cy="256" r="152" stroke-width="2.5" opacity="0.13"/>
+    <circle cx="256" cy="256" r="132" stroke-width="2.5" opacity="0.11"/>
+    <circle cx="256" cy="256" r="112" stroke-width="2.5" opacity="0.09"/>
+    <circle cx="256" cy="256" r="92" stroke-width="2.5" opacity="0.07"/>
+  </g>
+
+  <circle cx="256" cy="256" r="56" fill="url(#label1n)"/>
+  <circle cx="256" cy="256" r="7" fill="#12080b"/>
+
+  <path d="M118 256 q34 -34 69 0 t69 0 t69 0 t69 0"
+        stroke="#ffe1e7" stroke-width="15" stroke-linecap="round" fill="none" opacity="0.95"/>
+</svg>

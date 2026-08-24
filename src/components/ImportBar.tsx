@@ -2,14 +2,22 @@ import { useState } from 'react';
 import type { JSX } from 'react';
 import { useLibrary } from '../store/library';
 import { useSettings } from '../store/settings';
-import { isYouTubeUrl } from '../lib/ytdlp';
+import { isYouTubeUrl, resolveViaYtDlp } from '../lib/ytdlp';
+import type { YtItem } from '../lib/ytdlp';
 import { FolderIcon, SpinnerIcon, ChevronRightIcon, MusicNoteIcon } from './Icons';
+import { ImportConfirmSheet } from './ImportConfirmSheet';
+import type { ImportOverrides } from './ImportConfirmSheet';
+import { ManualImportSheet } from './ManualImportSheet';
 
 export function ImportBar(): JSX.Element {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [statusText, setStatusText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<'auto' | 'manual'>('auto');
+  const [pendingItems, setPendingItems] = useState<YtItem[] | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+
   const importFromUrl = useLibrary((s) => s.importFromUrl);
   const importYouTube = useLibrary((s) => s.importYouTube);
   const rescanFolder = useLibrary((s) => s.rescanFolder);
@@ -18,8 +26,10 @@ export function ImportBar(): JSX.Element {
 
   const ytdlpServer = useSettings((s) => s.ytdlpServer);
   const ytdlpToken = useSettings((s) => s.ytdlpToken);
+  const confirmImport = useSettings((s) => s.confirmImport);
   const setYtdlpServer = useSettings((s) => s.setYtdlpServer);
   const setYtdlpToken = useSettings((s) => s.setYtdlpToken);
+  const setConfirmImport = useSettings((s) => s.setConfirmImport);
   const isYt = url.trim().length > 0 && isYouTubeUrl(url);
 
   const downloadDirName = useLibrary((s) => s.downloadDirName);
@@ -28,27 +38,71 @@ export function ImportBar(): JSX.Element {
   const chooseDownloadFolder = useLibrary((s) => s.chooseDownloadFolder);
   const clearDownloadFolder = useLibrary((s) => s.clearDownloadFolder);
 
+  const runAutoImport = async (
+    trimmed: string,
+    overrides?: Record<string, ImportOverrides>,
+    onProgress?: (done: number, total: number, label: string) => void
+  ): Promise<void> => {
+    const res = await importYouTube(trimmed, onProgress, overrides);
+    const parts = [`Imported ${res.imported}`];
+    if (res.skipped > 0) parts.push(`${res.skipped} already in library`);
+    if (res.failed > 0) parts.push(`${res.failed} failed`);
+    setStatusText(parts.join(' · ') + (res.imported > 0 ? ' — check Recently Added' : ''));
+    setUrl('');
+  };
+
   const handleImport = async (): Promise<void> => {
     const trimmed = url.trim();
     if (!trimmed || busy) return;
     setBusy(true);
     setError(null);
-    setStatusText(isYt ? 'Resolving…' : null);
+    setStatusText(null);
     try {
-      if (isYt) {
-        const res = await importYouTube(trimmed, (done, total, label) =>
-          setStatusText(total > 0 && done < total ? `Downloading ${done + 1}/${total} — ${label}` : label)
-        );
-        const parts = [`Imported ${res.imported}`];
-        if (res.skipped > 0) parts.push(`${res.skipped} already in library`);
-        if (res.failed > 0) parts.push(`${res.failed} failed`);
-        setStatusText(parts.join(' · ') + (res.imported > 0 ? ' — check Recently Added' : ''));
-        setUrl('');
-      } else {
+      if (!isYt) {
+        setStatusText('Fetching…');
         await importFromUrl(trimmed);
         setStatusText('Imported — check Recently Added');
         setUrl('');
+        return;
       }
+      if (mode === 'manual') {
+        setBusy(false);
+        setManualOpen(true);
+        return;
+      }
+      setStatusText('Resolving…');
+      if (confirmImport) {
+        // Resolve first so the user can review/edit before anything downloads.
+        const items = await resolveViaYtDlp(ytdlpServer, ytdlpToken, trimmed);
+        if (items.length === 0) throw new Error('No videos found for that link');
+        setBusy(false);
+        setPendingItems(items);
+        return;
+      }
+      setStatusText('Downloading…');
+      await runAutoImport(trimmed, undefined, (done, total, label) =>
+        setStatusText(total > 0 && done < total ? `Downloading ${done + 1}/${total} — ${label}` : label)
+      );
+    } catch (e) {
+      setStatusText(null);
+      setError(e instanceof Error ? e.message : 'Import failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleConfirmedImport = async (overrides: Record<string, ImportOverrides>, dontAskAgain: boolean): Promise<void> => {
+    const trimmed = url.trim();
+    setPendingItems(null);
+    if (!trimmed || busy) return;
+    setBusy(true);
+    setError(null);
+    setStatusText('Downloading…');
+    try {
+      if (dontAskAgain) setConfirmImport(false);
+      await runAutoImport(trimmed, overrides, (done, total, label) =>
+        setStatusText(total > 0 && done < total ? `Downloading ${done + 1}/${total} — ${label}` : label)
+      );
     } catch (e) {
       setStatusText(null);
       setError(e instanceof Error ? e.message : 'Import failed');
@@ -73,9 +127,29 @@ export function ImportBar(): JSX.Element {
           autoCapitalize="off"
         />
         <button className="pill-btn primary" style={{ flexShrink: 0 }} onClick={() => void handleImport()} disabled={busy}>
-          {busy ? <SpinnerIcon size={16} /> : isYt ? <MusicNoteIcon size={15} /> : <ChevronRightIcon size={15} />} Add
+          {busy ? <SpinnerIcon size={16} /> : isYt && mode === 'manual' ? <ChevronRightIcon size={15} /> : <MusicNoteIcon size={15} />} Add
         </button>
       </div>
+
+      {isYt && !busy && !pendingItems && !manualOpen && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          {(
+            [
+              ['auto', 'Auto Download'],
+              ['manual', 'Manual Song']
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              className={`pill-btn${mode === value ? ' primary' : ''}`}
+              style={{ padding: '5px 14px', fontSize: 13 }}
+              onClick={() => setMode(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {(isYt || (ytdlpServer.length > 0 && url.trim() === '')) && (
         <div style={{ marginTop: 10 }}>
@@ -99,7 +173,7 @@ export function ImportBar(): JSX.Element {
             style={{ fontSize: 14, marginTop: 6 }}
           />
           <p style={{ marginTop: 6, fontSize: 12, color: 'var(--label-secondary)' }}>
-            Leave empty to use this deployment's built-in yt-dlp API — or point to your own server (see README).
+            Leave empty to use this deployment's built-in yt-dlp API — or point to your own server (see README). Manual Song mode needs no server.
           </p>
         </div>
       )}
@@ -166,6 +240,16 @@ export function ImportBar(): JSX.Element {
         <p style={{ marginTop: 8, fontSize: 13, color: 'var(--label-secondary)' }}>{statusText}</p>
       )}
       {error && <p style={{ marginTop: 8, fontSize: 13, color: 'var(--accent)' }}>{error}</p>}
+
+      {pendingItems && (
+        <ImportConfirmSheet
+          items={pendingItems}
+          onConfirm={(overrides, dontAsk) => void handleConfirmedImport(overrides, dontAsk)}
+          onCancel={() => setPendingItems(null)}
+        />
+      )}
+
+      {manualOpen && <ManualImportSheet url={url.trim()} onClose={() => setManualOpen(false)} />}
     </div>
   );
 }

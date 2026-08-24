@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { usePlayer } from '../store/player';
 import { useLibrary } from '../store/library';
-import { useUI } from '../store/ui';
+import { useUI, type Page } from '../store/ui';
 import { Artwork } from './Artwork';
 import { blobToDataUrl } from '../lib/metadata';
 
@@ -49,7 +49,17 @@ export function ActionSheet(): JSX.Element | null {
   const player = usePlayer.getState();
   const lib = useLibrary.getState();
 
-  const actions: { label: string; fn: () => void }[] =
+  // Apple Music behaviour: the now-playing sheet slides down to the mini pill,
+  // then the target page opens.
+  const goToPage = (page: Page): void => {
+    useUI.setState({ showNowPlaying: false, showQueue: false });
+    close();
+    useUI.getState().navigate(page);
+  };
+
+  const albumKey = `${track.album}|||${track.albumArtist ?? track.artist}`.toLowerCase();
+
+  const actions: { label: string; sub?: string; fn: () => void }[] =
     submenu === 'playlist'
       ? [
           {
@@ -67,6 +77,16 @@ export function ActionSheet(): JSX.Element | null {
       : submenu === 'edit'
         ? []
         : [
+            {
+              label: 'Go to Album',
+              sub: track.album,
+              fn: () => goToPage({ type: 'album', key: albumKey })
+            },
+            {
+              label: 'Go to Artist',
+              sub: track.artist,
+              fn: () => goToPage({ type: 'artist', name: track.artist })
+            },
             {
               label: 'Play Next',
               fn: () => {
@@ -212,11 +232,17 @@ export function ActionSheet(): JSX.Element | null {
                 <button
                   key={a.label}
                   className="action-item"
+                  style={a.sub ? { flexDirection: 'column', alignItems: 'flex-start', gap: 1 } : undefined}
                   onClick={() => {
                     a.fn();
                   }}
                 >
-                  {a.label}
+                  <span>{a.label}</span>
+                  {a.sub && (
+                    <span style={{ fontSize: 12, color: 'var(--label-secondary)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {a.sub}
+                    </span>
+                  )}
                 </button>
               ))}
             </>
