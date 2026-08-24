@@ -122,6 +122,7 @@ def _run_with_fallback(fn):
                 or 'not a bot' in msg
                 or 'playerscripts' in msg
                 or 'needs to be reloaded' in msg
+                or 'Requested format' in msg
                 or 'DRM protected' in msg
             ):
                 continue

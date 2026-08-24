@@ -3,3 +3,10 @@ dist
 dev-dist
 *.local
 .DS_Store
+
+__pycache__/
+*.pyc
+# cookie/secret files - NEVER commit
+cookies*.txt
+cookies_env_value.txt
+*.cookies

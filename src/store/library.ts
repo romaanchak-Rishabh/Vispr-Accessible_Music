@@ -112,8 +112,17 @@ interface LibraryState {
   importFromUrl: (url: string) => Promise<void>;
   importYouTube: (
     url: string,
-    onProgress?: (done: number, total: number, label: string) => void
+    onProgress?: (done: number, total: number, label: string) => void,
+    overrides?: Record<string, { title?: string; artist?: string; album?: string; artwork?: string }>
   ) => Promise<{ imported: number; skipped: number; failed: number }>;
+  updateTrackMeta: (
+    trackId: string,
+    patch: { title?: string; artist?: string; album?: string; artwork?: string }
+  ) => Promise<void>;
+  addFileWithMeta: (
+    file: File,
+    meta: { title: string; artist: string; album?: string; artwork?: string }
+  ) => Promise<Track>;
   addFiles: (files: File[]) => Promise<void>;
   createPlaylist: (name: string) => string;
   deletePlaylist: (id: string) => void;
@@ -304,7 +313,27 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     await finalizeImport(set, get, newTracks);
   },
 
-  importYouTube: async (url, onProgress) => {
+  addFileWithMeta: async (file, meta) => {
+    const track: Track = {
+      id: `f-${file.name}-${file.size}-${Date.now()}`,
+      title: meta.title.trim() || file.name,
+      artist: meta.artist.trim() || 'Unknown Artist',
+      album: meta.album?.trim() || 'Unknown Album',
+      fileName: file.name,
+      path: file.name,
+      source: 'file',
+      size: file.size,
+      addedAt: Date.now(),
+      artwork: meta.artwork
+    };
+    fileCache.set(track.id, file);
+    await db.saveFileBlob(track.id, file);
+    await saveCopyToDownloadFolder(file.name, file);
+    await finalizeImport(set, get, [track]);
+    return track;
+  },
+
+  importYouTube: async (url, onProgress, overrides) => {
     const { ytdlpServer, ytdlpToken } = useSettings.getState();
     // Empty server = use this deployment's own /api functions (same origin).
     const { resolveViaYtDlp, downloadAudioViaYtDlp } = await import('../lib/ytdlp');
@@ -365,20 +394,19 @@ export const useLibrary = create<LibraryState>((set, get) => ({
         artwork = artwork ?? item.thumbnail;
       }
       const existing = get().byId[`y-${item.id}`];
+      const ov = overrides?.[item.id];
       const track: Track = {
         id: `y-${item.id}`,
-        title: item.title ?? filename,
-        artist: item.uploader ?? 'Unknown Artist',
-        album: item.playlist_title ?? 'YouTube',
+        title: ov?.title?.trim() || item.title || filename,
+        artist: ov?.artist?.trim() || item.uploader || 'Unknown Artist',
+        album: ov?.album?.trim() || item.playlist_title || 'YouTube',
         fileName: filename,
         path: filename,
         source: 'file',
         size: blob.size,
         addedAt: Date.now(),
         duration: item.duration,
-        artwork,
-        // keep previously-stored artwork if the fresh fetch failed
-        ...(existing && !artwork ? { artwork: existing.artwork } : {})
+        artwork: ov?.artwork ?? artwork ?? (existing && !artwork ? existing.artwork : undefined)
       };
       fileCache.set(track.id, new File([blob], filename, { type: blob.type || 'audio/mp4' }));
       await db.saveFileBlob(track.id, fileCache.get(track.id)!);
@@ -400,6 +428,26 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 
     await finalizeImport(set, get, newTracks);
     return { imported: newTracks.length, skipped, failed };
+  },
+
+  updateTrackMeta: async (trackId, patch) => {
+    const tracks = get().tracks.map((t) =>
+      t.id === trackId
+        ? {
+            ...t,
+            ...(patch.title?.trim() ? { title: patch.title.trim() } : {}),
+            ...(patch.artist?.trim() ? { artist: patch.artist.trim() } : {}),
+            ...(patch.album?.trim() ? { album: patch.album.trim() } : {}),
+            ...(patch.artwork !== undefined ? { artwork: patch.artwork || undefined } : {})
+          }
+        : t
+    );
+    const byId: Record<string, Track> = {};
+    for (const t of tracks) byId[t.id] = t;
+    const albums = buildAlbums(tracks);
+    const artists = buildArtists(tracks, albums);
+    await db.saveTracks(tracks);
+    set({ tracks, byId, albums, artists });
   },
 
   createPlaylist: (name) => {
