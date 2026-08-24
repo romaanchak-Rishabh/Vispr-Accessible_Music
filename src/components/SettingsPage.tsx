@@ -1,0 +1,194 @@
+import { useEffect } from 'react';
+import type { JSX } from 'react';
+import { useLibrary } from '../store/library';
+import { usePlayer } from '../store/player';
+import { ACCENTS, applyAppearance, useSettings } from '../store/settings';
+import type { AccentId, ThemeMode } from '../store/settings';
+
+function SectionTitle({ children }: { children: string }): JSX.Element {
+  return (
+    <div style={{ margin: '0 28px 8px', fontSize: 13, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--label-secondary)' }}>
+      {children}
+    </div>
+  );
+}
+
+function Row({ label, children }: { label: string; children?: React.ReactNode }): JSX.Element {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '11px 16px',
+        borderTop: '0.5px solid var(--separator)'
+      }}
+    >
+      <span style={{ fontSize: 15 }}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function Switch({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }): JSX.Element {
+  return (
+    <button
+      className={`switch${on ? ' on' : ''}`}
+      role="switch"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+    />
+  );
+}
+
+const THEMES: { id: ThemeMode; label: string }[] = [
+  { id: 'system', label: 'Auto' },
+  { id: 'light', label: 'Day' },
+  { id: 'dark', label: 'Night' }
+];
+
+export function SettingsPage(): JSX.Element {
+  const theme = useSettings((s) => s.theme);
+  const accent = useSettings((s) => s.accent);
+  const setTheme = useSettings((s) => s.setTheme);
+  const setAccent = useSettings((s) => s.setAccent);
+  const confirmImport = useSettings((s) => s.confirmImport);
+  const setConfirmImport = useSettings((s) => s.setConfirmImport);
+  const ytdlpServer = useSettings((s) => s.ytdlpServer);
+  const ytdlpToken = useSettings((s) => s.ytdlpToken);
+  const youtubeApiKey = useSettings((s) => s.youtubeApiKey);
+  const setYtdlpServer = useSettings((s) => s.setYtdlpServer);
+  const setYtdlpToken = useSettings((s) => s.setYtdlpToken);
+  const setYoutubeApiKey = useSettings((s) => s.setYoutubeApiKey);
+
+  const crossfade = usePlayer((s) => s.crossfade);
+  const toggleCrossfade = usePlayer((s) => s.toggleCrossfade);
+
+  const trackCount = useLibrary((s) => s.tracks.length);
+  const albumCount = useLibrary((s) => s.albums.length);
+  const artistCount = useLibrary((s) => s.artists.length);
+  const totalBytes = useLibrary((s) => s.tracks.reduce((n, t) => n + (t.size || 0), 0));
+
+  // live-apply appearance whenever these settings change
+  useEffect(() => {
+    applyAppearance(theme, accent);
+  }, [theme, accent]);
+
+  return (
+    <div style={{ paddingTop: 6, paddingBottom: 24 }}>
+      <SectionTitle>Appearance</SectionTitle>
+      <div className="group">
+        <Row label="Theme">
+          <div style={{ display: 'flex', gap: 6 }}>
+            {THEMES.map((t) => (
+              <button
+                key={t.id}
+                className={`pill-btn${theme === t.id ? ' primary' : ''}`}
+                style={{ padding: '5px 14px', fontSize: 13 }}
+                onClick={() => setTheme(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <Row label="Accent">
+          <div style={{ display: 'flex', gap: 9 }}>
+            {ACCENTS.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => setAccent(a.id as AccentId)}
+                aria-label={`${a.label} accent`}
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 999,
+                  background: `linear-gradient(135deg, ${a.color}, ${a.color}cc)`,
+                  border: accent === a.id ? '2px solid var(--label)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+              />
+            ))}
+          </div>
+        </Row>
+      </div>
+
+      <SectionTitle>Playback</SectionTitle>
+      <div className="group" style={{ marginTop: 0 }}>
+        <Row label="Crossfade between songs">
+          <Switch on={crossfade} onChange={() => toggleCrossfade()} />
+        </Row>
+      </div>
+
+      <SectionTitle>Import</SectionTitle>
+      <div className="group" style={{ marginTop: 0 }}>
+        <Row label="Confirm songs before importing">
+          <Switch on={confirmImport} onChange={setConfirmImport} />
+        </Row>
+        <div style={{ padding: '10px 16px 14px', borderTop: '0.5px solid var(--separator)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input
+            className="search-input"
+            style={{ paddingLeft: 12, fontSize: 14 }}
+            placeholder="yt-dlp server URL (optional)"
+            value={ytdlpServer}
+            onChange={(e) => setYtdlpServer(e.target.value)}
+            autoCorrect="off"
+            autoCapitalize="off"
+          />
+          <input
+            className="search-input"
+            style={{ paddingLeft: 12, fontSize: 14 }}
+            placeholder="yt-dlp shared secret (optional)"
+            value={ytdlpToken}
+            onChange={(e) => setYtdlpToken(e.target.value)}
+            type="password"
+            autoCorrect="off"
+            autoCapitalize="off"
+          />
+          <input
+            className="search-input"
+            style={{ paddingLeft: 12, fontSize: 14 }}
+            placeholder="YouTube API key (optional, better metadata)"
+            value={youtubeApiKey}
+            onChange={(e) => setYoutubeApiKey(e.target.value)}
+            autoCorrect="off"
+            autoCapitalize="off"
+          />
+          <span style={{ fontSize: 12, color: 'var(--label-secondary)' }}>
+            Empty server uses this deployment's built-in yt-dlp API. Manual Song mode needs none of these.
+          </span>
+        </div>
+      </div>
+
+      <SectionTitle>Library</SectionTitle>
+      <div className="group" style={{ marginTop: 0 }}>
+        <Row label="Songs">
+          <span style={{ fontSize: 15, color: 'var(--label-secondary)' }}>{trackCount}</span>
+        </Row>
+        <Row label="Albums">
+          <span style={{ fontSize: 15, color: 'var(--label-secondary)' }}>{albumCount}</span>
+        </Row>
+        <Row label="Artists">
+          <span style={{ fontSize: 15, color: 'var(--label-secondary)' }}>{artistCount}</span>
+        </Row>
+        <Row label="Offline storage used">
+          <span style={{ fontSize: 15, color: 'var(--label-secondary)' }}>
+            {totalBytes > 1024 * 1024 ? `${(totalBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(totalBytes / 1024)} KB`}
+          </span>
+        </Row>
+      </div>
+
+      <SectionTitle>About</SectionTitle>
+      <div className="group" style={{ marginTop: 0 }}>
+        <Row label="Version">
+          <span style={{ fontSize: 15, color: 'var(--label-secondary)' }}>1.0.0</span>
+        </Row>
+        <div style={{ padding: '10px 16px 14px', borderTop: '0.5px solid var(--separator)', fontSize: 12, color: 'var(--label-secondary)' }}>
+          Vispr — your personal offline music library. Install it from your browser menu (&quot;Add to Home Screen&quot;) for the full app experience.
+        </div>
+      </div>
+    </div>
+  );
+}

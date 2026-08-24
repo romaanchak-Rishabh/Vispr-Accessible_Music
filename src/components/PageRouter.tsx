@@ -29,11 +29,14 @@ export function PageRouter(): JSX.Element {
       return <ArtistDetailView name={page.name} />;
     case 'playlist':
       return <PlaylistDetailView playlistId={page.id} />;
+    case 'settings':
+      return <SettingsPage />;
   }
 }
 
 // Listen Now lives in Views.tsx (exported as ListenNowView)
 import { ListenNowView } from './Views';
+import { SettingsPage } from './SettingsPage';
 function ListenNowLazy(): JSX.Element {
   return <ListenNowView />;
 }

@@ -6,6 +6,7 @@
   --accent-2: #fb5c74;
   --accent-soft: rgba(250, 35, 59, 0.12);
   --accent-gradient: linear-gradient(135deg, #fb5c74, #fa233b);
+  --aurora-accent: 250, 35, 59;
 
   --bg-grouped: #f2f2f7;
   --bg-primary: #ffffff;
@@ -59,6 +60,91 @@
   }
 }
 
+/* Manual theme override (Settings > Appearance). These must win over the
+   prefers-color-scheme blocks above, so they re-declare the full token sets. */
+html[data-theme='light'] {
+  --bg-grouped: #f2f2f7;
+  --bg-primary: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-secondary: rgba(118, 118, 128, 0.12);
+  --label: #000000;
+  --label-secondary: rgba(60, 60, 67, 0.6);
+  --label-tertiary: rgba(60, 60, 67, 0.3);
+  --separator: rgba(60, 60, 67, 0.29);
+  --fill-1: rgba(120, 120, 128, 0.2);
+
+  --glass-hairline: rgba(255, 255, 255, 0.55);
+  --glass-highlight: rgba(255, 255, 255, 0.65);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --surface: rgba(255, 255, 255, 0.66);
+  --nav-blur: rgba(250, 250, 252, 0.62);
+  --tab-blur: rgba(250, 250, 252, 0.6);
+  --player-bg: rgba(255, 255, 255, 0.55);
+  --sheet-bg: rgba(246, 246, 248, 0.86);
+  --sidebar-bg: rgba(240, 240, 244, 0.55);
+  --aurora-opacity: 0.5;
+}
+
+html[data-theme='dark'] {
+  --bg-grouped: #000000;
+  --bg-primary: #1c1c1e;
+  --bg-elevated: #2c2c2e;
+  --bg-secondary: rgba(118, 118, 128, 0.18);
+  --label: #ffffff;
+  --label-secondary: rgba(235, 235, 245, 0.6);
+  --label-tertiary: rgba(235, 235, 245, 0.3);
+  --separator: rgba(84, 84, 88, 0.65);
+  --fill-1: rgba(120, 120, 128, 0.36);
+
+  --glass-hairline: rgba(255, 255, 255, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.18);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --surface: rgba(40, 40, 46, 0.55);
+  --nav-blur: rgba(18, 18, 20, 0.62);
+  --tab-blur: rgba(14, 14, 16, 0.6);
+  --player-bg: rgba(30, 30, 34, 0.52);
+  --sheet-bg: rgba(36, 36, 40, 0.9);
+  --sidebar-bg: rgba(16, 16, 18, 0.5);
+  --aurora-opacity: 0.65;
+}
+
+/* Accent presets (Settings > Accent). Red is the default in :root. */
+html[data-accent='blue'] {
+  --accent: #0a84ff;
+  --accent-2: #409cff;
+  --accent-soft: rgba(10, 132, 255, 0.12);
+  --accent-gradient: linear-gradient(135deg, #409cff, #0a84ff);
+  --aurora-accent: 10, 132, 255;
+}
+html[data-accent='purple'] {
+  --accent: #bf5af2;
+  --accent-2: #d18cf5;
+  --accent-soft: rgba(191, 90, 242, 0.12);
+  --accent-gradient: linear-gradient(135deg, #d18cf5, #bf5af2);
+  --aurora-accent: 191, 90, 242;
+}
+html[data-accent='pink'] {
+  --accent: #ff375f;
+  --accent-2: #ff6b87;
+  --accent-soft: rgba(255, 55, 95, 0.12);
+  --accent-gradient: linear-gradient(135deg, #ff6b87, #ff375f);
+  --aurora-accent: 255, 55, 95;
+}
+html[data-accent='green'] {
+  --accent: #30d158;
+  --accent-2: #63e284;
+  --accent-soft: rgba(48, 209, 88, 0.12);
+  --accent-gradient: linear-gradient(135deg, #63e284, #30d158);
+  --aurora-accent: 48, 209, 88;
+}
+html[data-accent='orange'] {
+  --accent: #ff9f0a;
+  --accent-2: #ffb84d;
+  --accent-soft: rgba(255, 159, 10, 0.12);
+  --accent-gradient: linear-gradient(135deg, #ffb84d, #ff9f0a);
+  --aurora-accent: 255, 159, 10;
+}
+
 /* ============================================================
    Base
    ============================================================ */
@@ -93,7 +179,7 @@ body::before {
   pointer-events: none;
   opacity: var(--aurora-opacity);
   background:
-    radial-gradient(42% 42% at 18% 12%, rgba(250, 35, 59, 0.5) 0%, transparent 70%),
+    radial-gradient(42% 42% at 18% 12%, rgba(var(--aurora-accent), 0.5) 0%, transparent 70%),
     radial-gradient(38% 38% at 85% 22%, rgba(64, 120, 255, 0.4) 0%, transparent 70%),
     radial-gradient(45% 45% at 70% 88%, rgba(150, 60, 255, 0.38) 0%, transparent 70%),
     radial-gradient(36% 36% at 25% 82%, rgba(255, 140, 60, 0.3) 0%, transparent 70%);
@@ -444,7 +530,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(145deg, #fb5c74 0%, #fa233b 55%, #d61f33 100%);
+  background: var(--accent-gradient);
   color: rgba(255, 255, 255, 0.9);
 }
 

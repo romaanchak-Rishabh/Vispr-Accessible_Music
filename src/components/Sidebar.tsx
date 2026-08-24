@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 import { useUI, type Page } from '../store/ui';
 import { useLibrary } from '../store/library';
-import { ListenIcon, BrowseIcon, LibraryIcon, SearchIcon, MusicNoteIcon, PlusCircleIcon } from './Icons';
+import { ListenIcon, BrowseIcon, LibraryIcon, SearchIcon, MusicNoteIcon, PlusCircleIcon, SettingsIcon } from './Icons';
 
 export function Sidebar(): JSX.Element {
   const tab = useUI((s) => s.tab);
@@ -17,12 +17,7 @@ export function Sidebar(): JSX.Element {
   return (
     <aside className="sidebar">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 10px' }}>
-        <span
-          className="art-placeholder"
-          style={{ width: 30, height: 30, borderRadius: 7, color: '#fff' }}
-        >
-          <MusicNoteIcon size={17} />
-        </span>
+        <img src="/favicon.svg" alt="" style={{ width: 30, height: 30, borderRadius: 7 }} draggable={false} />
         <span style={{ fontWeight: 700, fontSize: 16 }}>Vispr</span>
       </div>
 
@@ -90,6 +85,13 @@ export function Sidebar(): JSX.Element {
         }}
       >
         <PlusCircleIcon size={18} /> New Playlist
+      </button>
+
+      <button
+        className={`sidebar-item ${isPage({ type: 'settings' }) ? 'active' : ''}`}
+        onClick={() => setTab('settings')}
+      >
+        <SettingsIcon size={20} /> Settings
       </button>
 
       <div style={{ marginTop: 'auto', padding: 12 }}>

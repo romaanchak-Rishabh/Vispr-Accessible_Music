@@ -1,12 +1,13 @@
 import { useUI } from '../store/ui';
-import { ListenIcon, BrowseIcon, LibraryIcon, SearchIcon } from './Icons';
+import { ListenIcon, BrowseIcon, LibraryIcon, SearchIcon, SettingsIcon } from './Icons';
 import type { JSX } from 'react';
 
 const tabs = [
   { id: 'listen', label: 'Listen Now', icon: ListenIcon },
   { id: 'browse', label: 'Browse', icon: BrowseIcon },
   { id: 'library', label: 'Library', icon: LibraryIcon },
-  { id: 'search', label: 'Search', icon: SearchIcon }
+  { id: 'search', label: 'Search', icon: SearchIcon },
+  { id: 'settings', label: 'Settings', icon: SettingsIcon }
 ] as const;
 
 export function TabBar(): JSX.Element {

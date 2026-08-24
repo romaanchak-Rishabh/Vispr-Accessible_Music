@@ -4,6 +4,7 @@ import { useAudioEngine } from './hooks/useAudioEngine';
 import { useMediaQuery } from './hooks/useMediaQuery';
 import { useLibrary } from './store/library';
 import { usePlayer } from './store/player';
+import { applyAppearance, useSettings } from './store/settings';
 import { useUI } from './store/ui';
 import type { Track } from './types';
 import { TabBar } from './components/TabBar';
@@ -51,7 +52,14 @@ export default function App(): JSX.Element {
   const pageStack = useUI((s) => s.pageStack);
   const goBack = useUI((s) => s.goBack);
   const hasQueue = usePlayer((s) => s.queue.length > 0);
+  const theme = useSettings((s) => s.theme);
+  const accent = useSettings((s) => s.accent);
   void useAudioEngine();
+
+  // apply persisted appearance on startup and on every change
+  useEffect(() => {
+    applyAppearance(theme, accent);
+  }, [theme, accent]);
 
   useEffect(() => {
     void init().then(() => {

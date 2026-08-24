@@ -84,7 +84,7 @@ export function NowPlayingSheet(): JSX.Element | null {
         <TimeRow current={currentTime} duration={duration} />
 
         <div className="np-controls">
-          <button className={`icon-btn ${shuffle ? '' : 'disabled'}`} style={{ color: shuffle ? '#fa233b' : '#fff' }} onClick={toggleShuffle}>
+          <button className={`icon-btn ${shuffle ? '' : 'disabled'}`} style={{ color: shuffle ? 'var(--accent)' : '#fff' }} onClick={toggleShuffle}>
             <ShuffleIcon size={24} />
           </button>
           <button className="icon-btn" onClick={previous} style={{ color: '#fff' }}>
@@ -104,7 +104,7 @@ export function NowPlayingSheet(): JSX.Element | null {
           </button>
           <button
             className={`icon-btn ${repeat === 'off' ? 'disabled' : ''}`}
-            style={{ color: repeat !== 'off' ? '#fa233b' : '#fff' }}
+            style={{ color: repeat !== 'off' ? 'var(--accent)' : '#fff' }}
             onClick={cycleRepeat}
           >
             {repeat === 'one' ? <RepeatOneIcon size={24} /> : <RepeatIcon size={24} />}
