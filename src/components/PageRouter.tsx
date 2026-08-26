@@ -9,7 +9,7 @@ import { Artwork } from './Artwork';
 import { EmptyLibrary, AlbumCard } from './Views';
 import { ImportBar } from './ImportBar';
 import { ChevronRightIcon, PlusCircleIcon, EllipsisIcon, ShuffleIcon, PlayIcon, SparklesIcon } from './Icons';
-import { getRecommendations, type Recommendation } from '../lib/recommender';
+import { getRecommendations, getSmartRecommendations, type Recommendation } from '../lib/recommender';
 import { getTrackProfile } from '../lib/classifier';
 
 export function PageRouter(): JSX.Element {
@@ -702,21 +702,39 @@ function ForYouPage(): JSX.Element {
 
   const [, setSeed] = useState(() => Date.now());
   const [recs, setRecs] = useState<Recommendation[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [embeddingProgress, setEmbeddingProgress] = useState<{ done: number; total: number } | null>(null);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     const newSeed = Date.now();
     setSeed(newSeed);
-    const favIds = new Set(favourites.map((t) => t.id));
-    const recentTracks = recentlyPlayed.map((e) => e.track);
-    const results = getRecommendations(tracks, playCounts, recentTracks, playlists, favIds, 10, newSeed);
-    setRecs(results);
+    setLoading(true);
+    setEmbeddingProgress(null);
+    try {
+      const favIds = new Set(favourites.map((t) => t.id));
+      const recentTracks = recentlyPlayed.map((e) => e.track);
+      const results = await getSmartRecommendations(
+        tracks, playCounts, recentTracks, playlists, favIds, 10, newSeed,
+        (done, total) => setEmbeddingProgress({ done, total }),
+      );
+      setRecs(results);
+    } catch {
+      // Fallback to sync recommendations
+      const favIds = new Set(favourites.map((t) => t.id));
+      const recentTracks = recentlyPlayed.map((e) => e.track);
+      const results = getRecommendations(tracks, playCounts, recentTracks, playlists, favIds, 10, Date.now());
+      setRecs(results);
+    } finally {
+      setLoading(false);
+      setEmbeddingProgress(null);
+    }
   }, [tracks, playCounts, recentlyPlayed, playlists, favourites]);
 
   useEffect(() => {
-    if (status === 'ready' && tracks.length > 0) {
+    if (status === 'ready' && tracks.length > 0 && recs.length === 0) {
       refresh();
     }
-  }, [status, tracks.length, refresh]);
+  }, [status, tracks.length]);
 
   if (status === 'loading') {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--label-secondary)' }}>Loading…</div>;
@@ -738,17 +756,37 @@ function ForYouPage(): JSX.Element {
         <button
           className="pill-btn"
           onClick={refresh}
-          style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}
+          disabled={loading}
+          style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 5, opacity: loading ? 0.5 : 1 }}
         >
-          <SparklesIcon size={14} /> Refresh
+          <SparklesIcon size={14} /> {loading ? 'Loading…' : 'Refresh'}
         </button>
       </div>
 
       <p style={{ padding: '4px 16px 14px', fontSize: 13, color: 'var(--label-secondary)' }}>
-        Picked from your library based on what you listen to most
+        {loading && embeddingProgress
+          ? `Embedding library… ${embeddingProgress.done}/${embeddingProgress.total}`
+          : 'Picked from your library based on what you listen to most'}
       </p>
 
-      {recs.length === 0 ? (
+      {loading && recs.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <div style={{ fontSize: 14, color: 'var(--label-secondary)', marginBottom: 8 }}>
+            Analysing your music taste…
+          </div>
+          {embeddingProgress && (
+            <div style={{ width: 120, height: 3, background: 'var(--fill-secondary)', borderRadius: 2, margin: '0 auto' }}>
+              <div style={{
+                width: `${(embeddingProgress.done / embeddingProgress.total) * 100}%`,
+                height: '100%',
+                background: 'var(--accent)',
+                borderRadius: 2,
+                transition: 'width 0.3s ease',
+              }} />
+            </div>
+          )}
+        </div>
+      ) : recs.length === 0 ? (
         <p style={{ textAlign: 'center', color: 'var(--label-secondary)', padding: 30 }}>
           Play some songs first — recommendations improve as you listen.
         </p>

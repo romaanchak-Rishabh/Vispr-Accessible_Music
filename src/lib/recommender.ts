@@ -1,5 +1,11 @@
 import type { Track } from '../types';
 import { getTrackProfile, type GenreTag, type EraTag } from './classifier';
+import {
+  embedTracks,
+  cosineSimilarity,
+  centroid,
+  isModelReady,
+} from './embeddings';
 
 export interface TasteProfile {
   artistScores: Map<string, number>;
@@ -26,7 +32,6 @@ export function buildTasteProfile(
   playlists: { trackIds: string[] }[],
   favourites: Set<string>
 ): TasteProfile {
-  // Artist scores: weighted by play count
   const artistScores = new Map<string, number>();
   const genreScores = new Map<GenreTag, number>();
   const eraScores = new Map<EraTag, number>();
@@ -38,29 +43,21 @@ export function buildTasteProfile(
     if (plays === 0) continue;
 
     const profile = getTrackProfile(t);
-
-    // Artist affinity
     const artistKey = t.artist.toLowerCase();
     artistScores.set(artistKey, (artistScores.get(artistKey) ?? 0) + plays);
-
-    // Genre preference
     genreScores.set(profile.genre1, (genreScores.get(profile.genre1) ?? 0) + plays);
     if (profile.genre2 !== 'unknown') {
       genreScores.set(profile.genre2, (genreScores.get(profile.genre2) ?? 0) + plays * 0.5);
     }
-
-    // Era preference
     eraScores.set(profile.era, (eraScores.get(profile.era) ?? 0) + plays);
   }
 
-  // Normalise scores to 0–1
   if (totalPlays > 0) {
     for (const [k, v] of artistScores) artistScores.set(k, v / totalPlays);
     for (const [k, v] of genreScores) genreScores.set(k, v / totalPlays);
     for (const [k, v] of eraScores) eraScores.set(k, v / totalPlays);
   }
 
-  // Boost recently-played artists (extra 30% within last 10 plays)
   const recentlyPlayedArtists = new Map<string, number>();
   recentlyPlayed.forEach((t, i) => {
     const recency = 1 - i / Math.max(recentlyPlayed.length, 1);
@@ -70,7 +67,6 @@ export function buildTasteProfile(
     artistScores.set(artist, (artistScores.get(artist) ?? 0) + boost);
   }
 
-  // Playlist co-occurrence
   const playlistCoOccurrences = new Map<string, Set<string>>();
   for (const pl of playlists) {
     for (const id of pl.trackIds) {
@@ -97,7 +93,9 @@ export function buildTasteProfile(
 function scoreTrack(
   track: Track,
   taste: TasteProfile,
-  seed: number
+  seed: number,
+  favCentroid: Float32Array | null,
+  embeddings: Map<string, Float32Array> | null,
 ): { score: number; reasons: string[] } {
   const profile = getTrackProfile(track);
   const reasons: string[] = [];
@@ -145,17 +143,28 @@ function scoreTrack(
     reasons.push('Favourited');
   }
 
-  // 6. Exploration bonus (0–8 pts) — small random noise per seed
+  // 6. Semantic similarity (0–20 pts) — cosine similarity to favourite centroid
+  if (favCentroid && embeddings) {
+    const trackEmb = embeddings.get(track.id);
+    if (trackEmb) {
+      const sim = cosineSimilarity(trackEmb, favCentroid);
+      const simPts = Math.max(0, sim) * 20;
+      score += simPts;
+      if (simPts > 8) reasons.push('Sounds like your favourites');
+      else if (simPts > 5) reasons.push('Similar vibe');
+    }
+  }
+
+  // 7. Exploration bonus (0–8 pts) — small random noise per seed
   const trackSeed = hashString(track.id + seed);
   const explorationNoise = (trackSeed % 100) / 100 * 8;
   score += explorationNoise;
 
-  // 7. Repetition penalty (−0 to −15 pts) — penalise recently played
+  // 8. Repetition penalty (−0 to −15 pts) — penalise recently played
   if (taste.recentlyPlayed.has(track.id)) {
     const penalty = 15;
     score -= penalty;
   } else {
-    // Also penalise songs played many times already (novelty factor)
     const plays = taste.playCounts[track.id] ?? 0;
     if (plays > 20) score -= 5;
     else if (plays > 10) score -= 3;
@@ -174,7 +183,7 @@ function hashString(s: string): number {
   return Math.abs(h);
 }
 
-/* ── main recommendation entry point ─────────────────────────────────── */
+/* ── main recommendation entry point (sync, no embeddings) ──────────── */
 
 export function getRecommendations(
   tracks: Track[],
@@ -189,7 +198,6 @@ export function getRecommendations(
 
   const taste = buildTasteProfile(tracks, playCounts, recentlyPlayed, playlists, favourites);
 
-  // If no play data yet, return random songs (exploration mode)
   const hasData = Object.keys(playCounts).length > 0;
   if (!hasData) {
     const shuffled = [...tracks].sort(() => Math.random() - 0.5);
@@ -200,23 +208,18 @@ export function getRecommendations(
     }));
   }
 
-  // Score every track
   const scored = tracks.map((t) => {
-    const { score, reasons } = scoreTrack(t, taste, seed);
+    const { score, reasons } = scoreTrack(t, taste, seed, null, null);
     return { track: t, score, reasons };
   });
 
-  // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
 
-  // Pick top candidates, but allow some exploration by sometimes swapping
-  // in a random mid-tier track (Spotify-like "freshness" injection)
   const result: Recommendation[] = [];
   const used = new Set<string>();
   const topPool = scored.slice(0, Math.min(count * 3, scored.length));
 
   for (let i = 0; i < count && i < topPool.length; i++) {
-    // Every 3rd slot, try to inject a random mid-tier track for variety
     let pick: (typeof topPool)[number];
     if (i > 0 && i % 3 === 0 && topPool.length > count) {
       const midStart = Math.floor(count * 1.5);
@@ -238,4 +241,94 @@ export function getRecommendations(
   }
 
   return result.slice(0, count);
+}
+
+/* ── async recommendation with embeddings ────────────────────────────── */
+
+export async function getSmartRecommendations(
+  tracks: Track[],
+  playCounts: Record<string, number>,
+  recentlyPlayed: Track[],
+  playlists: { trackIds: string[] }[],
+  favourites: Set<string>,
+  count = 10,
+  seed = Date.now(),
+  onEmbeddingProgress?: (done: number, total: number) => void,
+): Promise<Recommendation[]> {
+  if (tracks.length === 0) return [];
+
+  const hasData = Object.keys(playCounts).length > 0;
+  if (!hasData) {
+    const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, count).map((t) => ({
+      track: t,
+      score: 0,
+      reasons: ['Good starting point']
+    }));
+  }
+
+  // Compute favourite centroid for semantic similarity
+  const favIds = [...favourites];
+  let favCentroid: Float32Array | null = null;
+  let embeddings: Map<string, Float32Array> | null = null;
+
+    try {
+      // Embed all tracks (cached after first run)
+      embeddings = await embedTracks(tracks, onEmbeddingProgress);
+
+      // Build centroid from favourites
+      if (favIds.length > 0) {
+        const favVecs = favIds
+          .map((id) => embeddings!.get(id))
+          .filter((v): v is Float32Array => !!v);
+        if (favVecs.length > 0) {
+          favCentroid = centroid(favVecs);
+        }
+      }
+  } catch {
+    // Embeddings failed — fall back to heuristic-only scoring
+  }
+
+  const taste = buildTasteProfile(tracks, playCounts, recentlyPlayed, playlists, favourites);
+
+  const scored = tracks.map((t) => {
+    const { score, reasons } = scoreTrack(t, taste, seed, favCentroid, embeddings);
+    return { track: t, score, reasons };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+
+  const result: Recommendation[] = [];
+  const used = new Set<string>();
+  const topPool = scored.slice(0, Math.min(count * 3, scored.length));
+
+  for (let i = 0; i < count && i < topPool.length; i++) {
+    let pick: (typeof topPool)[number];
+    if (i > 0 && i % 3 === 0 && topPool.length > count) {
+      const midStart = Math.floor(count * 1.5);
+      const midEnd = Math.min(topPool.length, count * 3);
+      const midRange = topPool.slice(midStart, midEnd).filter((c) => !used.has(c.track.id));
+      if (midRange.length > 0) {
+        pick = midRange[Math.floor(Math.random() * midRange.length)];
+      } else {
+        pick = topPool[i];
+      }
+    } else {
+      pick = topPool[i];
+    }
+
+    if (!used.has(pick.track.id)) {
+      used.add(pick.track.id);
+      result.push(pick);
+    }
+  }
+
+  return result.slice(0, count);
+}
+
+/* ── embedding status for UI ─────────────────────────────────────────── */
+
+export function getEmbeddingStatus(): 'ready' | 'loading' | 'unavailable' {
+  if (isModelReady()) return 'ready';
+  return 'unavailable';
 }
