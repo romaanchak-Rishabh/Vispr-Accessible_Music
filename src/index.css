@@ -1008,7 +1008,7 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 .sheet-overlay {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 110; /* must sit above .nowplaying-overlay (100) so the ⋯ menu shows over the player */
   background: rgba(0, 0, 0, 0.42);
   display: flex;
   align-items: flex-end;

@@ -1,9 +1,11 @@
 import type { JSX } from 'react';
+import { useState } from 'react';
 import { useLibrary } from '../store/library';
 import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import { Artwork } from './Artwork';
 import { ImportBar } from './ImportBar';
+import { PostImportSheet } from './PostImportSheet';
 import { FolderIcon, SpinnerIcon, ChevronRightIcon } from './Icons';
 import type { Album } from '../types';
 
@@ -108,6 +110,22 @@ export function EmptyLibrary(): JSX.Element {
   const scanProgress = useLibrary((s) => s.scanProgress);
   const connectFolder = useLibrary((s) => s.connectFolder);
   const addFiles = useLibrary((s) => s.addFiles);
+  const [postImportIds, setPostImportIds] = useState<string[] | null>(null);
+
+  const pickFilesAndTag = (): void => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'audio/*,.mp3,.m4a,.flac,.wav,.ogg,.opus';
+    input.onchange = () => {
+      if (input.files) {
+        void addFiles(Array.from(input.files)).then((ids) => {
+          if (ids.length > 0) setPostImportIds(ids);
+        });
+      }
+    };
+    input.click();
+  };
 
   if (scanning) {
     return (
@@ -143,7 +161,7 @@ export function EmptyLibrary(): JSX.Element {
           <button className="cta-btn" onClick={() => void useLibrary.getState().reconnectFolder()}>
             Reconnect Folder
           </button>
-          <button className="cta-btn secondary" onClick={() => pickFiles(addFiles)}>
+          <button className="cta-btn secondary" onClick={pickFilesAndTag}>
             Choose Files Instead
           </button>
         </>
@@ -152,25 +170,17 @@ export function EmptyLibrary(): JSX.Element {
           <button className="cta-btn" onClick={() => void connectFolder()}>
             Connect Music Folder
           </button>
-          <button className="cta-btn secondary" onClick={() => pickFiles(addFiles)}>
+          <button className="cta-btn secondary" onClick={pickFilesAndTag}>
             Choose Files Instead
           </button>
         </>
       )}
       <ImportBar />
+      {postImportIds && (
+        <PostImportSheet trackIds={postImportIds} onClose={() => setPostImportIds(null)} />
+      )}
     </div>
   );
-}
-
-function pickFiles(addFiles: (files: File[]) => void): void {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.multiple = true;
-  input.accept = 'audio/*,.mp3,.m4a,.flac,.wav,.ogg,.opus';
-  input.onchange = () => {
-    if (input.files) void addFiles(Array.from(input.files));
-  };
-  input.click();
 }
 
 function RecentCard({ trackId }: { trackId: string }): JSX.Element | null {

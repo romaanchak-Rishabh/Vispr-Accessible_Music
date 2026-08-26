@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 export type Page =
   | { type: 'listen' }
+  | { type: 'forYou' }
   | { type: 'browse' }
   | { type: 'library'; section?: 'playlists' | 'artists' | 'albums' | 'songs' | 'recent' }
   | { type: 'search' }
@@ -11,7 +12,7 @@ export type Page =
   | { type: 'settings' };
 
 interface UIState {
-  tab: 'listen' | 'browse' | 'library' | 'search' | 'settings';
+  tab: 'listen' | 'forYou' | 'browse' | 'library' | 'search' | 'settings';
   pageStack: Page[];
   showNowPlaying: boolean;
   showQueue: boolean;
@@ -45,13 +46,15 @@ export const useUI = create<UIState>((set, get) => ({
       pageStack: [
         tab === 'listen'
           ? { type: 'listen' }
-          : tab === 'browse'
-            ? { type: 'browse' }
-            : tab === 'library'
-              ? { type: 'library' }
-              : tab === 'settings'
-                ? { type: 'settings' }
-                : { type: 'search' }
+          : tab === 'forYou'
+            ? { type: 'forYou' }
+            : tab === 'browse'
+              ? { type: 'browse' }
+              : tab === 'library'
+                ? { type: 'library' }
+                : tab === 'settings'
+                  ? { type: 'settings' }
+                  : { type: 'search' }
       ]
     }),
 

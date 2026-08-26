@@ -103,6 +103,7 @@ interface LibraryState {
   hasFolderSupport: boolean;
   downloadDirName: string | null;
   downloadDirNeedsAuth: boolean;
+  topExcluded: Record<string, true>;
   chooseDownloadFolder: () => Promise<boolean>;
   clearDownloadFolder: () => Promise<void>;
   init: () => Promise<void>;
@@ -114,16 +115,18 @@ interface LibraryState {
     url: string,
     onProgress?: (done: number, total: number, label: string) => void,
     overrides?: Record<string, { title?: string; artist?: string; album?: string; artwork?: string }>
-  ) => Promise<{ imported: number; skipped: number; failed: number }>;
+  ) => Promise<{ imported: number; skipped: number; failed: number; trackIds: string[] }>;
   updateTrackMeta: (
     trackId: string,
-    patch: { title?: string; artist?: string; album?: string; artwork?: string }
+    patch: { title?: string; artist?: string; album?: string; artwork?: string; genre1?: string; genre2?: string }
   ) => Promise<void>;
   addFileWithMeta: (
     file: File,
     meta: { title: string; artist: string; album?: string; artwork?: string }
   ) => Promise<Track>;
-  addFiles: (files: File[]) => Promise<void>;
+  toggleFavourite: (trackId: string) => Promise<void>;
+  removeFromMostListened: (trackId: string) => Promise<void>;
+  addFiles: (files: File[]) => Promise<string[]>;
   createPlaylist: (name: string) => string;
   deletePlaylist: (id: string) => void;
   renamePlaylist: (id: string, name: string) => void;
@@ -146,6 +149,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   hasFolderSupport: supportsDirectoryPicker(),
   downloadDirName: null,
   downloadDirNeedsAuth: false,
+  topExcluded: {},
 
   chooseDownloadFolder: async () => {
     const dir = await pickDirectory('readwrite');
@@ -166,8 +170,12 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 
   init: async () => {
     try {
-      const [tracks, playlists] = await Promise.all([db.loadTracks(), db.loadPlaylists()]);
-      set({ playlists });
+      const [tracks, playlists, topExcluded] = await Promise.all([
+        db.loadTracks(),
+        db.loadPlaylists(),
+        db.loadTopExcluded()
+      ]);
+      set({ playlists, topExcluded });
       const savedDir = await db.loadDownloadDir();
       if (savedDir) {
         downloadDirHandle = savedDir;
@@ -267,7 +275,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     const audioFiles = files.filter(
       (f) => /\.(mp3|m4a|mp4|aac|flac|wav|ogg|oga|opus|webm)$/i.test(f.name) || f.type.startsWith('audio/')
     );
-    if (audioFiles.length === 0) return;
+    if (audioFiles.length === 0) return [];
     set({ scanning: true, scanProgress: { scanned: 0, found: audioFiles.length } });
 
     const newTracks: Track[] = [];
@@ -311,6 +319,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     await Promise.all(Array.from({ length: Math.min(6, audioFiles.length) }, worker));
 
     await finalizeImport(set, get, newTracks);
+    return newTracks.map((t) => t.id);
   },
 
   addFileWithMeta: async (file, meta) => {
@@ -427,7 +436,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     }
 
     await finalizeImport(set, get, newTracks);
-    return { imported: newTracks.length, skipped, failed };
+    return { imported: newTracks.length, skipped, failed, trackIds: newTracks.map((t) => t.id) };
   },
 
   updateTrackMeta: async (trackId, patch) => {
@@ -438,7 +447,9 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             ...(patch.title?.trim() ? { title: patch.title.trim() } : {}),
             ...(patch.artist?.trim() ? { artist: patch.artist.trim() } : {}),
             ...(patch.album?.trim() ? { album: patch.album.trim() } : {}),
-            ...(patch.artwork !== undefined ? { artwork: patch.artwork || undefined } : {})
+            ...(patch.artwork !== undefined ? { artwork: patch.artwork || undefined } : {}),
+            ...(patch.genre1 !== undefined ? { genre1: patch.genre1 || undefined } : {}),
+            ...(patch.genre2 !== undefined ? { genre2: patch.genre2 || undefined } : {})
           }
         : t
     );
@@ -448,6 +459,22 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     const artists = buildArtists(tracks, albums);
     await db.saveTracks(tracks);
     set({ tracks, byId, albums, artists });
+  },
+
+  toggleFavourite: async (trackId) => {
+    const tracks = get().tracks.map((t) =>
+      t.id === trackId ? { ...t, favouritedAt: t.favouritedAt ? undefined : Date.now() } : t
+    );
+    const byId: Record<string, Track> = {};
+    for (const t of tracks) byId[t.id] = t;
+    await db.saveTracks(tracks);
+    set({ tracks, byId });
+  },
+
+  removeFromMostListened: async (trackId) => {
+    const topExcluded = { ...get().topExcluded, [trackId]: true as const };
+    await db.saveTopExcluded(topExcluded);
+    set({ topExcluded });
   },
 
   createPlaylist: (name) => {
@@ -589,4 +616,30 @@ export function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/* ---------- Smart lists ---------- */
+
+export const AUTO_FAVOURITES_ID = 'auto-favourites';
+export const AUTO_MOST_LISTENED_ID = 'auto-most-listened';
+
+export const AUTO_PLAYLISTS = [
+  { id: AUTO_FAVOURITES_ID, name: 'Favourites' },
+  { id: AUTO_MOST_LISTENED_ID, name: 'Most Listened' }
+] as const;
+
+export function isAutoPlaylist(id: string): boolean {
+  return id === AUTO_FAVOURITES_ID || id === AUTO_MOST_LISTENED_ID;
+}
+
+export function getFavourites(tracks: Track[]): Track[] {
+  return tracks
+    .filter((t) => !!t.favouritedAt)
+    .sort((a, b) => (b.favouritedAt ?? 0) - (a.favouritedAt ?? 0));
+}
+
+export function getMostListened(tracks: Track[], playCounts: Record<string, number>, topExcluded: Record<string, true>): Track[] {
+  return tracks
+    .filter((t) => !topExcluded[t.id] && (playCounts[t.id] ?? 0) > 0)
+    .sort((a, b) => (playCounts[b.id] ?? 0) - (playCounts[a.id] ?? 0));
 }

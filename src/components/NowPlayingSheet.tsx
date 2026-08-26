@@ -46,8 +46,9 @@ export function NowPlayingSheet(): JSX.Element | null {
   const closeNowPlaying = useUI((s) => s.closeNowPlaying);
   const toggleQueue = useUI((s) => s.toggleQueue);
   const setActionSheet = useUI((s) => s.setActionSheet);
+  const showNowPlaying = useUI((s) => s.showNowPlaying);
 
-  if (!track) return null;
+  if (!track || !showNowPlaying) return null;
 
   return (
     <div className="nowplaying-overlay">

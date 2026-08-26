@@ -1,7 +1,8 @@
 import type { JSX } from 'react';
 import { useUI, type Page } from '../store/ui';
 import { useLibrary } from '../store/library';
-import { ListenIcon, BrowseIcon, LibraryIcon, SearchIcon, MusicNoteIcon, PlusCircleIcon, SettingsIcon } from './Icons';
+import { AUTO_PLAYLISTS } from '../store/library';
+import { ListenIcon, SparklesIcon, BrowseIcon, LibraryIcon, SearchIcon, MusicNoteIcon, PlusCircleIcon, SettingsIcon } from './Icons';
 
 export function Sidebar(): JSX.Element {
   const tab = useUI((s) => s.tab);
@@ -23,6 +24,9 @@ export function Sidebar(): JSX.Element {
 
       <button className={`sidebar-item ${tab === 'listen' ? 'active' : ''}`} onClick={() => setTab('listen')}>
         <ListenIcon size={20} /> Listen Now
+      </button>
+      <button className={`sidebar-item ${tab === 'forYou' ? 'active' : ''}`} onClick={() => setTab('forYou')}>
+        <SparklesIcon size={20} /> For You
       </button>
       <button className={`sidebar-item ${tab === 'browse' ? 'active' : ''}`} onClick={() => setTab('browse')}>
         <BrowseIcon size={20} /> Browse
@@ -67,6 +71,15 @@ export function Sidebar(): JSX.Element {
       </button>
 
       <div className="sidebar-section-label">Playlists</div>
+      {AUTO_PLAYLISTS.map((pl) => (
+        <button
+          key={pl.id}
+          className={`sidebar-item ${isPage({ type: 'playlist', id: pl.id }) ? 'active' : ''}`}
+          onClick={() => navigate({ type: 'playlist', id: pl.id })}
+        >
+          <MusicNoteIcon size={16} /> {pl.name}
+        </button>
+      ))}
       {playlists.map((p) => (
         <button
           key={p.id}

@@ -6,6 +6,17 @@ import { useUI, type Page } from '../store/ui';
 import { Artwork } from './Artwork';
 import { blobToDataUrl } from '../lib/metadata';
 
+const GENRE_OPTIONS = [
+  'bollywood', 'hindi', 'punjabi', 'tamil', 'telugu', 'malayalam', 'kannada', 'marathi', 'bengali',
+  'rock', 'pop', 'english', 'japanese', 'korean', 'spanish',
+  'classical', 'devotional', 'ghazal', 'folk', 'sufi',
+  'rap', 'hip-hop', 'r&b', 'soul',
+  'electronic', 'edm', 'lo-fi', 'ambient',
+  'jazz', 'blues', 'country',
+  'indie', 'alternative', 'metal', 'punk',
+  'reggaeton', 'latin', 'acoustic', 'foreign'
+] as const;
+
 export function ActionSheet(): JSX.Element | null {
   const trackId = useUI((s) => s.actionSheetTrackId);
   const setActionSheet = useUI((s) => s.setActionSheet);
@@ -17,6 +28,8 @@ export function ActionSheet(): JSX.Element | null {
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [album, setAlbum] = useState('');
+  const [genre1, setGenre1] = useState('');
+  const [genre2, setGenre2] = useState('');
   const [artwork, setArtwork] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,6 +45,8 @@ export function ActionSheet(): JSX.Element | null {
     setTitle(track.title);
     setArtist(track.artist);
     setAlbum(track.album);
+    setGenre1(track.genre1 ?? '');
+    setGenre2(track.genre2 ?? '');
     setArtwork(track.artwork);
     setSubmenu('edit');
   };
@@ -42,7 +57,7 @@ export function ActionSheet(): JSX.Element | null {
   };
 
   const saveEdit = async (): Promise<void> => {
-    await useLibrary.getState().updateTrackMeta(track.id, { title, artist, album, artwork });
+    await useLibrary.getState().updateTrackMeta(track.id, { title, artist, album, artwork, genre1, genre2 });
     close();
   };
 
@@ -86,6 +101,13 @@ export function ActionSheet(): JSX.Element | null {
               label: 'Go to Artist',
               sub: track.artist,
               fn: () => goToPage({ type: 'artist', name: track.artist })
+            },
+            {
+              label: track.favouritedAt ? '♥ Favourited — tap to remove' : '♡ Add to Favourites',
+              fn: () => {
+                void lib.toggleFavourite(track.id);
+                close();
+              }
             },
             {
               label: 'Play Next',
@@ -170,6 +192,30 @@ export function ActionSheet(): JSX.Element | null {
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Artist" value={artist} onChange={(e) => setArtist(e.target.value)} />
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Album" value={album} onChange={(e) => setAlbum(e.target.value)} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select
+                  className="search-input"
+                  style={{ flex: 1, paddingLeft: 10, fontSize: 13 }}
+                  value={genre1}
+                  onChange={(e) => setGenre1(e.target.value)}
+                >
+                  <option value="">Category 1</option>
+                  {GENRE_OPTIONS.map((g) => (
+                    <option key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</option>
+                  ))}
+                </select>
+                <select
+                  className="search-input"
+                  style={{ flex: 1, paddingLeft: 10, fontSize: 13 }}
+                  value={genre2}
+                  onChange={(e) => setGenre2(e.target.value)}
+                >
+                  <option value="">Category 2</option>
+                  {GENRE_OPTIONS.map((g) => (
+                    <option key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</option>
+                  ))}
+                </select>
+              </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   className="pill-btn primary"

@@ -25,6 +25,8 @@ function pageTitle(): string {
   switch (page.type) {
     case 'listen':
       return 'Listen Now';
+    case 'forYou':
+      return 'For You';
     case 'browse':
       return 'Browse';
     case 'library':

@@ -8,6 +8,7 @@ import { FolderIcon, SpinnerIcon, ChevronRightIcon, MusicNoteIcon } from './Icon
 import { ImportConfirmSheet } from './ImportConfirmSheet';
 import type { ImportOverrides } from './ImportConfirmSheet';
 import { ManualImportSheet } from './ManualImportSheet';
+import { PostImportSheet } from './PostImportSheet';
 
 export function ImportBar(): JSX.Element {
   const [url, setUrl] = useState('');
@@ -17,6 +18,7 @@ export function ImportBar(): JSX.Element {
   const [mode, setMode] = useState<'auto' | 'manual'>('auto');
   const [pendingItems, setPendingItems] = useState<YtItem[] | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
+  const [postImportIds, setPostImportIds] = useState<string[] | null>(null);
 
   const importFromUrl = useLibrary((s) => s.importFromUrl);
   const importYouTube = useLibrary((s) => s.importYouTube);
@@ -42,13 +44,14 @@ export function ImportBar(): JSX.Element {
     trimmed: string,
     overrides?: Record<string, ImportOverrides>,
     onProgress?: (done: number, total: number, label: string) => void
-  ): Promise<void> => {
+  ): Promise<string[]> => {
     const res = await importYouTube(trimmed, onProgress, overrides);
     const parts = [`Imported ${res.imported}`];
     if (res.skipped > 0) parts.push(`${res.skipped} already in library`);
     if (res.failed > 0) parts.push(`${res.failed} failed`);
     setStatusText(parts.join(' · ') + (res.imported > 0 ? ' — check Recently Added' : ''));
     setUrl('');
+    return res.trackIds;
   };
 
   const handleImport = async (): Promise<void> => {
@@ -60,9 +63,17 @@ export function ImportBar(): JSX.Element {
     try {
       if (!isYt) {
         setStatusText('Fetching…');
+        const beforeIds = new Set(useLibrary.getState().tracks.map((t) => t.id));
         await importFromUrl(trimmed);
+        const afterIds = useLibrary.getState().tracks.map((t) => t.id);
+        const newIds = afterIds.filter((id) => !beforeIds.has(id));
         setStatusText('Imported — check Recently Added');
         setUrl('');
+        if (newIds.length > 0) {
+          setBusy(false);
+          setPostImportIds(newIds);
+          return;
+        }
         return;
       }
       if (mode === 'manual') {
@@ -80,9 +91,14 @@ export function ImportBar(): JSX.Element {
         return;
       }
       setStatusText('Downloading…');
-      await runAutoImport(trimmed, undefined, (done, total, label) =>
+      const trackIds = await runAutoImport(trimmed, undefined, (done, total, label) =>
         setStatusText(total > 0 && done < total ? `Downloading ${done + 1}/${total} — ${label}` : label)
       );
+      if (trackIds.length > 0) {
+        setBusy(false);
+        setPostImportIds(trackIds);
+        return;
+      }
     } catch (e) {
       setStatusText(null);
       setError(e instanceof Error ? e.message : 'Import failed');
@@ -100,9 +116,14 @@ export function ImportBar(): JSX.Element {
     setStatusText('Downloading…');
     try {
       if (dontAskAgain) setConfirmImport(false);
-      await runAutoImport(trimmed, overrides, (done, total, label) =>
+      const trackIds = await runAutoImport(trimmed, overrides, (done, total, label) =>
         setStatusText(total > 0 && done < total ? `Downloading ${done + 1}/${total} — ${label}` : label)
       );
+      if (trackIds.length > 0) {
+        setBusy(false);
+        setPostImportIds(trackIds);
+        return;
+      }
     } catch (e) {
       setStatusText(null);
       setError(e instanceof Error ? e.message : 'Import failed');
@@ -250,6 +271,10 @@ export function ImportBar(): JSX.Element {
       )}
 
       {manualOpen && <ManualImportSheet url={url.trim()} onClose={() => setManualOpen(false)} />}
+
+      {postImportIds && (
+        <PostImportSheet trackIds={postImportIds} onClose={() => setPostImportIds(null)} />
+      )}
     </div>
   );
 }

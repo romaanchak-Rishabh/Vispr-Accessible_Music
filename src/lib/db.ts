@@ -62,6 +62,7 @@ export async function savePlaylists(playlists: Playlist[]): Promise<void> {
 }
 
 const DLDIR_KEY = 'settings:download-dir';
+const TOP_EXCLUDED_KEY = 'library:top-excluded';
 
 export async function saveDownloadDir(handle: FileSystemDirectoryHandle): Promise<void> {
   await set(DLDIR_KEY, handle);
@@ -73,4 +74,12 @@ export async function loadDownloadDir(): Promise<FileSystemDirectoryHandle | und
 
 export async function clearDownloadDir(): Promise<void> {
   await del(DLDIR_KEY);
+}
+
+export async function loadTopExcluded(): Promise<Record<string, true>> {
+  return (await get<Record<string, true>>(TOP_EXCLUDED_KEY)) ?? {};
+}
+
+export async function saveTopExcluded(map: Record<string, true>): Promise<void> {
+  await set(TOP_EXCLUDED_KEY, map);
 }

@@ -5,6 +5,8 @@ export interface Track {
   album: string;
   albumArtist?: string;
   genre?: string;
+  genre1?: string;
+  genre2?: string;
   year?: number;
   trackNo?: number;
   fileName: string;
@@ -12,6 +14,7 @@ export interface Track {
   source: 'dir' | 'file';
   size: number;
   addedAt: number;
+  favouritedAt?: number;
   duration?: number;
   artwork?: string;
 }

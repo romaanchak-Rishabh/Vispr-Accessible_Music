@@ -185,7 +185,27 @@ export function useAudioEngine(): void {
       void startFade(nextTrack);
     };
 
+    const checking = { busy: false, rerun: false };
     const check = async (): Promise<void> => {
+      // guard against overlapping runs: timeupdate ticks fire this constantly,
+      // and concurrent runs race the file-load for a newly selected track
+      if (checking.busy) {
+        checking.rerun = true;
+        return;
+      }
+      checking.busy = true;
+      try {
+        await runCheck();
+      } finally {
+        checking.busy = false;
+        if (checking.rerun) {
+          checking.rerun = false;
+          void check();
+        }
+      }
+    };
+
+    const runCheck = async (): Promise<void> => {
       const st = usePlayer.getState();
 
       // any manual intervention during a fade hard-cuts to the new intent
@@ -243,7 +263,14 @@ export function useAudioEngine(): void {
 
     const unsub = usePlayer.subscribe((state, prev) => {
       if (state.volume !== prev.volume && !fading) applyVol(state.volume);
-      void check();
+      // currentTime updates fire many times per second; only re-run the full
+      // engine check when something that can change playback actually changed
+      const significant =
+        state.queue !== prev.queue ||
+        state.index !== prev.index ||
+        state.isPlaying !== prev.isPlaying ||
+        state.seekTo?.nonce !== prev.seekTo?.nonce;
+      if (significant) void check();
     });
 
     // Media session action handlers (lock screen / notification controls)

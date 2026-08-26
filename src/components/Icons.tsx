@@ -219,3 +219,11 @@ export const SettingsIcon = ({ size }: IconProps) => (
     />
   </S>
 );
+
+export const SparklesIcon = ({ size }: IconProps) => (
+  <S size={size}>
+    <path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z" fill="currentColor" stroke="none" />
+    <path d="M18 14l.9 2.6L21.5 17.5l-2.6.9L18 21l-.9-2.6L14.5 17.5l2.6-.9z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none" />
+    <path d="M5 16l.6 1.8L7.4 18.4l-1.8.6L5 20.8l-.6-1.8-1.8-.6 1.8-.6z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none" />
+  </S>
+);

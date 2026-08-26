@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import type { JSX } from 'react';
-import { useLibrary } from '../store/library';
+import { useLibrary, getFavourites, getMostListened, isAutoPlaylist, AUTO_FAVOURITES_ID, AUTO_MOST_LISTENED_ID } from '../store/library';
 import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import type { Album, Artist } from '../types';
@@ -8,7 +8,9 @@ import { TrackRow } from './TrackRow';
 import { Artwork } from './Artwork';
 import { EmptyLibrary, AlbumCard } from './Views';
 import { ImportBar } from './ImportBar';
-import { ChevronRightIcon, PlusCircleIcon, EllipsisIcon, ShuffleIcon, PlayIcon } from './Icons';
+import { ChevronRightIcon, PlusCircleIcon, EllipsisIcon, ShuffleIcon, PlayIcon, SparklesIcon } from './Icons';
+import { getRecommendations, type Recommendation } from '../lib/recommender';
+import { getTrackProfile } from '../lib/classifier';
 
 export function PageRouter(): JSX.Element {
   const pageStack = useUI((s) => s.pageStack);
@@ -17,6 +19,8 @@ export function PageRouter(): JSX.Element {
   switch (page.type) {
     case 'listen':
       return <ListenNowLazy />;
+    case 'forYou':
+      return <ForYouPage />;
     case 'browse':
       return <BrowseView />;
     case 'library':
@@ -222,9 +226,17 @@ function LibraryStats(): JSX.Element {
 
 function PlaylistsManager(): JSX.Element {
   const playlists = useLibrary((s) => s.playlists);
+  const tracks = useLibrary((s) => s.tracks);
+  const playCounts = usePlayer((s) => s.playCounts);
+  const topExcluded = useLibrary((s) => s.topExcluded);
   const createPlaylist = useLibrary((s) => s.createPlaylist);
   const navigate = useUI((s) => s.navigate);
   const [name, setName] = useState('');
+
+  const autoCounts: [string, string, number][] = [
+    [AUTO_FAVOURITES_ID, 'Favourites', getFavourites(tracks).length],
+    [AUTO_MOST_LISTENED_ID, 'Most Listened', getMostListened(tracks, playCounts, topExcluded).length]
+  ];
 
   return (
     <div>
@@ -254,6 +266,20 @@ function PlaylistsManager(): JSX.Element {
         </p>
       ) : (
         <div className="group">
+          {autoCounts.map(([id, label, count]) => (
+            <button key={id} className="row" onClick={() => navigate({ type: 'playlist', id })}>
+              <Artwork className="row-artwork" placeholderSize={20} />
+              <span className="row-texts">
+                <span className="row-title" style={{ display: 'block' }}>
+                  {label}
+                </span>
+                <span className="row-subtitle" style={{ display: 'block' }}>
+                  {count} {count === 1 ? 'song' : 'songs'} · auto
+                </span>
+              </span>
+              <ChevronRightIcon size={16} />
+            </button>
+          ))}
           {playlists.map((p) => (
             <button key={p.id} className="row" onClick={() => navigate({ type: 'playlist', id: p.id })}>
               <Artwork className="row-artwork" placeholderSize={20} />
@@ -557,20 +583,74 @@ function ArtistSongRow({ trackId }: { trackId: string }): JSX.Element | null {
 }
 
 function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element | null {
-  const playlist = useLibrary((s) => s.playlists.find((p) => p.id === playlistId));
+  const realPlaylist = useLibrary((s) => s.playlists.find((p) => p.id === playlistId));
+  const tracks = useLibrary((s) => s.tracks);
   const byId = useLibrary((s) => s.byId);
+  const topExcluded = useLibrary((s) => s.topExcluded);
+  const playCounts = usePlayer((s) => s.playCounts);
   const deletePlaylist = useLibrary((s) => s.deletePlaylist);
   const removeFromPlaylist = useLibrary((s) => s.removeFromPlaylist);
+  const toggleFavourite = useLibrary((s) => s.toggleFavourite);
+  const removeFromMostListened = useLibrary((s) => s.removeFromMostListened);
   const goBack = useUI((s) => s.goBack);
   const playTracks = usePlayer((s) => s.playTracks);
 
-  if (!playlist) return null;
-  const tracks = playlist.trackIds.map((id) => byId[id]).filter(Boolean);
+  if (isAutoPlaylist(playlistId)) {
+    const isFav = playlistId === AUTO_FAVOURITES_ID;
+    const list = isFav ? getFavourites(tracks) : getMostListened(tracks, playCounts, topExcluded);
+    return (
+      <div className="fade-page">
+        <DetailHeader
+          kicker="Playlist"
+          title={isFav ? 'Favourites' : 'Most Listened'}
+          subtitle={`${list.length} songs · auto`}
+          artwork={list[0]?.artwork}
+        >
+          <button
+            className="pill-btn primary"
+            disabled={list.length === 0}
+            style={list.length === 0 ? { opacity: 0.5 } : undefined}
+            onClick={() => playTracks(list, 0, isFav ? 'Favourites' : 'Most Listened')}
+          >
+            <PlayIcon size={15} /> Play
+          </button>
+        </DetailHeader>
+
+        {list.length === 0 ? (
+          <p style={{ textAlign: 'center', color: 'var(--label-secondary)', padding: 30 }}>
+            {isFav
+              ? 'Nothing here yet. Use the ⋯ menu on any song and choose “Add to Favourites”.'
+              : 'Play some songs first — this list fills itself with your most-played tracks.'}
+          </p>
+        ) : (
+          <div className="group">
+            {list.map((t) => (
+              <div key={t.id} className="rowwrap">
+                <TrackRow track={t} />
+                <button
+                  className="icon-btn"
+                  style={{ paddingRight: 14, color: 'var(--label-secondary)' }}
+                  onClick={() => (isFav ? void toggleFavourite(t.id) : void removeFromMostListened(t.id))}
+                  aria-label="Remove from list"
+                >
+                  A-
+                </button>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+  }
+
+  if (!realPlaylist) return null;
+  const playlist = realPlaylist;
+  const plTracks = playlist.trackIds.map((id) => byId[id]).filter(Boolean);
 
   return (
     <div className="fade-page">
-      <DetailHeader kicker="Playlist" title={playlist.name} subtitle={`${tracks.length} songs`} artwork={tracks[0]?.artwork}>
-        <button className="pill-btn primary" disabled={tracks.length === 0} style={tracks.length === 0 ? { opacity: 0.5 } : undefined} onClick={() => playTracks(tracks, 0, playlist.name)}>
+      <DetailHeader kicker="Playlist" title={playlist.name} subtitle={`${plTracks.length} songs`} artwork={plTracks[0]?.artwork}>
+        <button className="pill-btn primary" disabled={plTracks.length === 0} style={plTracks.length === 0 ? { opacity: 0.5 } : undefined} onClick={() => playTracks(plTracks, 0, playlist.name)}>
           <PlayIcon size={15} /> Play
         </button>
         <button
@@ -584,13 +664,13 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
         </button>
       </DetailHeader>
 
-      {tracks.length === 0 ? (
+      {plTracks.length === 0 ? (
         <p style={{ textAlign: 'center', color: 'var(--label-secondary)', padding: 30 }}>
           Empty playlist. Add songs using the ⋯ button on any track.
         </p>
       ) : (
         <div className="group">
-          {tracks.map((t) => (
+          {plTracks.map((t) => (
             <div key={t.id} className="rowwrap">
               <TrackRow track={t} />
               <button
@@ -599,12 +679,168 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
                 onClick={() => removeFromPlaylist(playlist.id, t.id)}
                 aria-label="Remove from playlist"
               >
-                ×
+                A-
               </button>
             </div>
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+/* ── For You — NLP recommendations ──────────────────────────────────── */
+
+function ForYouPage(): JSX.Element {
+  const status = useLibrary((s) => s.status);
+  const tracks = useLibrary((s) => s.tracks);
+  const playCounts = usePlayer((s) => s.playCounts);
+  const recentlyPlayed = usePlayer((s) => s.recentlyPlayed);
+  const playlists = useLibrary((s) => s.playlists);
+  const favourites = useLibrary((s) => s.tracks.filter((t) => !!t.favouritedAt));
+  const playTracks = usePlayer((s) => s.playTracks);
+
+  const [, setSeed] = useState(() => Date.now());
+  const [recs, setRecs] = useState<Recommendation[]>([]);
+
+  const refresh = useCallback(() => {
+    const newSeed = Date.now();
+    setSeed(newSeed);
+    const favIds = new Set(favourites.map((t) => t.id));
+    const recentTracks = recentlyPlayed.map((e) => e.track);
+    const results = getRecommendations(tracks, playCounts, recentTracks, playlists, favIds, 10, newSeed);
+    setRecs(results);
+  }, [tracks, playCounts, recentlyPlayed, playlists, favourites]);
+
+  useEffect(() => {
+    if (status === 'ready' && tracks.length > 0) {
+      refresh();
+    }
+  }, [status, tracks.length, refresh]);
+
+  if (status === 'loading') {
+    return <div style={{ padding: 40, textAlign: 'center', color: 'var(--label-secondary)' }}>Loading…</div>;
+  }
+
+  if (status !== 'ready' || tracks.length === 0) {
+    return (
+      <div>
+        <h1 className="large-title">For You</h1>
+        <EmptyLibrary />
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-page">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px' }}>
+        <h1 className="large-title" style={{ margin: 0 }}>For You</h1>
+        <button
+          className="pill-btn"
+          onClick={refresh}
+          style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}
+        >
+          <SparklesIcon size={14} /> Refresh
+        </button>
+      </div>
+
+      <p style={{ padding: '4px 16px 14px', fontSize: 13, color: 'var(--label-secondary)' }}>
+        Picked from your library based on what you listen to most
+      </p>
+
+      {recs.length === 0 ? (
+        <p style={{ textAlign: 'center', color: 'var(--label-secondary)', padding: 30 }}>
+          Play some songs first — recommendations improve as you listen.
+        </p>
+      ) : (
+        <>
+          <div className="detail-actions">
+            <button
+              className="pill-btn primary"
+              onClick={() => playTracks(recs.map((r) => r.track), 0, 'For You')}
+            >
+              <PlayIcon size={15} /> Play All
+            </button>
+            <button
+              className="pill-btn"
+              onClick={() => {
+                const shuffled = [...recs].sort(() => Math.random() - 0.5);
+                playTracks(shuffled.map((r) => r.track), 0, 'For You — Shuffle');
+              }}
+            >
+              <ShuffleIcon size={15} /> Shuffle
+            </button>
+          </div>
+
+          <div className="group">
+            {recs.map((rec, i) => (
+              <ForYouCard key={rec.track.id} rec={rec} index={i + 1} onPlay={() => playTracks(recs.map((r) => r.track), i, 'For You')} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ForYouCard({ rec, index, onPlay }: { rec: Recommendation; index: number; onPlay: () => void }): JSX.Element {
+  const profile = getTrackProfile(rec.track);
+  const setActionSheet = useUI((s) => s.setActionSheet);
+  const currentId = usePlayer((s) => s.queue[s.index]?.id);
+  const isPlaying = usePlayer((s) => s.isPlaying);
+  const current = currentId === rec.track.id;
+
+  const genreLabel = (g: string): string => {
+    if (!g || g === 'unknown') return '';
+    return g.charAt(0).toUpperCase() + g.slice(1);
+  };
+
+  return (
+    <button
+      className="row"
+      style={{ margin: '0 16px', width: 'auto', background: current ? 'var(--accent-bg)' : 'var(--bg-primary)', borderRadius: 10, marginBottom: 2 }}
+      onClick={onPlay}
+    >
+      <div style={{ position: 'relative', width: 48, height: 48, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: 'var(--fill-secondary)' }}>
+        <Artwork src={rec.track.artwork} className="row-artwork" style={{ width: 48, height: 48, borderRadius: 8, position: 'absolute', top: 0, left: 0 } as React.CSSProperties} placeholderSize={18} alt="" />
+        <div style={{ position: 'absolute', top: 3, left: 3, background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4 }}>
+          {index}
+        </div>
+      </div>
+      <span className="row-texts" style={{ minWidth: 0 }}>
+        <span className="row-title" style={{ display: 'block', color: current ? 'var(--accent)' : undefined }}>
+          {isPlaying && current ? '▶ ' : ''}{rec.track.title}
+        </span>
+        <span className="row-subtitle" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {rec.track.artist}
+        </span>
+        {rec.reasons.length > 0 && (
+          <span style={{ display: 'block', fontSize: 11, color: 'var(--accent)', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+            {rec.reasons[0]}
+          </span>
+        )}
+      </span>
+      <span style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+        {profile.genre1 !== 'unknown' && (
+          <span style={{ fontSize: 10, background: 'var(--accent-bg)', color: 'var(--accent)', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>
+            {genreLabel(profile.genre1)}
+          </span>
+        )}
+        {profile.era !== 'unknown' && (
+          <span style={{ fontSize: 10, background: 'var(--fill-secondary)', color: 'var(--label-secondary)', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>
+            {profile.era}
+          </span>
+        )}
+      </span>
+      <span
+        className="icon-btn row-btn-dots"
+        onClick={(e) => {
+          e.stopPropagation();
+          setActionSheet(rec.track.id);
+        }}
+      >
+        <EllipsisIcon size={18} />
+      </span>
+    </button>
   );
 }
