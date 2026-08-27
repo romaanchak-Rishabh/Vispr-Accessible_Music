@@ -159,6 +159,13 @@ export function SettingsPage(): JSX.Element {
           <span style={{ fontSize: 12, color: 'var(--label-secondary)' }}>
             Empty server uses this deployment's built-in yt-dlp API. Manual Song mode needs none of these.
           </span>
+          <div style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-bg)', padding: '8px 10px', borderRadius: 8, lineHeight: 1.5 }}>
+            <strong>Run your own server?</strong> Start the Python backend on a laptop with internet, then expose it with Cloudflare Tunnel:
+            <code style={{ display: 'block', marginTop: 4, fontSize: 11, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+              cloudflared tunnel --url http://localhost:8080
+            </code>
+            Paste the <code>https://…trycloudflare.com</code> URL above. Works from anywhere.
+          </div>
         </div>
       </div>
 
