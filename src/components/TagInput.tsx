@@ -15,6 +15,7 @@ export function TagInput({ value, onChange, options, placeholder, label }: TagIn
   const [activeIdx, setActiveIdx] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<{ x: number; y: number; moved: boolean }>({ x: 0, y: 0, moved: false });
   const uid = useId();
 
   // Sync external value changes
@@ -146,16 +147,28 @@ export function TagInput({ value, onChange, options, placeholder, label }: TagIn
                 role="option"
                 aria-selected={isActive}
                 onPointerDown={(e) => {
+                  dragState.current = { x: e.clientX, y: e.clientY, moved: false };
                   e.preventDefault();
-                  select(isCustom ? query.trim() : opt);
                 }}
-                onClick={() => select(isCustom ? query.trim() : opt)}
+                onPointerMove={(e) => {
+                  const s = dragState.current;
+                  if (!s.moved && Math.hypot(e.clientX - s.x, e.clientY - s.y) > 8) s.moved = true;
+                }}
+                onPointerUp={() => {
+                  const s = dragState.current;
+                  if (!s.moved) select(isCustom ? query.trim() : opt);
+                  s.moved = true;
+                }}
+                onPointerCancel={() => {
+                  dragState.current.moved = true;
+                }}
                 onMouseEnter={() => setActiveIdx(i)}
                 style={{
                   padding: '6px 10px',
                   borderRadius: 6,
                   fontSize: 13,
                   cursor: 'pointer',
+                  touchAction: 'pan-y',
                   background: isActive ? 'var(--accent)' : 'transparent',
                   color: isActive ? '#fff' : 'var(--label)',
                   whiteSpace: 'nowrap',
