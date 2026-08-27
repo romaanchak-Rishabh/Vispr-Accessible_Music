@@ -16,6 +16,16 @@ function authHeaders(token: string): HeadersInit {
   return token ? { 'X-Auth-Token': token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
 }
 
+async function fetchWithTimeout(input: RequestInfo, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 export function effectiveServerBase(server: string): string {
   let s = server.trim().replace(/\/+$/, '');
   // Ensure https:// for Cloudflare tunnels and similar
@@ -27,11 +37,11 @@ export function effectiveServerBase(server: string): string {
 
 export async function resolveViaYtDlp(server: string, token: string, url: string): Promise<YtItem[]> {
   const base = effectiveServerBase(server);
-  const resp = await fetch(`${base}/api/resolve`, {
+  const resp = await fetchWithTimeout(`${base}/api/resolve`, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({ url })
-  });
+  }, 30_000);
   if (!resp.ok) {
     let msg = `HTTP ${resp.status}`;
     try {
@@ -51,11 +61,11 @@ export async function downloadAudioViaYtDlp(
   videoUrl: string
 ): Promise<{ blob: Blob; ext: string; filename: string }> {
   const base = effectiveServerBase(server);
-  const resp = await fetch(`${base}/api/download`, {
+  const resp = await fetchWithTimeout(`${base}/api/download`, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({ url: videoUrl })
-  });
+  }, 180_000);
   if (!resp.ok) {
     let msg = `HTTP ${resp.status}`;
     try {

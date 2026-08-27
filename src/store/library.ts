@@ -366,68 +366,80 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     let done = 0;
     let skipped = 0;
     let failed = 0;
-    for (const item of items) {
-      // Dedup: if this exact video is already in the library, don't download again
-      if (get().byId[`y-${item.id}`]) {
-        done++;
-        skipped++;
-        const label = `${item.title ?? item.id} — already in library`;
-        set({ scanProgress: { scanned: done, found: items.length, label } });
-        onProgress?.(done, items.length, label);
-        continue;
-      }
-      onProgress?.(done, items.length, item.title ?? item.id);
-      const videoUrl = item.webpage_url ?? `https://www.youtube.com/watch?v=${item.id}`;
-      let blob: Blob;
-      let filename: string;
-      try {
-        const dl = await downloadAudioViaYtDlp(ytdlpServer, ytdlpToken, videoUrl);
-        blob = dl.blob;
-        filename = dl.filename;
-      } catch (err) {
-        done++;
-        failed++;
-        set({ scanProgress: { scanned: done, found: items.length, label: `failed: ${item.title ?? item.id}` } });
-        onProgress?.(done, items.length, `failed: ${item.title ?? item.id}`);
-        continue;
-      }
-      let artwork: string | undefined;
-      if (item.thumbnail) {
-        try {
-          const thumbResp = await fetch(item.thumbnail, { mode: 'cors' });
-          if (thumbResp.ok) artwork = (await blobToDataUrl(await thumbResp.blob())) ?? undefined;
-        } catch {
-          /* thumbnail optional */
+    try {
+      for (const item of items) {
+        // Dedup: if this exact video is already in the library, don't download again
+        if (get().byId[`y-${item.id}`]) {
+          done++;
+          skipped++;
+          const label = `${item.title ?? item.id} — already in library`;
+          set({ scanProgress: { scanned: done, found: items.length, label } });
+          onProgress?.(done, items.length, label);
+          continue;
         }
-        // direct <img> loading doesn't need CORS; use the remote URL as fallback
-        artwork = artwork ?? item.thumbnail;
+        onProgress?.(done, items.length, item.title ?? item.id);
+        const videoUrl = item.webpage_url ?? `https://www.youtube.com/watch?v=${item.id}`;
+        try {
+          const dl = await downloadAudioViaYtDlp(ytdlpServer, ytdlpToken, videoUrl);
+          let artwork: string | undefined;
+          if (item.thumbnail) {
+            try {
+              const ctrl = new AbortController();
+              const t = setTimeout(() => ctrl.abort(), 8000);
+              const thumbResp = await fetch(item.thumbnail, { mode: 'cors', signal: ctrl.signal });
+              clearTimeout(t);
+              if (thumbResp.ok) artwork = (await blobToDataUrl(await thumbResp.blob())) ?? undefined;
+            } catch {
+              /* thumbnail optional */
+            }
+            // direct <img> loading doesn't need CORS; use the remote URL as fallback
+            artwork = artwork ?? item.thumbnail;
+          }
+          const existing = get().byId[`y-${item.id}`];
+          const ov = overrides?.[item.id];
+          const track: Track = {
+            id: `y-${item.id}`,
+            title: ov?.title?.trim() || item.title || dl.filename,
+            artist: ov?.artist?.trim() || item.uploader || 'Unknown Artist',
+            album: ov?.album?.trim() || item.playlist_title || 'YouTube',
+            fileName: dl.filename,
+            path: dl.filename,
+            source: 'file',
+            size: dl.blob.size,
+            addedAt: Date.now(),
+            duration: item.duration,
+            artwork: ov?.artwork ?? artwork ?? (existing && !artwork ? existing.artwork : undefined)
+          };
+          fileCache.set(track.id, new File([dl.blob], dl.filename, { type: dl.blob.type || 'audio/mp4' }));
+          try {
+            await db.saveFileBlob(track.id, fileCache.get(track.id)!);
+          } catch {
+            // IndexedDB may reject large blobs on mobile — still keep the track in the library.
+            console.warn('[library] blob save skipped for', track.id);
+          }
+          try {
+            await saveCopyToDownloadFolder(dl.filename, dl.blob);
+          } catch {
+            /* download-folder copy optional */
+          }
+          newTracks.push(track);
+          done++;
+          set({ scanProgress: { scanned: done, found: items.length, label: item.title ?? item.id } });
+          onProgress?.(done, items.length, item.title ?? item.id);
+        } catch (err) {
+          done++;
+          failed++;
+          set({ scanProgress: { scanned: done, found: items.length, label: `failed: ${item.title ?? item.id}` } });
+          onProgress?.(done, items.length, `failed: ${item.title ?? item.id}`);
+        }
       }
-      const existing = get().byId[`y-${item.id}`];
-      const ov = overrides?.[item.id];
-      const track: Track = {
-        id: `y-${item.id}`,
-        title: ov?.title?.trim() || item.title || filename,
-        artist: ov?.artist?.trim() || item.uploader || 'Unknown Artist',
-        album: ov?.album?.trim() || item.playlist_title || 'YouTube',
-        fileName: filename,
-        path: filename,
-        source: 'file',
-        size: blob.size,
-        addedAt: Date.now(),
-        duration: item.duration,
-        artwork: ov?.artwork ?? artwork ?? (existing && !artwork ? existing.artwork : undefined)
-      };
-      fileCache.set(track.id, new File([blob], filename, { type: blob.type || 'audio/mp4' }));
-      await db.saveFileBlob(track.id, fileCache.get(track.id)!);
-      await saveCopyToDownloadFolder(filename, blob);
-      newTracks.push(track);
-      done++;
-      set({ scanProgress: { scanned: done, found: items.length, label: item.title ?? item.id } });
-      onProgress?.(done, items.length, item.title ?? item.id);
+    } finally {
+      // Always persist whatever imported so scanning can't get stuck and
+      // partially-imported songs survive a restart.
+      await finalizeImport(set, get, newTracks);
     }
 
     if (newTracks.length === 0 && failed > 0) {
-      await finalizeImport(set, get, []);
       throw new Error(
         items.length === 1
           ? 'Download failed — the yt-dlp server could not fetch that video'
@@ -435,7 +447,6 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       );
     }
 
-    await finalizeImport(set, get, newTracks);
     return { imported: newTracks.length, skipped, failed, trackIds: newTracks.map((t) => t.id) };
   },
 
