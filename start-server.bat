@@ -5,6 +5,12 @@ echo   Vispr Local Server + Tunnel
 echo  ================================
 echo.
 
+REM Download cloudflared if missing
+if not exist "cloudflared.exe" (
+    echo  Downloading cloudflared...
+    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe' -OutFile 'cloudflared.exe'"
+)
+
 REM Find local IP
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /i "IPv4" ^| findstr /v "127.0.0.1"') do (
     set LOCAL_IP=%%a
