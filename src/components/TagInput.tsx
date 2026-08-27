@@ -145,10 +145,11 @@ export function TagInput({ value, onChange, options, placeholder, label }: TagIn
                 key={opt}
                 role="option"
                 aria-selected={isActive}
-                onMouseDown={(e) => {
+                onPointerDown={(e) => {
                   e.preventDefault();
                   select(isCustom ? query.trim() : opt);
                 }}
+                onClick={() => select(isCustom ? query.trim() : opt)}
                 onMouseEnter={() => setActiveIdx(i)}
                 style={{
                   padding: '6px 10px',

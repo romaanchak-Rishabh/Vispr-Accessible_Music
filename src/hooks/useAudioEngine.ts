@@ -49,6 +49,15 @@ export function useAudioEngine(): void {
       }
     };
 
+    // Media duration is often 0/Infinity for blob mp4 on Android before
+    // metadata settles; fall back to the metadata we already have from yt-dlp.
+    const durationFor = (a: HTMLAudioElement): number => {
+      const d = a.duration;
+      if (isFinite(d) && d > 0) return d;
+      const t = usePlayer.getState().queue[usePlayer.getState().index];
+      return t?.duration ?? 0;
+    };
+
     const applyVol = (v: number): void => {
       els[cur].volume = Math.max(0, Math.min(1, v));
     };
@@ -80,7 +89,7 @@ export function useAudioEngine(): void {
 
     const onLoaded = (e: Event): void => {
       if ((e.currentTarget as HTMLAudioElement) !== els[cur]) return;
-      usePlayer.getState().setDuration(els[cur].duration || 0);
+      usePlayer.getState().setDuration(durationFor(els[cur]));
       syncPositionState();
     };
 
@@ -108,6 +117,8 @@ export function useAudioEngine(): void {
 
     els.forEach((a) => {
       a.addEventListener('loadedmetadata', onLoaded);
+      a.addEventListener('loadeddata', onLoaded);
+      a.addEventListener('durationchange', onLoaded);
       a.addEventListener('ended', onEnded);
       a.addEventListener('timeupdate', onTimeUpdate);
       a.addEventListener('error', onError);
@@ -131,6 +142,7 @@ export function useAudioEngine(): void {
         other.volume = 0;
         loadedFor[slot] = nextTrack.id;
         registerMediaSession(nextTrack);
+        usePlayer.getState().setDuration(nextTrack.duration || 0);
         other.load();
         await other.play();
       } catch {
@@ -232,6 +244,7 @@ export function useAudioEngine(): void {
           els[cur].src = urls[cur]!;
           loadedFor[cur] = trackId;
           registerMediaSession(track);
+          usePlayer.getState().setDuration(track.duration || 0);
           els[cur].load();
         } else if (!file) {
           console.warn('[audio] could not resolve file for track:', track.id, track.title);
@@ -299,6 +312,8 @@ export function useAudioEngine(): void {
       abortFade();
       els.forEach((a, i) => {
         a.removeEventListener('loadedmetadata', onLoaded);
+        a.removeEventListener('loadeddata', onLoaded);
+        a.removeEventListener('durationchange', onLoaded);
         a.removeEventListener('ended', onEnded);
         a.removeEventListener('timeupdate', onTimeUpdate);
         a.removeEventListener('error', onError);
