@@ -23,6 +23,12 @@ export function TagInput({ value, onChange, options, placeholder, label }: TagIn
     setQuery(value);
   }, [value]);
 
+  // Refs so the delayed blur handler never reads stale render-time values
+  const queryRef = useRef(query);
+  queryRef.current = query;
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
   const filtered = options.filter((opt) =>
     opt.toLowerCase().includes(query.trim().toLowerCase())
   );
@@ -102,14 +108,15 @@ export function TagInput({ value, onChange, options, placeholder, label }: TagIn
           setTimeout(() => {
             setOpen(false);
             // If user typed something not in options, offer it as custom
-            if (query.trim() && query.trim() !== value) {
-              const match = options.find((o) => o.toLowerCase() === query.trim().toLowerCase());
-              onChange(match ?? query.trim());
-              setQuery(match ?? query.trim());
+            const q = queryRef.current.trim();
+            if (q && q !== valueRef.current) {
+              const match = options.find((o) => o.toLowerCase() === q.toLowerCase());
+              onChange(match ?? q);
+              setQuery(match ?? q);
             } else {
-              setQuery(value);
+              setQuery(valueRef.current ?? '');
             }
-          }, 150);
+          }, 120);
         }}
         role="combobox"
         aria-expanded={open}
