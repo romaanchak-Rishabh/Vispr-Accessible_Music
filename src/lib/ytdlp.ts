@@ -17,7 +17,12 @@ function authHeaders(token: string): HeadersInit {
 }
 
 export function effectiveServerBase(server: string): string {
-  return server.trim().replace(/\/+$/, '');
+  let s = server.trim().replace(/\/+$/, '');
+  // Ensure https:// for Cloudflare tunnels and similar
+  if (s && !s.startsWith('http://') && !s.startsWith('https://')) {
+    s = 'https://' + s;
+  }
+  return s;
 }
 
 export async function resolveViaYtDlp(server: string, token: string, url: string): Promise<YtItem[]> {
