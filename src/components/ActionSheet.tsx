@@ -5,17 +5,8 @@ import { useLibrary } from '../store/library';
 import { useUI, type Page } from '../store/ui';
 import { Artwork } from './Artwork';
 import { blobToDataUrl } from '../lib/metadata';
-
-const GENRE_OPTIONS = [
-  'bollywood', 'hindi', 'punjabi', 'tamil', 'telugu', 'malayalam', 'kannada', 'marathi', 'bengali',
-  'rock', 'pop', 'english', 'japanese', 'korean', 'spanish',
-  'classical', 'devotional', 'ghazal', 'folk', 'sufi',
-  'rap', 'hip-hop', 'r&b', 'soul',
-  'electronic', 'edm', 'lo-fi', 'ambient',
-  'jazz', 'blues', 'country',
-  'indie', 'alternative', 'metal', 'punk',
-  'reggaeton', 'latin', 'acoustic', 'foreign'
-] as const;
+import { formatArtist } from '../types';
+import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue } from '../lib/tags';
 
 export function ActionSheet(): JSX.Element | null {
   const trackId = useUI((s) => s.actionSheetTrackId);
@@ -27,9 +18,11 @@ export function ActionSheet(): JSX.Element | null {
   const [newName, setNewName] = useState('');
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
+  const [artist2, setArtist2] = useState('');
   const [album, setAlbum] = useState('');
   const [genre1, setGenre1] = useState('');
   const [genre2, setGenre2] = useState('');
+  const [year, setYear] = useState('');
   const [artwork, setArtwork] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,9 +37,11 @@ export function ActionSheet(): JSX.Element | null {
   const openEdit = (): void => {
     setTitle(track.title);
     setArtist(track.artist);
+    setArtist2(track.artist2 ?? '');
     setAlbum(track.album);
     setGenre1(track.genre1 ?? '');
     setGenre2(track.genre2 ?? '');
+    setYear(track.year ? String(track.year) : '');
     setArtwork(track.artwork);
     setSubmenu('edit');
   };
@@ -57,7 +52,9 @@ export function ActionSheet(): JSX.Element | null {
   };
 
   const saveEdit = async (): Promise<void> => {
-    await useLibrary.getState().updateTrackMeta(track.id, { title, artist, album, artwork, genre1, genre2 });
+    const y = year.trim();
+    const yearNum = y && /^\d{4}$/.test(y) ? parseInt(y, 10) : undefined;
+    await useLibrary.getState().updateTrackMeta(track.id, { title, artist, artist2, album, artwork, genre1, genre2, year: yearNum });
     close();
   };
 
@@ -190,8 +187,20 @@ export function ActionSheet(): JSX.Element | null {
                 Change Cover…
               </button>
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-              <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Artist" value={artist} onChange={(e) => setArtist(e.target.value)} />
+              <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Artist 1" value={artist} onChange={(e) => setArtist(e.target.value)} />
+              <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Artist 2 (feat.)" value={artist2} onChange={(e) => setArtist2(e.target.value)} />
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Album" value={album} onChange={(e) => setAlbum(e.target.value)} />
+              <select
+                className="search-input"
+                style={{ paddingLeft: 10, fontSize: 13 }}
+                value={year ? eraToDisplayValue(year) : ''}
+                onChange={(e) => setYear(yearToEraValue(e.target.value))}
+              >
+                <option value="">Year / Era</option>
+                {YEAR_OPTIONS.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
               <div style={{ display: 'flex', gap: 8 }}>
                 <select
                   className="search-input"
@@ -271,7 +280,7 @@ export function ActionSheet(): JSX.Element | null {
                 <Artwork src={track.artwork} className="row-artwork" placeholderSize={18} alt="" />
                 <div style={{ minWidth: 0 }}>
                   <div className="row-title">{track.title}</div>
-                  <div className="row-subtitle">{track.artist}</div>
+                  <div className="row-subtitle">{formatArtist(track)}</div>
                 </div>
               </div>
               {actions.map((a) => (

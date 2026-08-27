@@ -8,6 +8,7 @@ import { ImportBar } from './ImportBar';
 import { PostImportSheet } from './PostImportSheet';
 import { FolderIcon, SpinnerIcon, ChevronRightIcon } from './Icons';
 import type { Album } from '../types';
+import { formatArtist } from '../types';
 
 export function ListenNowView(): JSX.Element {
   const status = useLibrary((s) => s.status);
@@ -199,7 +200,7 @@ function RecentCard({ trackId }: { trackId: string }): JSX.Element | null {
     >
       <Artwork src={track.artwork} className="card-artwork" placeholderSize={28} alt="" style={{ width: 110, height: 110 } as React.CSSProperties} />
       <div className="card-title">{track.title}</div>
-      <div className="card-subtitle">{track.artist}</div>
+      <div className="card-subtitle">{formatArtist(track)}</div>
     </button>
   );
 }
@@ -221,7 +222,7 @@ function TopTrackRow({ trackId, rank }: { trackId: string; rank: number }): JSX.
           {track.title}
         </span>
         <span className="row-subtitle" style={{ display: 'block' }}>
-          {track.artist}
+          {formatArtist(track)}
         </span>
       </span>
       <span className="row-trailing">{counts ?? ''}</span>

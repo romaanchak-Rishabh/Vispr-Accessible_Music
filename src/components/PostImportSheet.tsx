@@ -5,51 +5,11 @@ import { useUI } from '../store/ui';
 import type { Track } from '../types';
 import { TagInput } from './TagInput';
 import { Artwork } from './Artwork';
-
-const GENRE_OPTIONS = [
-  'bollywood', 'hindi', 'punjabi', 'tamil', 'telugu', 'malayalam', 'kannada', 'marathi', 'bengali',
-  'rock', 'pop', 'english', 'japanese', 'korean', 'spanish',
-  'classical', 'devotional', 'ghazal', 'folk', 'sufi',
-  'rap', 'hip-hop', 'r&b', 'soul',
-  'electronic', 'edm', 'lo-fi', 'ambient',
-  'jazz', 'blues', 'country',
-  'indie', 'alternative', 'metal', 'punk',
-  'reggaeton', 'latin', 'acoustic', 'foreign'
-] as const;
-
-const YEAR_OPTIONS = [
-  'New (2020s)',
-  'Recent (2010s)',
-  'Classic (2000s)',
-  'Retro (90s)',
-  'Old School (80s)',
-  'Vintage (70s & earlier)',
-  'Unknown'
-] as const;
-
-function yearToEraValue(raw: string): string {
-  if (raw.startsWith('New')) return '2020s';
-  if (raw.startsWith('Recent')) return '2010s';
-  if (raw.startsWith('Classic')) return '2000s';
-  if (raw.startsWith('Retro')) return '1990s';
-  if (raw.startsWith('Old School')) return '1980s';
-  if (raw.startsWith('Vintage')) return '1970s';
-  if (raw === 'Unknown') return '';
-  return raw;
-}
-
-function eraToDisplayValue(raw: string): string {
-  if (!raw) return '';
-  if (raw === '2020s') return 'New (2020s)';
-  if (raw === '2010s') return 'Recent (2010s)';
-  if (raw === '2000s') return 'Classic (2000s)';
-  if (raw === '1990s') return 'Retro (90s)';
-  if (raw === '1980s') return 'Old School (80s)';
-  if (raw === '1970s' || raw === 'before') return 'Vintage (70s & earlier)';
-  return raw;
-}
+import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue } from '../lib/tags';
 
 interface TrackEdits {
+  artist: string;
+  artist2: string;
   genre1: string;
   genre2: string;
   year: string;
@@ -74,9 +34,22 @@ export function PostImportSheet({ trackIds, onClose }: Props): JSX.Element | nul
   if (tracks.length === 0) return null;
 
   const albumOptions = [...new Set(allAlbums.map((a) => a.title))].sort();
+  const artistOptions = [...new Set(tracks.map((t) => t.artist).concat(tracks.map((t) => t.artist2 ?? '')))]
+    .filter(Boolean)
+    .sort();
 
   const getEdit = (id: string): TrackEdits =>
-    edits[id] ?? { genre1: '', genre2: '', year: '', album: '' };
+    edits[id] ?? (() => {
+      const t = byId[id];
+      return {
+        artist: t?.artist ?? '',
+        artist2: t?.artist2 ?? '',
+        genre1: t?.genre1 ?? '',
+        genre2: t?.genre2 ?? '',
+        year: t?.year ? String(t.year) : '',
+        album: (t?.album && t.album !== 'YouTube') ? t.album : ''
+      };
+    })();
 
   const setEdit = (id: string, patch: Partial<TrackEdits>): void => {
     setEdits((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -89,7 +62,9 @@ export function PostImportSheet({ trackIds, onClose }: Props): JSX.Element | nul
     for (const track of tracks) {
       const e = edits[track.id];
       if (!e) continue;
-      const patch: { genre1?: string; genre2?: string; year?: number; album?: string } = {};
+      const patch: { genre1?: string; genre2?: string; year?: number; album?: string; artist?: string; artist2?: string } = {};
+      if (track.artist !== e.artist && e.artist) patch.artist = e.artist;
+      if (track.artist2 !== e.artist2) patch.artist2 = e.artist2 || undefined;
       if (e.genre1) patch.genre1 = e.genre1;
       if (e.genre2) patch.genre2 = e.genre2;
       if (e.year) {
@@ -174,6 +149,24 @@ export function PostImportSheet({ trackIds, onClose }: Props): JSX.Element | nul
                 )}
               </div>
             </div>
+
+            {/* Artist 1 */}
+            <TagInput
+              label="Artist 1"
+              placeholder="Search or type artist…"
+              value={currentEdit.artist}
+              onChange={(v) => setEdit(currentTrack.id, { artist: v })}
+              options={artistOptions}
+            />
+
+            {/* Artist 2 */}
+            <TagInput
+              label="Artist 2"
+              placeholder="Featuring / second artist…"
+              value={currentEdit.artist2}
+              onChange={(v) => setEdit(currentTrack.id, { artist2: v })}
+              options={artistOptions}
+            />
 
             {/* Tag 1 */}
             <TagInput

@@ -3,6 +3,7 @@ import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import { Artwork } from './Artwork';
 import { PlayIcon, PauseIcon, NextIcon } from './Icons';
+import { formatArtist } from '../types';
 
 export function MiniPlayer(): JSX.Element | null {
   const track = usePlayer((s) => s.queue[s.index]);
@@ -28,7 +29,7 @@ export function MiniPlayer(): JSX.Element | null {
             {track.title}
           </span>
           <span className="mini-artist" style={{ display: 'block' }}>
-            {track.artist}
+            {formatArtist(track)}
           </span>
         </span>
         <span

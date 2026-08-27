@@ -3,6 +3,7 @@ import type { JSX } from 'react';
 import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import type { Track } from '../types';
+import { formatArtist } from '../types';
 import { Artwork } from './Artwork';
 
 const ROW_H = 56;
@@ -126,7 +127,7 @@ function QueueRow({ track, queueIndex, current = false }: { track: Track; queueI
             {track.title}
           </span>
           <span className="row-subtitle" style={{ display: 'block' }}>
-            {track.artist}
+            {formatArtist(track)}
           </span>
         </span>
       </button>

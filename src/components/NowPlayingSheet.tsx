@@ -4,6 +4,7 @@ import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import { Artwork } from './Artwork';
 import { SeekBar, TimeRow } from './SeekBar';
+import { formatArtist } from '../types';
 import {
   ChevronLeftIcon,
   EllipsisIcon,
@@ -78,7 +79,7 @@ export function NowPlayingSheet(): JSX.Element | null {
 
         <div className="np-titles">
           <div className="np-title">{track.title}</div>
-          <div className="np-artist">{track.artist}</div>
+          <div className="np-artist">{formatArtist(track)}</div>
         </div>
 
         <SeekBar current={currentTime} duration={duration} onSeek={seek} light />

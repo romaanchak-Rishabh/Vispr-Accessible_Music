@@ -114,11 +114,29 @@ interface LibraryState {
   importYouTube: (
     url: string,
     onProgress?: (done: number, total: number, label: string) => void,
-    overrides?: Record<string, { title?: string; artist?: string; album?: string; artwork?: string }>
+    overrides?: Record<string, {
+      title?: string;
+      artist?: string;
+      artist2?: string;
+      album?: string;
+      genre1?: string;
+      genre2?: string;
+      year?: string;
+      artwork?: string;
+    }>
   ) => Promise<{ imported: number; skipped: number; failed: number; trackIds: string[] }>;
   updateTrackMeta: (
     trackId: string,
-    patch: { title?: string; artist?: string; album?: string; artwork?: string; genre1?: string; genre2?: string }
+    patch: {
+      title?: string;
+      artist?: string;
+      artist2?: string;
+      album?: string;
+      artwork?: string;
+      genre1?: string;
+      genre2?: string;
+      year?: number;
+    }
   ) => Promise<void>;
   addFileWithMeta: (
     file: File,
@@ -397,11 +415,19 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           }
           const existing = get().byId[`y-${item.id}`];
           const ov = overrides?.[item.id];
+          const genre1 = ov?.genre1?.trim() || undefined;
+          const genre2 = ov?.genre2?.trim() || undefined;
+          const yearRaw = ov?.year?.trim();
+          const year = yearRaw && /^\d{4}$/.test(yearRaw) ? parseInt(yearRaw, 10) : undefined;
           const track: Track = {
             id: `y-${item.id}`,
             title: ov?.title?.trim() || item.title || dl.filename,
             artist: ov?.artist?.trim() || item.uploader || 'Unknown Artist',
+            artist2: ov?.artist2?.trim() || undefined,
             album: ov?.album?.trim() || item.playlist_title || 'YouTube',
+            genre1,
+            genre2,
+            year,
             fileName: dl.filename,
             path: dl.filename,
             source: 'file',
@@ -457,10 +483,12 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             ...t,
             ...(patch.title?.trim() ? { title: patch.title.trim() } : {}),
             ...(patch.artist?.trim() ? { artist: patch.artist.trim() } : {}),
+            ...(patch.artist2 !== undefined ? { artist2: patch.artist2?.trim() || undefined } : {}),
             ...(patch.album?.trim() ? { album: patch.album.trim() } : {}),
             ...(patch.artwork !== undefined ? { artwork: patch.artwork || undefined } : {}),
             ...(patch.genre1 !== undefined ? { genre1: patch.genre1 || undefined } : {}),
-            ...(patch.genre2 !== undefined ? { genre2: patch.genre2 || undefined } : {})
+            ...(patch.genre2 !== undefined ? { genre2: patch.genre2 || undefined } : {}),
+            ...(patch.year !== undefined ? { year: patch.year || undefined } : {})
           }
         : t
     );

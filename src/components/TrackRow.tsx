@@ -2,6 +2,7 @@ import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import { formatTime } from '../store/library';
 import type { Track } from '../types';
+import { formatArtist } from '../types';
 import { Artwork } from './Artwork';
 import { EllipsisIcon, PauseIcon } from './Icons';
 
@@ -54,7 +55,7 @@ export function TrackRow({
             {track.title}
           </span>
           <span className="row-subtitle" style={{ display: 'block' }}>
-            {track.artist}
+            {formatArtist(track)}
           </span>
         </span>
         {trailingDuration && (

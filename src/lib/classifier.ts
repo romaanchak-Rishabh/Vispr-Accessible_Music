@@ -113,6 +113,7 @@ function buildSearchText(track: Track): string {
   const parts = [
     track.title,
     track.artist,
+    track.artist2 ?? '',
     track.album,
     track.albumArtist ?? '',
     track.genre ?? ''

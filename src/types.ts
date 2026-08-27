@@ -2,6 +2,7 @@ export interface Track {
   id: string;
   title: string;
   artist: string;
+  artist2?: string;
   album: string;
   albumArtist?: string;
   genre?: string;
@@ -52,4 +53,12 @@ export const AUDIO_EXTENSIONS = ['.mp3', '.m4a', '.mp4', '.aac', '.flac', '.wav'
 export function isAudioFile(name: string): boolean {
   const lower = name.toLowerCase();
   return AUDIO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+export function formatArtist(track: Pick<Track, 'artist' | 'artist2'>): string {
+  const a = track.artist;
+  const b = track.artist2?.trim();
+  if (!b) return a;
+  if (a.toLowerCase().includes(b.toLowerCase())) return a;
+  return `${a} × ${b}`;
 }

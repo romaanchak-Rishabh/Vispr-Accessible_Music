@@ -3,6 +3,7 @@ import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import { Artwork } from './Artwork';
 import { SeekBar } from './SeekBar';
+import { formatArtist } from '../types';
 import {
   PlayIcon,
   PauseIcon,
@@ -45,7 +46,7 @@ export function DesktopPlayerBar(): JSX.Element | null {
         <Artwork src={track.artwork} className="mini-art" placeholderSize={18} alt="" />
         <div style={{ minWidth: 0 }}>
           <div className="mini-title">{track.title}</div>
-          <div className="mini-artist">{track.artist}</div>
+          <div className="mini-artist">{formatArtist(track)}</div>
         </div>
       </div>
 

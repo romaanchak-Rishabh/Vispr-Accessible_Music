@@ -4,6 +4,7 @@ import { useLibrary, getFavourites, getMostListened, isAutoPlaylist, AUTO_FAVOUR
 import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import type { Album, Artist } from '../types';
+import { formatArtist } from '../types';
 import { TrackRow } from './TrackRow';
 import { Artwork } from './Artwork';
 import { EmptyLibrary, AlbumCard } from './Views';
@@ -850,7 +851,7 @@ function ForYouCard({ rec, index, onPlay }: { rec: Recommendation; index: number
           {isPlaying && current ? '▶ ' : ''}{rec.track.title}
         </span>
         <span className="row-subtitle" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {rec.track.artist}
+          {formatArtist(rec.track)}
         </span>
         {rec.reasons.length > 0 && (
           <span style={{ display: 'block', fontSize: 11, color: 'var(--accent)', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
