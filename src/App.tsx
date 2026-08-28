@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import type { JSX } from 'react';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { useMediaQuery } from './hooks/useMediaQuery';
+import { startTunnelSync } from './lib/tunnelSync';
 import { useLibrary } from './store/library';
 import { usePlayer } from './store/player';
 import { applyAppearance, useSettings } from './store/settings';
@@ -62,6 +63,9 @@ export default function App(): JSX.Element {
   useEffect(() => {
     applyAppearance(theme, accent);
   }, [theme, accent]);
+
+  // keep the backend server URL in sync with the published (auto-healed) tunnel
+  useEffect(() => startTunnelSync(), []);
 
   useEffect(() => {
     void init().then(() => {

@@ -11,3 +11,12 @@ cookies*.txt
 cookies_env_value.txt
 *.cookies
 cloudflared.exe
+# local-only tunnel/notifier config + WhatsApp session
+tunnel-config.json
+wwebjs-session/
+.wwebjs_cache/
+linked.ok
+.wa-notify.lock
+qr.txt
+qr.png
+watch-tunnel.log

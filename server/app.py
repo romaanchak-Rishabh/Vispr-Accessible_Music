@@ -299,13 +299,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Auth-Token")
 
     def do_OPTIONS(self):  # noqa: N802
         self.send_response(204)
         self._cors()
         self.end_headers()
+
+    def do_GET(self):  # noqa: N802
+        if self.path.split("?")[0] == "/api/ping":
+            self._json(200, {"ok": True})
+            return
+        self._json(404, {"error": "not found"})
 
     def _json(self, status, obj):
         body = json.dumps(obj).encode()
