@@ -40,3 +40,9 @@ export function eraToDisplayValue(raw: string): string {
   if (raw === '1970s' || raw === 'before') return 'Vintage (70s & earlier)';
   return raw;
 }
+
+/** Capitalize the first letter of a genre/tag for display (values are stored lowercase). */
+export function formatGenre(g: string): string {
+  if (!g) return '';
+  return g.charAt(0).toUpperCase() + g.slice(1);
+}

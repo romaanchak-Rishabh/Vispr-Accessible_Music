@@ -1,11 +1,12 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { YtItem } from '../lib/ytdlp';
 import { Artwork } from './Artwork';
 import { blobToDataUrl } from '../lib/metadata';
 import { TagInput } from './TagInput';
 import { useLibrary } from '../store/library';
-import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue } from '../lib/tags';
+import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue, formatGenre } from '../lib/tags';
+import { lookupMetadata, yearToEra } from '../lib/metadataLookup';
 
 export interface ImportOverrides {
   title?: string;
@@ -64,6 +65,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   const [fieldIdx, setFieldIdx] = useState(0);
   const [stage, setStage] = useState<'ask' | 'finish'>('ask');
   const [dontAsk, setDontAsk] = useState(false);
+  const [lookup, setLookup] = useState<Record<string, 'pending' | 'done' | 'none'>>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
   const libraryTracks = useLibrary((s) => s.tracks);
@@ -79,6 +81,47 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   const item = items[songIdx];
   const field = FIELDS[fieldIdx];
   const showYear = field.key === 'year';
+
+  // Auto-prefill artist/album/year/genre from a free music API (no key needed).
+  // Only fills fields the user hasn't set yet; never overwrites their answers.
+  useEffect(() => {
+    const it = items[songIdx];
+    if (!it) return;
+    if (lookup[it.id] === 'done' || lookup[it.id] === 'none') return;
+    const title = (it.title ?? '')
+      .replace(/\s*\((official\s*)?(lyric|lyrics|audio|audio\s*only|video|official\s*video|music\s*video|full\s*song|song|hd|4k|extended)\)\s*$/i, '')
+      .replace(/\s*-\s*(topic|official|lyrics?)\s*$/i, '')
+      .trim();
+    if (!title) {
+      setLookup((prev) => ({ ...prev, [it.id]: 'none' }));
+      return;
+    }
+    setLookup((prev) => ({ ...prev, [it.id]: 'pending' }));
+    let cancelled = false;
+    let applied = false;
+    void lookupMetadata(title, it.uploader)
+      .then((res) => {
+        if (cancelled || !res) return;
+        const era = yearToEra(res.year);
+        if (res.artist || res.album || res.genre || era) applied = true;
+        setEdits((prev) => {
+          const cur = prev[it.id] ?? {};
+          const next: ImportOverrides = { ...cur };
+          if (!next.artist && res.artist) next.artist = res.artist;
+          if (!next.album && res.album) next.album = res.album;
+          if (!next.genre1 && res.genre) next.genre1 = res.genre;
+          if (!next.year && era && !cur.year) next.year = era;
+          return { ...prev, [it.id]: next };
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setLookup((prev) => ({ ...prev, [it.id]: applied ? 'done' : 'none' }));
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songIdx, items]);
 
   const getValue = (it: YtItem, key: FieldKey): string => {
     const ov = edits[it.id];
@@ -99,7 +142,11 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   };
 
   const currentValue = getValue(item, field.key);
-  const currentDisplayValue = showYear ? eraToDisplayValue(currentValue) : currentValue;
+  const currentDisplayValue = showYear
+    ? eraToDisplayValue(currentValue)
+    : field.key.startsWith('genre')
+      ? formatGenre(currentValue)
+      : currentValue;
 
   const handleValue = (raw: string): void => {
     const stored = showYear ? yearToEraValue(raw) : raw;
@@ -228,7 +275,10 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                 />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getValue(item, 'title')}</div>
-                  <div style={{ fontSize: 12, color: 'var(--label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.uploader ?? ''}</div>
+                  <div style={{ fontSize: 12, color: 'var(--label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.uploader ?? ''}
+                    {lookup[item.id] === 'pending' && <span style={{ color: 'var(--accent)' }}> · looking up metadata…</span>}
+                  </div>
                 </div>
               </div>
 
@@ -239,6 +289,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
 
               {field.key === 'title' ? (
                 <input
+                  key={field.key}
                   className="search-input"
                   style={{ paddingLeft: 12, fontSize: 15 }}
                   placeholder={item.title ?? 'Title'}
@@ -247,6 +298,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                 />
               ) : (
                 <TagInput
+                  key={field.key}
                   value={currentDisplayValue}
                   onChange={handleValue}
                   options={optionsFor(field.key)}

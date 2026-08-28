@@ -49,13 +49,22 @@ export function useAudioEngine(): void {
       }
     };
 
-    // Media duration is often 0/Infinity for blob mp4 on Android before
-    // metadata settles; fall back to the metadata we already have from yt-dlp.
+    // Media duration is often 0/Infinity (Android) or wrong/doubled (iOS Safari
+    // misreads some m4a moov atoms from blob URLs). We already have the accurate
+    // duration from yt-dlp, so use it as the source of truth and only trust the
+    // element's reported duration when it agrees closely with the known value.
     const durationFor = (a: HTMLAudioElement): number => {
       const d = a.duration;
-      if (isFinite(d) && d > 0) return d;
       const t = usePlayer.getState().queue[usePlayer.getState().index];
-      return t?.duration ?? 0;
+      const known = typeof t?.duration === 'number' && isFinite(t.duration) && t.duration > 0 ? t.duration : 0;
+      if (known > 0) {
+        const saned = isFinite(d) && d > 0 ? d : 0;
+        if (!saned) return known;
+        const ratio = saned / known;
+        if (ratio > 0.8 && ratio < 1.25) return saned;
+        return known;
+      }
+      return isFinite(d) && d > 0 ? d : 0;
     };
 
     const applyVol = (v: number): void => {
@@ -65,12 +74,13 @@ export function useAudioEngine(): void {
     // keeps the lockscreen/notification scrubber in sync
     const syncPositionState = (): void => {
       const a = els[cur];
-      if (!('mediaSession' in navigator) || !a.duration || !isFinite(a.duration)) return;
+      const dur = durationFor(a);
+      if (!('mediaSession' in navigator) || !dur) return;
       try {
         navigator.mediaSession.setPositionState({
-          duration: a.duration,
+          duration: dur,
           playbackRate: a.playbackRate,
-          position: Math.max(0, Math.min(a.currentTime, a.duration))
+          position: Math.max(0, Math.min(a.currentTime, dur))
         });
       } catch {
         /* unsupported */
@@ -186,9 +196,10 @@ export function useAudioEngine(): void {
       if (fading) return;
       const st = usePlayer.getState();
       if (!st.crossfade || !st.isPlaying || st.repeat === 'one') return;
-      if (!a.duration || !isFinite(a.duration)) return;
-      const remaining = a.duration - a.currentTime;
-      if (remaining > FADE_MS / 1000 + 0.15 || a.duration < (FADE_MS * 2.5) / 1000) return;
+      const dur = durationFor(a);
+      if (!dur) return;
+      const remaining = dur - a.currentTime;
+      if (remaining > FADE_MS / 1000 + 0.15 || dur < (FADE_MS * 2.5) / 1000) return;
       const hasNext = st.index < st.queue.length - 1 || st.repeat === 'all';
       if (!hasNext) return;
       const nextIndex = st.index < st.queue.length - 1 ? st.index + 1 : 0;

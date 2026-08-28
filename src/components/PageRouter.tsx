@@ -12,6 +12,7 @@ import { ImportBar } from './ImportBar';
 import { ChevronRightIcon, PlusCircleIcon, EllipsisIcon, ShuffleIcon, PlayIcon, SparklesIcon } from './Icons';
 import { getRecommendations, getSmartRecommendations, type Recommendation } from '../lib/recommender';
 import { getTrackProfile } from '../lib/classifier';
+import { formatGenre } from '../lib/tags';
 
 export function PageRouter(): JSX.Element {
   const pageStack = useUI((s) => s.pageStack);
@@ -363,7 +364,7 @@ function BrowseView(): JSX.Element {
             .slice(0, 12)
             .map(([g]) => (
               <span key={g} className="chip" style={{ cursor: 'default' }}>
-                {g}
+                {formatGenre(g)}
               </span>
             ))}
         </div>
