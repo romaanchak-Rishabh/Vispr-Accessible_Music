@@ -268,44 +268,6 @@ input:focus-visible {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Pull-to-refresh */
-.ptr-root {
-  position: relative;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  flex: 1;
-  overscroll-behavior-y: contain;
-}
-
-.ptr-indicator {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  overflow: hidden;
-  pointer-events: none;
-  background: var(--nav-blur);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-}
-
-.ptr-spinner {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 3px solid var(--fill-1);
-  border-top-color: var(--accent);
-  margin-bottom: 10px;
-  flex-shrink: 0;
-  transition: transform 0.1s linear;
-}
-
-.ptr-spinner.spinning {
-  animation: spin 0.7s linear infinite;
-}
-
 /* ============================================================
    Glass material helper
    ============================================================ */
@@ -345,21 +307,6 @@ input:focus-visible {
   padding-top: env(safe-area-inset-top);
 }
 
-/* Tall header — large page title, Apple Music style, on top-level (non-back) pages */
-.navbar--large .navbar-inner {
-  height: 64px;
-  align-items: flex-end;
-  padding-bottom: 8px;
-}
-
-.navbar--large .navbar-title {
-  text-align: left;
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.4px;
-  line-height: 1.1;
-}
-
 .navbar-inner {
   display: flex;
   align-items: center;
@@ -393,14 +340,6 @@ input:focus-visible {
   font-weight: 800;
   letter-spacing: 0.37px;
   padding: 8px 16px 12px;
-}
-
-/* On mobile the tall navbar already shows the (large) page title, so drop the
-   in-page duplicate heading. Desktop keeps it (no navbar up there). */
-@media (max-width: 899px) {
-  .app-mobile .large-title {
-    display: none;
-  }
 }
 
 .section-header {

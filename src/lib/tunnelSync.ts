@@ -12,7 +12,7 @@ function hostOf(u: string): string | null {
   }
 }
 
-export async function fetchLatestTunnel(): Promise<string> {
+async function fetchLatestTunnel(): Promise<string> {
   const r = await fetch(RAW_URL, { cache: 'no-store' });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const text = (await r.text()).replace(/^\uFEFF/, '');
