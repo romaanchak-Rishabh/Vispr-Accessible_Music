@@ -148,6 +148,19 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
       ? formatGenre(currentValue)
       : currentValue;
 
+  const metaState: 'pending' | 'found' | 'none' | 'idle' =
+    lookup[item.id] === 'pending' ? 'pending' : lookup[item.id] === 'done' ? 'found' : lookup[item.id] === 'none' ? 'none' : 'idle';
+  const metaChip =
+    metaState === 'pending' ? (
+      <span className="meta-status pending">
+        <span className="meta-spinner" /> Scanning metadata…
+      </span>
+    ) : metaState === 'found' ? (
+      <span className="meta-status found">✓ Metadata found &amp; pre-filled</span>
+    ) : metaState === 'none' ? (
+      <span className="meta-status none">No metadata found — fill in manually</span>
+    ) : null;
+
   const handleValue = (raw: string): void => {
     const stored = showYear ? yearToEraValue(raw) : raw;
     setField(item, field.key, stored);
@@ -280,7 +293,6 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                   <div style={{ fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getValue(item, 'title')}</div>
                   <div style={{ fontSize: 12, color: 'var(--label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {item.uploader ?? ''}
-                    {lookup[item.id] === 'pending' && <span style={{ color: 'var(--accent)' }}> · looking up metadata…</span>}
                   </div>
                 </div>
               </div>
@@ -290,24 +302,28 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                 <div style={{ fontSize: 12, color: 'var(--label-secondary)', marginBottom: 6 }}>{field.hint}</div>
               </div>
 
-              {field.key === 'title' ? (
-                <input
-                  key={field.key}
-                  className="search-input"
-                  style={{ paddingLeft: 12, fontSize: 16, padding: '11px 12px 11px 34px' }}
-                  placeholder={item.title ?? 'Title'}
-                  value={currentValue}
-                  onChange={(e) => setField(item, 'title', e.target.value)}
-                />
-              ) : (
-                <TagInput
-                  key={field.key}
-                  value={currentDisplayValue}
-                  onChange={handleValue}
-                  options={optionsFor(field.key)}
-                  placeholder={defaultForKey(item, field.key) || field.hint}
-                />
-              )}
+              {metaChip && <div style={{ marginBottom: -4 }}>{metaChip}</div>}
+
+              <div className={lookup[item.id] === 'pending' ? 'field-loading' : undefined}>
+                {field.key === 'title' ? (
+                  <input
+                    key={field.key}
+                    className="search-input"
+                    style={{ paddingLeft: 12, fontSize: 16, padding: '11px 12px 11px 34px' }}
+                    placeholder={item.title ?? 'Title'}
+                    value={currentValue}
+                    onChange={(e) => setField(item, 'title', e.target.value)}
+                  />
+                ) : (
+                  <TagInput
+                    key={field.key}
+                    value={currentDisplayValue}
+                    onChange={handleValue}
+                    options={optionsFor(field.key)}
+                    placeholder={defaultForKey(item, field.key) || field.hint}
+                  />
+                )}
+              </div>
 
               <button className="pill-btn" onClick={() => setStage('finish')} style={{ alignSelf: 'flex-end', fontSize: 13, padding: '5px 12px' }}>
                 Skip All

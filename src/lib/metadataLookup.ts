@@ -91,28 +91,21 @@ function withTimeout<T>(ms: number, fn: (signal: AbortSignal) => Promise<T>, fal
   return fn(ctrl.signal).catch(() => fallback).finally(() => clearTimeout(timer));
 }
 
-async function searchItunes(title: string, artistHint?: string, country = 'IN'): Promise<MetadataResult | null> {
+async function searchItunes(title: string, artistHint?: string): Promise<MetadataResult | null> {
   const withHint = artistHint ? `${title} ${artistHint}` : '';
   const queries = withHint ? [withHint, title] : [title];
-  let best: { s: number; m: MetadataResult } | null = null;
-  for (const q of queries) {
-    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=${country}&limit=8`;
-    // Short timeout — iTunes is fast and reliable; if a query stalls, move on
-    // immediately rather than making the import feel stuck.
-    const r = await withTimeout(3500, (signal) => fetch(url, { headers: { Accept: 'application/json' }, signal }), null);
-    if (!r || !r.ok) continue;
-    let data: {
-      results?: Array<{
-        trackName: string;
-        artistName: string;
-        collectionName?: string;
-        releaseDate?: string;
-        primaryGenreName?: string;
-        artworkUrl100?: string;
-      }>;
-    } | null = null;
-    try {
-      data = (await r.json()) as {
+  // A single song may live in different stores' catalogues, so try a couple.
+  // The caller applies an overall timeout bound, so this stays fast.
+  const countries = ['IN', 'US'];
+  const cands: Array<{ s: number; m: MetadataResult }> = [];
+  for (const country of countries) {
+    for (const q of queries) {
+      const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=${country}&limit=8`;
+      // Short timeout — iTunes is fast and reliable; if a query stalls, move on
+      // immediately rather than making the import feel stuck.
+      const r = await withTimeout(3500, (signal) => fetch(url, { headers: { Accept: 'application/json' }, signal }), null);
+      if (!r || !r.ok) continue;
+      let data: {
         results?: Array<{
           trackName: string;
           artistName: string;
@@ -121,28 +114,44 @@ async function searchItunes(title: string, artistHint?: string, country = 'IN'):
           primaryGenreName?: string;
           artworkUrl100?: string;
         }>;
-      };
-    } catch {
-      continue;
-    }
-    const res = data?.results ?? [];
-    if (res.length === 0) continue;
-    const tokens = norm(q).split(' ').filter((t) => t.length > 2);
-    for (const t of res) {
-      if (!t.trackName) continue;
-      const s = score(tokens, t.trackName);
-      if (s < 0.15) continue;
-      const m: MetadataResult = {
-        artist: t.artistName,
-        album: t.collectionName && t.collectionName !== t.trackName ? t.collectionName : undefined,
-        year: t.releaseDate ? new Date(t.releaseDate).getFullYear() : undefined,
-        genre: mapGenre(t.primaryGenreName ?? '') || undefined,
-        artwork: t.artworkUrl100 ? t.artworkUrl100.replace('100x100', '600x600') : undefined
-      };
-      if (!best || s > best.s) best = { s, m };
+      } | null = null;
+      try {
+        data = (await r.json()) as {
+          results?: Array<{
+            trackName: string;
+            artistName: string;
+            collectionName?: string;
+            releaseDate?: string;
+            primaryGenreName?: string;
+            artworkUrl100?: string;
+          }>;
+        };
+      } catch {
+        continue;
+      }
+      const res = data?.results ?? [];
+      if (res.length === 0) continue;
+      const tokens = norm(q).split(' ').filter((t) => t.length > 2);
+      for (const t of res) {
+        if (!t.trackName) continue;
+        const s = score(tokens, t.trackName);
+        if (s < 0.15) continue;
+        cands.push({
+          s,
+          m: {
+            artist: t.artistName,
+            album: t.collectionName && t.collectionName !== t.trackName ? t.collectionName : undefined,
+            year: t.releaseDate ? new Date(t.releaseDate).getFullYear() : undefined,
+            genre: mapGenre(t.primaryGenreName ?? '') || undefined,
+            artwork: t.artworkUrl100 ? t.artworkUrl100.replace('100x100', '600x600') : undefined
+          }
+        });
+      }
     }
   }
-  return best ? best.m : null;
+  if (cands.length === 0) return null;
+  cands.sort((a, b) => b.s - a.s);
+  return cands[0].m;
 }
 
 /**
