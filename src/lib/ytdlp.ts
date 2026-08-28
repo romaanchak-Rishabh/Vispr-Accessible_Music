@@ -8,6 +8,9 @@ export interface YtItem {
   playlist_title?: string;
 }
 
+import { useSettings } from '../store/settings';
+import { fetchLatestTunnel } from './tunnelSync';
+
 export function isYouTubeUrl(url: string): boolean {
   return /(?:youtube\.com|youtu\.be)/i.test(url);
 }
@@ -26,6 +29,41 @@ async function fetchWithTimeout(input: RequestInfo, init: RequestInit, timeoutMs
   }
 }
 
+/**
+ * Runs fn() with the current ytdlpServer. If it throws a network-level failure
+ * (the tunnel went stale / died), refresh the tunnel URL from git and retry
+ * once. This closes the gap between a quick-tunnel restart and the next 60s poll.
+ */
+async function withTunnelRetry<T>(fn: (server: string, token: string) => Promise<T>): Promise<T> {
+  const { ytdlpServer, ytdlpToken, setYtdlpServer } = useSettings.getState();
+  let server = ytdlpServer ?? '';
+  const token = ytdlpToken ?? '';
+  try {
+    return await fn(server, token);
+  } catch (err) {
+    const netErr =
+      err instanceof TypeError ||
+      ((err as { message?: string })?.message ?? '').includes('Failed to fetch') ||
+      ((err as { message?: string })?.message ?? '').includes('NetworkError');
+    if (!netErr) throw err;
+    try {
+      const latest = await fetchLatestTunnel();
+      if (latest && latest !== effectiveServer(server)) {
+        setYtdlpServer(latest);
+        server = latest;
+        return await fn(server, token);
+      }
+    } catch {
+      /* tunnel refresh failed — surface original error */
+    }
+    throw err;
+  }
+}
+
+function effectiveServer(s: string): string {
+  return s.trim().replace(/\/+$/, '');
+}
+
 export function effectiveServerBase(server: string): string {
   let s = server.trim().replace(/\/+$/, '');
   // Ensure https:// for Cloudflare tunnels and similar
@@ -35,24 +73,26 @@ export function effectiveServerBase(server: string): string {
   return s;
 }
 
-export async function resolveViaYtDlp(server: string, token: string, url: string): Promise<YtItem[]> {
-  const base = effectiveServerBase(server);
-  const resp = await fetchWithTimeout(`${base}/api/resolve`, {
-    method: 'POST',
-    headers: authHeaders(token),
-    body: JSON.stringify({ url })
-  }, 30_000);
-  if (!resp.ok) {
-    let msg = `HTTP ${resp.status}`;
-    try {
-      msg = ((await resp.json()) as { error?: string }).error ?? msg;
-    } catch {
-      /* keep default */
+export async function resolveViaYtDlp(_server: string, _token: string, url: string): Promise<YtItem[]> {
+  return withTunnelRetry(async (srv, tok) => {
+    const base = effectiveServerBase(srv);
+    const resp = await fetchWithTimeout(`${base}/api/resolve`, {
+      method: 'POST',
+      headers: authHeaders(tok),
+      body: JSON.stringify({ url })
+    }, 30_000);
+    if (!resp.ok) {
+      let msg = `HTTP ${resp.status}`;
+      try {
+        msg = ((await resp.json()) as { error?: string }).error ?? msg;
+      } catch {
+        /* keep default */
+      }
+      throw new Error(`Resolve failed: ${msg}`);
     }
-    throw new Error(`Resolve failed: ${msg}`);
-  }
-  const data = (await resp.json()) as { items?: YtItem[] };
-  return data.items ?? [];
+    const data = (await resp.json()) as { items?: YtItem[] };
+    return data.items ?? [];
+  });
 }
 
 export interface YtInfo {
