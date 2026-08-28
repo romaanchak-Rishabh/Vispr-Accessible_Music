@@ -41,6 +41,32 @@ export function eraToDisplayValue(raw: string): string {
   return raw;
 }
 
+/** Convert an era label (e.g. '2020s', 'before') to a representative numeric year,
+ *  or parse an actual 4-digit year. Returns undefined when the value is empty/unknown. */
+export function eraToYear(raw: string | undefined): number | undefined {
+  if (!raw) return undefined;
+  const v = raw.trim();
+  if (!v) return undefined;
+  if (/^\d{4}$/.test(v)) return parseInt(v, 10);
+  switch (v) {
+    case '2020s':
+      return 2020;
+    case '2010s':
+      return 2010;
+    case '2000s':
+      return 2000;
+    case '1990s':
+      return 1990;
+    case '1980s':
+      return 1980;
+    case '1970s':
+    case 'before':
+      return 1970;
+    default:
+      return undefined;
+  }
+}
+
 /** Capitalize the first letter of a genre/tag for display (values are stored lowercase). */
 export function formatGenre(g: string): string {
   if (!g) return '';

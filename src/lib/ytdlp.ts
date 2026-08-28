@@ -55,6 +55,30 @@ export async function resolveViaYtDlp(server: string, token: string, url: string
   return data.items ?? [];
 }
 
+export interface YtInfo {
+  description?: string;
+  tags?: string[];
+  year?: number;
+  artist?: string;
+  title?: string;
+}
+
+/** Full (non-flat) extraction of a single video so we can read its description/tags/year. */
+export async function fetchYtInfo(server: string, token: string, url: string): Promise<YtInfo | null> {
+  const base = effectiveServerBase(server);
+  try {
+    const resp = await fetchWithTimeout(`${base}/api/info`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ url })
+    }, 25_000);
+    if (!resp.ok) return null;
+    return (await resp.json()) as YtInfo;
+  } catch {
+    return null;
+  }
+}
+
 export async function downloadAudioViaYtDlp(
   server: string,
   token: string,

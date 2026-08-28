@@ -3,6 +3,7 @@ import type { Track, Album, Artist, Playlist } from '../types';
 import * as db from '../lib/db';
 import { pickDirectory, ensurePermission, scanMusicDirectory, supportsDirectoryPicker, type DirHandle } from '../lib/fsAccess';
 import { useSettings } from './settings';
+import { eraToYear } from '../lib/tags';
 import type { YtItem } from '../lib/ytdlp';
 
 const fileCache = new Map<string, File>();
@@ -418,7 +419,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           const genre1 = ov?.genre1?.trim() || undefined;
           const genre2 = ov?.genre2?.trim() || undefined;
           const yearRaw = ov?.year?.trim();
-          const year = yearRaw && /^\d{4}$/.test(yearRaw) ? parseInt(yearRaw, 10) : undefined;
+          const year = eraToYear(yearRaw);
           const track: Track = {
             id: `y-${item.id}`,
             title: ov?.title?.trim() || item.title || dl.filename,

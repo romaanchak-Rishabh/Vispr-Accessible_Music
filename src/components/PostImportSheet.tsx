@@ -5,7 +5,7 @@ import { useUI } from '../store/ui';
 import type { Track } from '../types';
 import { TagInput } from './TagInput';
 import { Artwork } from './Artwork';
-import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue } from '../lib/tags';
+import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue, eraToYear } from '../lib/tags';
 
 interface TrackEdits {
   artist: string;
@@ -68,8 +68,8 @@ export function PostImportSheet({ trackIds, onClose }: Props): JSX.Element | nul
       if (e.genre1) patch.genre1 = e.genre1;
       if (e.genre2) patch.genre2 = e.genre2;
       if (e.year) {
-        const y = parseInt(e.year, 10);
-        if (isFinite(y) && y > 1950) patch.year = y;
+        const y = eraToYear(e.year);
+        if (y) patch.year = y;
       }
       if (e.album) patch.album = e.album;
       if (Object.keys(patch).length > 0) {

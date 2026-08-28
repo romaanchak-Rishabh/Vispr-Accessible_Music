@@ -176,3 +176,71 @@ export async function lookupMetadata(title: string, artistHint?: string): Promis
     return null;
   }
 }
+
+const YT_FIELD_KEYS = [
+  'artist', 'artiste', 'singer', 'singers', 'vocals', 'vocalist', 'main artist',
+  'music', 'music director', 'composer', 'music by', 'sung by', 'performers',
+  'album', 'movie', 'album name', 'from the album', 'soundtrack', 'film',
+  'year', 'release', 'released', 'copyright', '(c)'
+];
+
+/**
+ * Derive best-effort metadata from a YouTube video description + tags.
+ * YouTube descriptions for Indian/regional songs are often the ONLY reliable
+ * source (iTunes typically has nothing). We scan structured "Label: value"
+ * lines (Artist / Music / Album / Movie / Year / Singer...) and feed the tags
+ * through the same genre mapper used for iTunes.
+ */
+export function parseYoutubeDescription(input: YtInfoLike): MetadataResult | null {
+  const desc = (input?.description ?? '').trim();
+  const tags = input?.tags ?? [];
+  const year = input?.year;
+  if (!desc && !tags.length) return null;
+
+  const lines = desc.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const found: Record<string, string> = {};
+  for (const line of lines) {
+    const m = line.match(/^([A-Za-z][A-Za-z &()'.-]{0,30})\s*[:=]\s*(.+)$/);
+    if (!m) continue;
+    const key = m[1].toLowerCase();
+    const val = m[2].replace(/\s+/g, ' ').replace(/^["']|["']$/g, '').trim();
+    if (!val || !YT_FIELD_KEYS.includes(key) || found[key]) continue;
+    found[key] = val;
+  }
+
+  const artist =
+    found['artist'] || found['artiste'] || found['singer'] || found['singers'] ||
+    found['vocals'] || found['vocalist'] || found['sung by'] || found['performers'] ||
+    found['music director'] || found['composer'] || found['music by'] || input?.artist;
+  const album =
+    found['album'] || found['album name'] || found['movie'] || found['from the album'] ||
+    found['soundtrack'] || found['film'];
+
+  let y = year;
+  if (!y) {
+    const yearVals = ['year', 'release', 'released', 'copyright', '(c)']
+      .map((k) => found[k])
+      .concat(desc.match(/\b(19|20)\d{2}\b/)?.[0] ?? []);
+    for (const v of yearVals) {
+      const mm = v && String(v).match(/\b(19|20)\d{2}\b/);
+      if (mm) {
+        y = parseInt(mm[0], 10);
+        break;
+      }
+    }
+  }
+
+  const genre = tags
+    .map((t) => mapGenre(t))
+    .find((g) => g && g !== 'foreign') || undefined;
+
+  if (!artist && !album && !y && !genre) return null;
+  return { artist: artist || undefined, album: album || undefined, year: y, genre };
+}
+
+export interface YtInfoLike {
+  description?: string;
+  tags?: string[];
+  year?: number;
+  artist?: string;
+}

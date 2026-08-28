@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { YtItem } from '../lib/ytdlp';
+import { fetchYtInfo } from '../lib/ytdlp';
 import { Artwork } from './Artwork';
 import { blobToDataUrl } from '../lib/metadata';
 import { TagInput } from './TagInput';
 import { useLibrary } from '../store/library';
+import { useSettings } from '../store/settings';
 import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue, formatGenre } from '../lib/tags';
-import { lookupMetadata, yearToEra } from '../lib/metadataLookup';
+import { lookupMetadata, yearToEra, parseYoutubeDescription } from '../lib/metadataLookup';
 
 export interface ImportOverrides {
   title?: string;
@@ -68,6 +70,8 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   const [lookup, setLookup] = useState<Record<string, 'pending' | 'done' | 'none'>>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const { ytdlpServer, ytdlpToken } = useSettings();
+
   const libraryTracks = useLibrary((s) => s.tracks);
   const allAlbums = useLibrary((s) => s.albums);
 
@@ -98,8 +102,27 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
     }
     setLookup((prev) => ({ ...prev, [it.id]: 'pending' }));
     let cancelled = false;
+    // iTunes is the primary source; if it comes up short (very common for
+    // Indian/regional songs) fall back to reading the YouTube description.
+    const fallback = async (res: { artist?: string; album?: string; year?: number; genre?: string } | null):
+      Promise<{ artist?: string; album?: string; year?: number; genre?: string }> => {
+      if (res && (res.artist || res.album || res.genre || res.year)) return res;
+      const videoUrl = it.webpage_url ?? (it.id ? `https://www.youtube.com/watch?v=${it.id}` : '');
+      if (!videoUrl) return res ?? {};
+      const info = await fetchYtInfo(ytdlpServer, ytdlpToken, videoUrl);
+      if (!info) return res ?? {};
+      const parsed = parseYoutubeDescription(info);
+      if (!parsed) return res ?? {};
+      return {
+        artist: parsed.artist ?? res?.artist,
+        album: parsed.album ?? res?.album,
+        year: parsed.year ?? res?.year,
+        genre: parsed.genre ?? res?.genre
+      };
+    };
     let applied = false;
     void lookupMetadata(title, it.uploader)
+      .then(fallback)
       .then((res) => {
         if (cancelled || !res) return;
         const era = yearToEra(res.year);
@@ -110,7 +133,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
           if (!next.artist && res.artist) next.artist = res.artist;
           if (!next.album && res.album) next.album = res.album;
           if (!next.genre1 && res.genre) next.genre1 = res.genre;
-          if (!next.year && era && !cur.year) next.year = era;
+          if (era && !cur.year) next.year = era;
           return { ...prev, [it.id]: next };
         });
       })

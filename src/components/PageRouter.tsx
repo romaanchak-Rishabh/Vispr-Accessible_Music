@@ -339,7 +339,8 @@ function BrowseView(): JSX.Element {
   const status = useLibrary((s) => s.status);
   const albums = useLibrary((s) => s.albums);
   const genres = useLibrary((s) => s.tracks.reduce<Map<string, number>>((m, t) => {
-    const g = t.genre ?? 'Unknown Genre';
+    const g = (t.genre1 ?? t.genre2 ?? t.genre ?? '').trim();
+    if (!g) return m;
     m.set(g, (m.get(g) ?? 0) + 1);
     return m;
   }, new Map()));
@@ -391,7 +392,7 @@ function SearchView(): JSX.Element {
         t.title.toLowerCase().includes(q) ||
         t.artist.toLowerCase().includes(q) ||
         t.album.toLowerCase().includes(q) ||
-        (t.genre ?? '').toLowerCase().includes(q)
+        (t.genre1 ?? t.genre2 ?? '').toLowerCase().includes(q)
     );
   }, [query, tracks]);
 

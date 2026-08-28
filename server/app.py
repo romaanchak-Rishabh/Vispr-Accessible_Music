@@ -5,6 +5,9 @@ Endpoints (POST, JSON):
   /api/resolve   { "url": "<youtube video or playlist url>" }
                  -> { "items": [ { "id", "title", "webpage_url", "uploader", "duration", "thumbnail", "playlist_title" } ] }
 
+  /api/info      { "url": "<single youtube video url>" }
+                 -> { "description", "tags", "year", "artist", "title" }
+
   /api/download  { "url": "<single youtube video url>" }
                  -> audio file bytes (m4a/webm)
 
@@ -235,6 +238,57 @@ def _info_to_items(info, url):
     return items
 
 
+def handle_info(payload):
+    """Full (non-flat) extraction of a single video -> { description, tags, year, artist }.
+
+    The /api/resolve endpoint uses extract_flat (fast for playlists), which omits
+    description/tags. This endpoint does a full extraction for ONE video so the
+    PWA can refine metadata from the YouTube description when iTunes has nothing
+    (common for Indian/regional songs).
+    """
+    url = normalize_url(payload.get("url", "").strip())
+    if not url:
+        return 400, {"error": "missing url"}
+
+    def attempt(client):
+        opts = _opts_for(client, {"skip_download": True, "noplaylist": True})
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+        if info is None:
+            raise RuntimeError("yt-dlp returned nothing")
+        return info
+
+    try:
+        info = _run_with_fallback(attempt)
+    except Exception as exc:  # noqa: BLE001
+        return 502, {"error": f"yt-dlp failed: {clean_err(str(exc))}"}
+
+    year = None
+    for key in ("release_year", "release_date"):
+        val = info.get(key)
+        if val:
+            m = re.search(r"(\d{4})", str(val))
+            if m:
+                year = int(m.group(1))
+                break
+    if year is None:
+        ud = info.get("upload_date")
+        if ud and isinstance(ud, str) and len(ud) >= 4 and ud[:4].isdigit():
+            year = int(ud[:4])
+
+    return 200, {
+        "description": info.get("description") or "",
+        "tags": info.get("tags") or [],
+        "year": year,
+        "artist": info.get("artist")
+        or info.get("album_artist")
+        or info.get("creator")
+        or info.get("uploader")
+        or info.get("channel"),
+        "title": info.get("title"),
+    }
+
+
 def handle_download(payload):
     url = normalize_url(payload.get("url", "").strip())
     if not url:
@@ -323,7 +377,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):  # noqa: N802
-        if self.path.split("?")[0] not in ("/api/resolve", "/api/download"):
+        if self.path.split("?")[0] not in ("/api/resolve", "/api/info", "/api/download"):
             self._json(404, {"error": "not found"})
             return
         if not check_auth(self.headers):
@@ -338,6 +392,11 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path.startswith("/api/resolve"):
             status, obj = handle_resolve(payload)
+            self._json(status, obj)
+            return
+
+        if self.path.startswith("/api/info"):
+            status, obj = handle_info(payload)
             self._json(status, obj)
             return
 
