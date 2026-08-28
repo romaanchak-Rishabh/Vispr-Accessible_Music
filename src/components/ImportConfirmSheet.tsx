@@ -209,6 +209,30 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
     advance();
   };
 
+  const skipSong = (): void => {
+    // Mark current song as completely skipped (no edits)
+    setEdits((prev) => {
+      const cur = prev[item.id];
+      if (cur) {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      }
+      return prev;
+    });
+    advance();
+  };
+
+  const skipAllRemaining = (): void => {
+    // Clear edits for all remaining songs including current
+    setEdits((prev) => {
+      const next = { ...prev };
+      items.slice(songIdx).forEach((it) => delete next[it.id]);
+      return next;
+    });
+    setStage('finish');
+  };
+
   const back = (): void => {
     if (stage === 'finish') {
       setStage('ask');
@@ -274,7 +298,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   const isLast = fieldIdx === FIELDS.length - 1 && songIdx === items.length - 1;
 
   return (
-    <div className="sheet-overlay" style={{ alignItems: 'flex-start', justifyContent: 'center', paddingTop: 24, paddingBottom: 20, overflowY: 'auto' }} onClick={onCancel}>
+    <div className="sheet-overlay" style={{ alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingBottom: 20, overflowY: 'auto' }} onClick={onCancel}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', minHeight: '100%' }} onClick={(e) => e.stopPropagation()}>
         <div className="import-wizard">
           <div className="import-wizard-head">
@@ -379,6 +403,16 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
               <button className="pill-btn" onClick={back} disabled={!canGoBack} style={{ opacity: canGoBack ? 1 : 0.4 }}>
                 Back
               </button>
+              {items.length > 1 && (
+                <>
+                  <button className="pill-btn" onClick={skipSong} style={{ background: 'var(--fill-1)', color: 'var(--label)' }}>
+                    Skip this song
+                  </button>
+                  <button className="pill-btn" onClick={skipAllRemaining} style={{ background: 'var(--fill-1)', color: 'var(--label)' }}>
+                    Skip all remaining
+                  </button>
+                </>
+              )}
               <button className="pill-btn" onClick={skip}>
                 Skip
               </button>

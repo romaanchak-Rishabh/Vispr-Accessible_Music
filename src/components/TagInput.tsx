@@ -139,7 +139,7 @@ export function TagInput({ value, onChange, options, placeholder, label }: TagIn
             border: '1px solid var(--separator)',
             borderRadius: 8,
             marginTop: 4,
-            maxHeight: 160,
+            maxHeight: 320,
             overflowY: 'auto',
             boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
             padding: 4

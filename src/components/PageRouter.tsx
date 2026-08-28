@@ -707,12 +707,14 @@ function ForYouPage(): JSX.Element {
   const [recs, setRecs] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
   const [embeddingProgress, setEmbeddingProgress] = useState<{ done: number; total: number } | null>(null);
+  const [showSweep, setShowSweep] = useState(false);
 
   const refresh = useCallback(async () => {
     const newSeed = Date.now();
     setSeed(newSeed);
     setLoading(true);
     setEmbeddingProgress(null);
+    setShowSweep(true);
     try {
       const favIds = new Set(favourites.map((t) => t.id));
       const recentTracks = recentlyPlayed.map((e) => e.track);
@@ -720,16 +722,21 @@ function ForYouPage(): JSX.Element {
         tracks, playCounts, recentTracks, playlists, favIds, 10, newSeed,
         (done, total) => setEmbeddingProgress({ done, total }),
       );
-      setRecs(results);
+      // Shuffle results so order changes on each refresh
+      const shuffled = [...results].sort(() => Math.random() - 0.5);
+      setRecs(shuffled);
     } catch {
       // Fallback to sync recommendations
       const favIds = new Set(favourites.map((t) => t.id));
       const recentTracks = recentlyPlayed.map((e) => e.track);
       const results = getRecommendations(tracks, playCounts, recentTracks, playlists, favIds, 10, Date.now());
-      setRecs(results);
+      const shuffled = [...results].sort(() => Math.random() - 0.5);
+      setRecs(shuffled);
     } finally {
       setLoading(false);
       setEmbeddingProgress(null);
+      // Keep aurora sweep visible for 1.5s after loading finishes
+      setTimeout(() => setShowSweep(false), 1500);
     }
   }, [tracks, playCounts, recentlyPlayed, playlists, favourites]);
 
@@ -754,8 +761,8 @@ function ForYouPage(): JSX.Element {
 
   return (
     <div className="fade-page" style={{ position: 'relative' }}>
-      {loading && <div className="magic-sweep" aria-hidden="true" />}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px' }}>
+      {(loading || showSweep) && <div className="magic-sweep" aria-hidden="true" />}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 0' }}>
         <h1 className="large-title" style={{ margin: 0 }}>For You</h1>
         <button
           className="pill-btn"
