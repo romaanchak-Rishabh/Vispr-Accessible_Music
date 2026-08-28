@@ -752,7 +752,8 @@ function ForYouPage(): JSX.Element {
   }
 
   return (
-    <div className="fade-page">
+    <div className="fade-page" style={{ position: 'relative' }}>
+      {loading && <div className="magic-sweep" aria-hidden="true" />}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px' }}>
         <h1 className="large-title" style={{ margin: 0 }}>For You</h1>
         <button

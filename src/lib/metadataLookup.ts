@@ -85,13 +85,23 @@ function score(tokens: string[], candidate: string): number {
   return hit / Math.max(1, c.length);
 }
 
+function withTimeout<T>(ms: number, fn: (signal: AbortSignal) => Promise<T>, fallback: T): Promise<T> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fn(ctrl.signal).catch(() => fallback).finally(() => clearTimeout(timer));
+}
+
 async function searchItunes(title: string, artistHint?: string, country = 'IN'): Promise<MetadataResult | null> {
-  const queries = [artistHint ? `${title} ${artistHint}` : title, title];
+  const withHint = artistHint ? `${title} ${artistHint}` : '';
+  const queries = withHint ? [withHint, title] : [title];
+  let best: { s: number; m: MetadataResult } | null = null;
   for (const q of queries) {
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=${country}&limit=8`;
-    const r = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (!r.ok) continue;
-    const data: {
+    // Short timeout — iTunes is fast and reliable; if a query stalls, move on
+    // immediately rather than making the import feel stuck.
+    const r = await withTimeout(3500, (signal) => fetch(url, { headers: { Accept: 'application/json' }, signal }), null);
+    if (!r || !r.ok) continue;
+    let data: {
       results?: Array<{
         trackName: string;
         artistName: string;
@@ -100,15 +110,28 @@ async function searchItunes(title: string, artistHint?: string, country = 'IN'):
         primaryGenreName?: string;
         artworkUrl100?: string;
       }>;
-    } = await r.json();
+    } | null = null;
+    try {
+      data = (await r.json()) as {
+        results?: Array<{
+          trackName: string;
+          artistName: string;
+          collectionName?: string;
+          releaseDate?: string;
+          primaryGenreName?: string;
+          artworkUrl100?: string;
+        }>;
+      };
+    } catch {
+      continue;
+    }
     const res = data?.results ?? [];
     if (res.length === 0) continue;
     const tokens = norm(q).split(' ').filter((t) => t.length > 2);
-    let best: { s: number; m: MetadataResult } | null = null;
     for (const t of res) {
       if (!t.trackName) continue;
       const s = score(tokens, t.trackName);
-      if (s < 0.25) continue;
+      if (s < 0.15) continue;
       const m: MetadataResult = {
         artist: t.artistName,
         album: t.collectionName && t.collectionName !== t.trackName ? t.collectionName : undefined,
@@ -118,57 +141,28 @@ async function searchItunes(title: string, artistHint?: string, country = 'IN'):
       };
       if (!best || s > best.s) best = { s, m };
     }
-    if (best) return best.m;
   }
-  return null;
-}
-
-let lastBrainzCall = 0;
-async function throttleBrainz(): Promise<void> {
-  const elapsed = Date.now() - lastBrainzCall;
-  if (elapsed < 1100) await new Promise((res) => setTimeout(res, 1100 - elapsed));
-  lastBrainzCall = Date.now();
-}
-
-async function searchMusicBrainz(title: string, artistHint?: string): Promise<MetadataResult | null> {
-  await throttleBrainz();
-  const cleanTitle = title.replace(/[()]/g, '').trim();
-  const query = artistHint
-    ? `recording:"${encodeURIComponent(cleanTitle)}" AND artist:"${encodeURIComponent(artistHint)}"`
-    : `recording:"${encodeURIComponent(cleanTitle)}"`;
-  const url = `https://musicbrainz.org/ws/2/recording/?query=${query}&fmt=json&limit=3`;
-  const r = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!r.ok) return null;
-  const data = (await r.json()) as {
-    recordings?: Array<{
-      title: string;
-      'artist-credit'?: Array<{ name?: string }>;
-      releases?: Array<{ title?: string; date?: string }>;
-    }>;
-  };
-  const rec = data?.recordings?.[0];
-  if (!rec || !rec.title) return null;
-  const rel = rec.releases?.[0];
-  return {
-    artist: rec['artist-credit']?.[0]?.name ?? artistHint,
-    album: rel?.title ?? undefined,
-    year: rel?.date ? Number.parseInt(rel.date.slice(0, 4), 10) || undefined : undefined
-  };
+  return best ? best.m : null;
 }
 
 /**
  * Best-effort metadata lookup for an imported song (no API keys required).
- * iTunes Search first (rich fields, CORS-friendly), MusicBrainz as fallback.
+ *
+ * Uses the iTunes Search API only. It is fast, CORS-friendly from the browser,
+ * and returns rich fields (artist, album, year, genre, artwork) — everything
+ * the import wizard needs. (MusicBrainz was dropped: it requires a special
+ * User-Agent, is heavily rate-limited, and frequently hangs/timeouts, which
+ * made the import feel stuck.)
+ *
+ * The whole lookup is bounded by a hard ~4.5s timeout so it never blocks the
+ * user even if the network is slow or offline.
  */
 export async function lookupMetadata(title: string, artistHint?: string): Promise<MetadataResult | null> {
   try {
-    const it = await searchItunes(title, artistHint);
-    if (it) return it;
-  } catch {
-    /* fall through to MusicBrainz */
-  }
-  try {
-    return await searchMusicBrainz(title, artistHint);
+    return await Promise.race([
+      searchItunes(title, artistHint),
+      new Promise<null>((res) => setTimeout(() => res(null), 4500))
+    ]);
   } catch {
     return null;
   }

@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import { Artwork } from './Artwork';
-import { PlayIcon, PauseIcon, NextIcon } from './Icons';
+import { PlayIcon, PauseIcon, NextIcon, PrevIcon } from './Icons';
 import { formatArtist } from '../types';
 
 export function MiniPlayer(): JSX.Element | null {
@@ -12,6 +12,7 @@ export function MiniPlayer(): JSX.Element | null {
   const duration = usePlayer((s) => s.duration);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const next = usePlayer((s) => s.next);
+  const previous = usePlayer((s) => s.previous);
   const openNowPlaying = useUI((s) => s.openNowPlaying);
 
   if (!track) return null;
@@ -31,6 +32,15 @@ export function MiniPlayer(): JSX.Element | null {
           <span className="mini-artist" style={{ display: 'block' }}>
             {formatArtist(track)}
           </span>
+        </span>
+        <span
+          className="mini-controls"
+          onClick={(e) => {
+            e.stopPropagation();
+            previous();
+          }}
+        >
+          <PrevIcon size={24} />
         </span>
         <span
           className="mini-controls"
