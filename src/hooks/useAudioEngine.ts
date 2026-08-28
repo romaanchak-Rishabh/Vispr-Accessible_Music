@@ -311,8 +311,9 @@ export function useAudioEngine(): void {
       setHandler('pause', () => usePlayer.getState().pause());
       setHandler('nexttrack', () => usePlayer.getState().next(false));
       setHandler('previoustrack', () => usePlayer.getState().previous());
-      setHandler('seekforward', () => usePlayer.getState().skipForward(5));
-      setHandler('seekbackward', () => usePlayer.getState().skipBackward(5));
+      // NOTE: no seekforward/seekbackward handlers. On iOS registering them
+      // replaces the Previous/Next buttons on the lock screen / Dynamic Island
+      // with the -10/+10 seek buttons (iOS shows one set, not both).
       setHandler('seekto', (details) => {
         if (details.seekTime != null) usePlayer.getState().seek(details.seekTime);
       });
