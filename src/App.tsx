@@ -18,6 +18,7 @@ import { DesktopPlayerBar } from './components/DesktopPlayerBar';
 import { InstallBanner } from './components/InstallBanner';
 import { Toast } from './components/Toast';
 import { PageRouter } from './components/PageRouter';
+import { PullToRefresh } from './components/PullToRefresh';
 import { ChevronLeftIcon } from './components/Icons';
 
 function pageTitle(): string {
@@ -52,8 +53,10 @@ function pageTitle(): string {
 export default function App(): JSX.Element {
   const isDesktop = useMediaQuery('(min-width: 900px)');
   const init = useLibrary((s) => s.init);
+  const rescanFolder = useLibrary((s) => s.rescanFolder);
   const pageStack = useUI((s) => s.pageStack);
   const goBack = useUI((s) => s.goBack);
+  const showToast = useUI((s) => s.showToast);
   const hasQueue = usePlayer((s) => s.queue.length > 0);
   const theme = useSettings((s) => s.theme);
   const accent = useSettings((s) => s.accent);
@@ -86,6 +89,17 @@ export default function App(): JSX.Element {
   const title = pageTitle();
   const canGoBack = pageStack.length > 1;
 
+  // Pull-to-refresh: rescan the linked folder when one is connected, otherwise
+  // reload the library from local storage (fast, safe, no data loss).
+  const handleRefresh = async (): Promise<void> => {
+    const didRescan = await rescanFolder();
+    if (didRescan) showToast('Library rescanned');
+    else {
+      await init();
+      showToast('Library refreshed');
+    }
+  };
+
   if (isDesktop) {
     return (
       <div className="app-desktop">
@@ -117,7 +131,10 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app-mobile">
-      <div className="content-scroll" style={{ paddingBottom: hasQueue ? 'calc(150px + env(safe-area-inset-bottom))' : 'calc(80px + env(safe-area-inset-bottom))' }}>
+      <PullToRefresh
+        onRefresh={handleRefresh}
+        style={{ paddingBottom: hasQueue ? 'calc(150px + env(safe-area-inset-bottom))' : 'calc(80px + env(safe-area-inset-bottom))' }}
+      >
         <header className={`navbar ${canGoBack ? '' : 'navbar--large'}`}>
           <div className="navbar-inner">
             {canGoBack && (
@@ -130,7 +147,7 @@ export default function App(): JSX.Element {
           </div>
         </header>
         <PageRouter />
-      </div>
+      </PullToRefresh>
 
       <MiniPlayer />
       <TabBar />
