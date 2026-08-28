@@ -227,3 +227,87 @@ export const SparklesIcon = ({ size }: IconProps) => (
     <path d="M5 16l.6 1.8L7.4 18.4l-1.8.6L5 20.8l-.6-1.8-1.8-.6 1.8-.6z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none" />
   </S>
 );
+
+export const HeartIcon = ({ size }: IconProps) => (
+  <S size={size}>
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.14-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.14a5.5 5.5 0 0 0 0 7.78l1.14 1.14a5.5 5.5 0 0 0 7.78 0l1.14-1.14a5.5 5.5 0 0 0 0-7.78z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+  </S>
+);
+
+export const HeartFillIcon = ({ size }: IconProps) => (
+  <S size={size}>
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.14-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.14a5.5 5.5 0 0 0 7.78 0l1.14-1.14a5.5 5.5 0 0 0 0-7.78z" fill="currentColor" />
+  </S>
+);
+
+export const RadioIcon = ({ size }: IconProps) => (
+  <S size={size} viewBox="0 0 28 28">
+    <circle cx="14" cy="14" r="10.5" stroke="currentColor" strokeWidth="1.8" />
+    <path d="M14 5.5v5.5l5.5 5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M14 22.5v-5.5l-5.5-5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M5 14H14M14 24H5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
+  </S>
+);
+
+export const ClockIcon = ({ size }: IconProps) => (
+  <S size={size} viewBox="0 0 28 28">
+    <circle cx="14" cy="14" r="11" stroke="currentColor" strokeWidth="1.8" />
+    <path d="M14 6v5.5l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="14" cy="14" r="2" fill="currentColor" />
+  </S>
+);
+
+export const MusicMixIcon = ({ size }: IconProps) => (
+  <S size={size} viewBox="0 0 28 28">
+    <path d="M7 6.5c0-1.5 1.3-2.5 3-2.5h10c1.7 0 3 1 3 2.5v12c0 1.5-1.3 2.5-3 2.5H10c-1.7 0-3-1-3-2.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+    <path d="M10 10h8M10 14h5M10 18h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+  </S>
+);
+
+export const WaveformIcon = ({ size }: IconProps) => (
+  <S size={size} viewBox="0 0 28 28">
+    <path d="M7 14c0-2.5 2-4.5 5-4.5s5 2 5 4.5-2 4.5-5 4.5S7 16.5 7 14Z" stroke="currentColor" strokeWidth="1.8" />
+    <path d="M21 9c0-3 2.5-5.5 6-5.5s6 2.5 6 5.5-2.5 5.5-6 5.5S21 12 21 9Z" stroke="currentColor" strokeWidth="1.8" />
+  </S>
+);
+
+export const MoodIcon = ({ size }: IconProps) => (
+  <S size={size} viewBox="0 0 28 28">
+    <circle cx="14" cy="14" r="11" stroke="currentColor" strokeWidth="1.8" />
+    <ellipse cx="10.5" cy="11" rx="1.5" ry="2" fill="currentColor" />
+    <ellipse cx="17.5" cy="11" rx="1.5" ry="2" fill="currentColor" />
+    <path d="M9 18c0 1.5 1 2.8 2.5 3.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M16.5 18c0 1.5 1 2.8 2.5 3.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </S>
+);
+
+export const StarIcon = ({ size }: IconProps) => (
+  <S size={size}>
+    <path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z" fill="currentColor" stroke="none" />
+  </S>
+);
+
+export const ChevronDownIcon = ({ size }: IconProps) => (
+  <S size={size}>
+    <path d="m9.5 19 6.2-7-6.2-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+  </S>
+);
+
+export const MagnifyingGlassIcon = ({ size }: IconProps) => (
+  <S size={size}>
+    <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+    <path d="m15.5 15.5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </S>
+);
+
+export const GearIcon = ({ size }: IconProps) => (
+  <S size={size}>
+    <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.7" />
+    <path
+      d="M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.5-2-3.4-2.3 1a7.6 7.6 0 0 0-2.6-1.5L14.1 2h-4l-.4 2.6a7.6 7.6 0 0 0-2.6 1.5l-2.3-1-2 3.4 2 1.5a7.6 7.6 0 0 0 0 3l-2 1.5 2 3.4 2.3-1a7.6 7.6 0 0 0 2.6 1.5l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 2.6-1.5l2.3 1 2-3.4z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+  </S>
+);
