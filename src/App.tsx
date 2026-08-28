@@ -117,18 +117,16 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app-mobile">
-      <div className="content-scroll" style={{ paddingBottom: hasQueue ? 150 : 80 }}>
-        <header className="navbar">
+      <div className="content-scroll" style={{ paddingBottom: hasQueue ? 'calc(150px + env(safe-area-inset-bottom))' : 'calc(80px + env(safe-area-inset-bottom))' }}>
+        <header className={`navbar ${canGoBack ? '' : 'navbar--large'}`}>
           <div className="navbar-inner">
-            {canGoBack ? (
+            {canGoBack && (
               <button className="navbar-btn" onClick={goBack} aria-label="Back">
                 <ChevronLeftIcon size={24} />
               </button>
-            ) : (
-              <span style={{ width: 44 }} />
             )}
             <span className="navbar-title">{title}</span>
-            <span style={{ width: 44 }} />
+            {canGoBack && <span style={{ width: 44 }} />}
           </div>
         </header>
         <PageRouter />

@@ -307,6 +307,21 @@ input:focus-visible {
   padding-top: env(safe-area-inset-top);
 }
 
+/* Tall header — large page title, Apple Music style, on top-level (non-back) pages */
+.navbar--large .navbar-inner {
+  height: 92px;
+  align-items: flex-end;
+  padding-bottom: 10px;
+}
+
+.navbar--large .navbar-title {
+  text-align: left;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  line-height: 1.1;
+}
+
 .navbar-inner {
   display: flex;
   align-items: center;
@@ -340,6 +355,14 @@ input:focus-visible {
   font-weight: 800;
   letter-spacing: 0.37px;
   padding: 8px 16px 12px;
+}
+
+/* On mobile the tall navbar already shows the (large) page title, so drop the
+   in-page duplicate heading. Desktop keeps it (no navbar up there). */
+@media (max-width: 899px) {
+  .app-mobile .large-title {
+    display: none;
+  }
 }
 
 .section-header {

@@ -56,4 +56,16 @@ export function applyAppearance(theme: ThemeMode, accent: AccentId): void {
   else root.dataset.theme = theme;
   if (!accent || accent === 'red') root.removeAttribute('data-accent');
   else root.dataset.accent = accent;
+
+  // Keep the browser chrome / home-indicator area in sync with the app theme so
+  // there's no black strip at the bottom in light mode.
+  const light = theme === 'light' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', light ? '#f2f2f7' : '#000000');
+  else {
+    const m = document.createElement('meta');
+    m.name = 'theme-color';
+    m.content = light ? '#f2f2f7' : '#000000';
+    document.head.appendChild(m);
+  }
 }
