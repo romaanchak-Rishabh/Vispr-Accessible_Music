@@ -127,7 +127,7 @@ export default function App(): JSX.Element {
             ) : (
               <span style={{ width: 44 }} />
             )}
-            <span className="navbar-title">{canGoBack ? title : ''}</span>
+            <span className="navbar-title">{title}</span>
             <span style={{ width: 44 }} />
           </div>
         </header>
