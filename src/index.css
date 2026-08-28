@@ -248,7 +248,8 @@ input:focus-visible {
 .app-mobile {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 100vh; /* fallback */
+  height: 100dvh; /* dynamic viewport — fills the visible screen on iOS so there's no blank strip at top/bottom */
   max-width: 640px;
   margin: 0 auto;
 }
@@ -256,7 +257,8 @@ input:focus-visible {
 .app-desktop {
   display: grid;
   grid-template-columns: 260px 1fr;
-  height: 100%;
+  height: 100vh; /* fallback */
+  height: 100dvh;
 }
 
 .content-scroll {
@@ -1107,6 +1109,56 @@ input[type='range'].slider:active::-webkit-slider-thumb {
   border-bottom: 6px solid var(--fill-1);
   display: flex;
   gap: 12px;
+  align-items: center;
+}
+
+/* One-question-per-page import wizard */
+.import-wizard {
+  background: var(--sheet-bg);
+  border-radius: 18px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 84vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glass-shadow);
+  animation: sheet-up-fade 0.32s var(--spring);
+}
+
+.import-wizard-head {
+  padding: 14px 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.import-wizard-body {
+  padding: 10px 16px 6px;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.import-wizard-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
+}
+
+.import-wizard-actions .pill-btn {
+  flex: 1;
+  justify-content: center;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.import-wizard-close-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 4px;
   align-items: center;
 }
 

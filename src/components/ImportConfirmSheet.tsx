@@ -234,26 +234,29 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
     }
   };
 
+  const canGoBack = songIdx > 0 || fieldIdx > 0;
+  const isLast = fieldIdx === FIELDS.length - 1 && songIdx === items.length - 1;
+
   return (
-    <div className="sheet-overlay" style={{ alignItems: 'flex-start', justifyContent: 'center', paddingTop: 28, paddingBottom: 20, overflowY: 'auto' }} onClick={onCancel}>
+    <div className="sheet-overlay" style={{ alignItems: 'flex-start', justifyContent: 'center', paddingTop: 24, paddingBottom: 20, overflowY: 'auto' }} onClick={onCancel}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', minHeight: '100%' }} onClick={(e) => e.stopPropagation()}>
-        <div className="action-sheet" style={{ width: 'min(460px, 100%)', borderRadius: 16, maxHeight: '78vh', display: 'flex', flexDirection: 'column' }}>
-          <div className="action-sheet-head">
-            <button className="pill-btn" style={{ fontSize: 13, padding: '4px 10px' }} onClick={onCancel}>
+        <div className="import-wizard">
+          <div className="import-wizard-head">
+            <button className="pill-btn" style={{ fontSize: 13, padding: '5px 12px' }} onClick={onCancel}>
               Cancel
             </button>
             <span style={{ fontSize: 16, fontWeight: 600, flex: 1, textAlign: 'center' }}>
               {stage === 'finish' ? 'Finish import' : `Song ${songIdx + 1} of ${items.length}`}
             </span>
-            <span style={{ fontSize: 12, color: 'var(--label-secondary)', minWidth: 52, textAlign: 'right' }}>{stepNo}/{totalSteps}</span>
+            <span style={{ fontSize: 12, color: 'var(--label-secondary)', minWidth: 40, textAlign: 'right' }}>{stepNo}/{totalSteps}</span>
           </div>
 
-          <div style={{ height: 3, background: 'var(--fill-1)', overflow: 'hidden' }}>
+          <div style={{ height: 3, background: 'var(--fill-1)', overflow: 'hidden', flexShrink: 0 }}>
             <div style={{ height: '100%', background: 'var(--accent)', transition: 'width 180ms ease', width: `${(stepNo / totalSteps) * 100}%` }} />
           </div>
 
           {stage === 'ask' ? (
-            <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', minHeight: 0 }}>
+            <div className="import-wizard-body">
               <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 <button
                   onClick={() => fileRef.current?.click()}
@@ -283,15 +286,15 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
               </div>
 
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{field.label}?</div>
-                <div style={{ fontSize: 12, color: 'var(--label-secondary)', marginBottom: 8 }}>{field.hint}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{field.label}?</div>
+                <div style={{ fontSize: 12, color: 'var(--label-secondary)', marginBottom: 6 }}>{field.hint}</div>
               </div>
 
               {field.key === 'title' ? (
                 <input
                   key={field.key}
                   className="search-input"
-                  style={{ paddingLeft: 12, fontSize: 15 }}
+                  style={{ paddingLeft: 12, fontSize: 16, padding: '11px 12px 11px 34px' }}
                   placeholder={item.title ?? 'Title'}
                   value={currentValue}
                   onChange={(e) => setField(item, 'title', e.target.value)}
@@ -306,24 +309,12 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                 />
               )}
 
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <button className="pill-btn" onClick={back} disabled={songIdx === 0 && fieldIdx === 0 && stage === 'ask'} style={{ opacity: songIdx === 0 && fieldIdx === 0 ? 0.4 : 1 }}>
-                  Back
-                </button>
-                <button className="pill-btn" onClick={skip} style={{ flex: 1 }}>
-                  Skip — {field.skipLabel}
-                </button>
-                <button className="pill-btn primary" onClick={advance} style={{ flex: 1 }}>
-                  {fieldIdx === FIELDS.length - 1 && songIdx === items.length - 1 ? 'Finish' : 'Next'}
-                </button>
-              </div>
-
-              <button className="pill-btn" onClick={() => setStage('finish')} style={{ alignSelf: 'flex-end' }}>
+              <button className="pill-btn" onClick={() => setStage('finish')} style={{ alignSelf: 'flex-end', fontSize: 13, padding: '5px 12px' }}>
                 Skip All
               </button>
             </div>
           ) : (
-            <div style={{ padding: '18px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', minHeight: 0 }}>
+            <div style={{ padding: '16px 16px 6px', display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', minHeight: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 600 }}>Apply this review?</div>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--label-secondary)', lineHeight: 1.5 }}>
                 {answeredCount()} of {items.length} song{items.length > 1 ? 's' : ''} have your answers. Choose how to finish the import.
@@ -341,6 +332,20 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                 <input type="checkbox" checked={dontAsk} onChange={(e) => setDontAsk(e.target.checked)} />
                 Don&apos;t ask again — save imports automatically
               </label>
+            </div>
+          )}
+
+          {stage === 'ask' && (
+            <div className="import-wizard-actions">
+              <button className="pill-btn" onClick={back} disabled={!canGoBack} style={{ opacity: canGoBack ? 1 : 0.4 }}>
+                Back
+              </button>
+              <button className="pill-btn" onClick={skip}>
+                Skip
+              </button>
+              <button className="pill-btn primary" onClick={advance}>
+                {isLast ? 'Finish' : 'Next'}
+              </button>
             </div>
           )}
         </div>

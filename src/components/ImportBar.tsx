@@ -119,9 +119,10 @@ export function ImportBar(): JSX.Element {
       const trackIds = await runAutoImport(trimmed, overrides, (done, total, label) =>
         setStatusText(total > 0 && done < total ? `Downloading ${done + 1}/${total} — ${label}` : label)
       );
+      // No PostImportSheet here — the user already reviewed & confirmed every
+      // song in the wizard, so the "Tag Your Music" form would just repeat it.
       if (trackIds.length > 0) {
         setBusy(false);
-        setPostImportIds(trackIds);
         return;
       }
     } catch (e) {
