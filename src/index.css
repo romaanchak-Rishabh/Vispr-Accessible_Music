@@ -347,14 +347,14 @@ input:focus-visible {
 
 /* Tall header — large page title, Apple Music style, on top-level (non-back) pages */
 .navbar--large .navbar-inner {
-  height: 92px;
+  height: 64px;
   align-items: flex-end;
-  padding-bottom: 10px;
+  padding-bottom: 8px;
 }
 
 .navbar--large .navbar-title {
   text-align: left;
-  font-size: 30px;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.4px;
   line-height: 1.1;
