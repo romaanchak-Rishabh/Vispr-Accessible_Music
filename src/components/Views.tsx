@@ -10,6 +10,7 @@ import { FolderIcon, SpinnerIcon, ChevronRightIcon, MagnifyingGlassIcon, GearIco
 import type { Album, Track } from '../types';
 import { formatArtist } from '../types';
 import { getSmartRecommendations, getRecommendations, type Recommendation } from '../lib/recommender';
+import { getTrackProfile, type GenreTag } from '../lib/classifier';
 
 function useResponsiveCardWidth(): number {
   const [w, setW] = useState(() => Math.min(180, Math.max(140, (window.innerWidth - 48) / 2 - 8)));
@@ -575,16 +576,21 @@ export function StationsSection(): JSX.Element | null {
 
   if (tracks.length === 0) return null;
 
-  // Your Station - endless personalized
   const yourStationTracks = [...tracks].sort(() => Math.random() - 0.5).slice(0, 50);
 
-  // Genre stations
-  const genreStations = [
-    { name: 'Bollywood Radio', icon: <MusicMixIcon size={28} />, gradient: 'linear-gradient(135deg, #fa233b, #fb5c74)' },
-    { name: 'Rock Radio', icon: <WaveformIcon size={28} />, gradient: 'linear-gradient(135deg, #0a84ff, #409cff)' },
-    { name: 'Chill Radio', icon: <MoodIcon size={28} />, gradient: 'linear-gradient(135deg, #30d158, #63e284)' },
-    { name: 'Party Radio', icon: <SparklesIcon size={28} />, gradient: 'linear-gradient(135deg, #ff9f0a, #ffb84d)' },
+  const genreStations: { name: string; icon: JSX.Element; gradient: string; genres: GenreTag[] }[] = [
+    { name: 'Bollywood Radio', icon: <MusicMixIcon size={28} />, gradient: 'linear-gradient(135deg, #fa233b, #fb5c74)', genres: ['bollywood', 'hindi', 'punjabi', 'tamil', 'telugu', 'malayalam', 'kannada', 'marathi', 'bengali'] },
+    { name: 'Rock Radio', icon: <WaveformIcon size={28} />, gradient: 'linear-gradient(135deg, #0a84ff, #409cff)', genres: ['rock', 'metal', 'punk', 'alternative', 'indie'] },
+    { name: 'Chill Radio', icon: <MoodIcon size={28} />, gradient: 'linear-gradient(135deg, #30d158, #63e284)', genres: ['lo-fi', 'ambient', 'acoustic', 'folk', 'classical', 'jazz'] },
+    { name: 'Party Radio', icon: <SparklesIcon size={28} />, gradient: 'linear-gradient(135deg, #ff9f0a, #ffb84d)', genres: ['edm', 'electronic', 'pop', 'reggaeton'] },
   ];
+
+  const getGenreTracks = (genres: GenreTag[]): Track[] => {
+    return tracks.filter((t) => {
+      const profile = getTrackProfile(t);
+      return genres.includes(profile.genre1) || genres.includes(profile.genre2);
+    }).slice(0, 50);
+  };
 
   const cardWidth = useResponsiveCardWidth();
 
@@ -594,17 +600,18 @@ export function StationsSection(): JSX.Element | null {
       <div className="hscroll" style={{ gap: 14 }}>
         <button
           className="station-card"
-          style={{ width: cardWidth, background: 'linear-gradient(135deg, #fa233b, #fb5c74)', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 160, overflow: 'hidden', position: 'relative', flexShrink: 0 }}
+          style={{ width: cardWidth, background: 'linear-gradient(135deg, #fa233b, #fb5c74)', borderRadius: 16, padding: 16, minHeight: 160, overflow: 'hidden', position: 'relative', flexShrink: 0 }}
           onClick={() => playTracks(yourStationTracks, 0, 'Your Station')}
         >
           <div style={{ position: 'absolute', inset: 0, zIndex: 0, opacity: 0.15, background: 'linear-gradient(135deg, #fa233b, #fb5c74)' }} />
-          <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Your Station</span>
               <span style={{ color: 'rgba(255,255,255,0.6)' }}><RadioIcon size={28} /></span>
             </div>
-            <h4 style={{ fontSize: 16, fontWeight: 700, color: '#fff', margin: 0 }}>Your Station</h4>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Endless mix of your favorites</p>
+            <h4 style={{ fontSize: 16, fontWeight: 700, color: '#fff', margin: '8px 0 0' }}>Your Station</h4>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '4px 0 0' }}>Endless mix of your favorites</p>
+            <div style={{ flex: 1 }} />
             <button className="pill-btn primary" style={{ alignSelf: 'flex-start', padding: '8px 16px', fontSize: 13 }} onClick={(e) => { e.stopPropagation(); playTracks(yourStationTracks, 0, 'Your Station'); }}>
               <PlayIcon size={14} /> Play
             </button>
@@ -614,31 +621,32 @@ export function StationsSection(): JSX.Element | null {
           <button
             key={station.name}
             className="station-card"
-            style={{ width: cardWidth, background: station.gradient, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 160, overflow: 'hidden', position: 'relative', flexShrink: 0 }}
+            style={{ width: cardWidth, background: station.gradient, borderRadius: 16, padding: 16, minHeight: 160, overflow: 'hidden', position: 'relative', flexShrink: 0 }}
             onClick={() => {
-              const genreTracks = tracks.filter((t) => t.genre1?.toLowerCase().includes(station.name.toLowerCase().split(' ')[0]) || t.genre2?.toLowerCase().includes(station.name.toLowerCase().split(' ')[0])).slice(0, 50);
-              if (genreTracks.length === 0) {
-                playTracks(tracks.slice(0, 50), 0, station.name);
+              const matched = getGenreTracks(station.genres);
+              if (matched.length > 0) {
+                playTracks(matched, 0, station.name);
               } else {
-                playTracks(genreTracks, 0, station.name);
+                playTracks(yourStationTracks, 0, station.name);
               }
             }}
           >
             <div style={{ position: 'absolute', inset: 0, zIndex: 0, opacity: 0.15, background: station.gradient }} />
-            <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Station</span>
                 {station.icon}
               </div>
-              <h4 style={{ fontSize: 16, fontWeight: 700, color: '#fff', margin: 0 }}>{station.name}</h4>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Non-stop music</p>
+              <h4 style={{ fontSize: 16, fontWeight: 700, color: '#fff', margin: '8px 0 0' }}>{station.name}</h4>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '4px 0 0' }}>Non-stop music</p>
+              <div style={{ flex: 1 }} />
               <button className="pill-btn primary" style={{ alignSelf: 'flex-start', padding: '8px 16px', fontSize: 13 }} onClick={(e) => {
                 e.stopPropagation();
-                const genreTracks = tracks.filter((t) => t.genre1?.toLowerCase().includes(station.name.toLowerCase().split(' ')[0]) || t.genre2?.toLowerCase().includes(station.name.toLowerCase().split(' ')[0])).slice(0, 50);
-                if (genreTracks.length === 0) {
-                  playTracks(tracks.slice(0, 50), 0, station.name);
+                const matched = getGenreTracks(station.genres);
+                if (matched.length > 0) {
+                  playTracks(matched, 0, station.name);
                 } else {
-                  playTracks(genreTracks, 0, station.name);
+                  playTracks(yourStationTracks, 0, station.name);
                 }
               }}>
                 <PlayIcon size={14} /> Play
