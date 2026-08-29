@@ -236,9 +236,9 @@ export function HeroSection(): JSX.Element {
           }}
           style={{
             position: 'relative',
-            borderRadius: 20,
+            borderRadius: 24,
             overflow: 'hidden',
-            background: 'linear-gradient(135deg, var(--accent-gradient), rgba(var(--aurora-accent), 1))',
+            background: 'linear-gradient(145deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))',
             padding: 20,
             display: 'flex',
             flexDirection: 'column',
@@ -253,8 +253,8 @@ export function HeroSection(): JSX.Element {
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover',
-                  opacity: 0.35,
-                  filter: 'blur(20px)',
+                  opacity: 0.4,
+                  filter: 'blur(24px) saturate(1.4)',
                 }}
               placeholderSize={80}
               alt=""
