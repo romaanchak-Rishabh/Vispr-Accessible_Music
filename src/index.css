@@ -497,6 +497,21 @@ input:focus-visible {
   transform: scale(0.96);
 }
 
+/* Kill default button tap highlight on all interactive cards */
+.card,
+.hero-mix-card,
+.mix-card,
+.enhanced-recent-card,
+.top-pick-card,
+.station-card,
+.mood-chip,
+.enhanced-album-card,
+.album-grid-card,
+.group .row,
+.pill-btn {
+  -webkit-tap-highlight-color: transparent;
+}
+
 .card-artwork {
   width: 150px;
   height: 150px;
@@ -1382,6 +1397,7 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 
 .album-grid-card:active {
   transform: scale(0.96);
+  background-color: transparent;
 }
 
 .album-grid-art {
@@ -1739,6 +1755,7 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 .hero-mix-card:active {
   transform: scale(0.98);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  background-color: transparent;
 }
 
 .hero-mix-badge {
@@ -1759,6 +1776,7 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 .mix-card:active {
   transform: scale(0.97);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  background-color: transparent;
 }
 
 .enhanced-recent-card {
@@ -1833,6 +1851,7 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 .station-card:active {
   transform: scale(0.97);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  background-color: transparent;
 }
 
 .mood-chip {
@@ -1842,6 +1861,7 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 .mood-chip:active {
   transform: scale(0.95);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  background-color: transparent;
 }
 
 .enhanced-album-card {
@@ -1851,6 +1871,7 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 
 .enhanced-album-card:active {
   transform: scale(0.96);
+  background-color: transparent;
 }
 
 .enhanced-album-card.pressed .play-overlay-btn {
