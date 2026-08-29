@@ -5,6 +5,7 @@ import { usePlayer } from '../store/player';
 import { ACCENTS, applyAppearance, useSettings } from '../store/settings';
 import type { AccentId, ThemeMode } from '../store/settings';
 import { exportLibrary, importLibrary, type ImportProgress } from '../lib/backup';
+import { ReceiveSheet } from './ReceiveSheet';
 
 function SectionTitle({ children }: { children: string }): JSX.Element {
   return (
@@ -69,6 +70,8 @@ export function SettingsPage(): JSX.Element {
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [receiveFile, setReceiveFile] = useState<File | null>(null);
+  const receiveInputRef = useRef<HTMLInputElement>(null);
 
   const trackCount = useLibrary((s) => s.tracks.length);
   const albumCount = useLibrary((s) => s.albums.length);
@@ -260,7 +263,29 @@ export function SettingsPage(): JSX.Element {
             {importError}
           </div>
         )}
+        <Row label="Receive share">
+          <button
+            className="pill-btn"
+            style={{ padding: '5px 14px', fontSize: 13 }}
+            onClick={() => receiveInputRef.current?.click()}
+          >
+            Open
+          </button>
+          <input
+            ref={receiveInputRef}
+            type="file"
+            accept=".vispr.json,.json"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) setReceiveFile(file);
+              e.target.value = '';
+            }}
+          />
+        </Row>
       </div>
+
+      {receiveFile && <ReceiveSheet file={receiveFile} onClose={() => setReceiveFile(null)} />}
 
       <SectionTitle>About</SectionTitle>
       <div className="group" style={{ marginTop: 0 }}>

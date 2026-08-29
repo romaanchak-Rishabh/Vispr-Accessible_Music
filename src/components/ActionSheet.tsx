@@ -7,6 +7,7 @@ import { Artwork } from './Artwork';
 import { blobToDataUrl } from '../lib/metadata';
 import { formatArtist } from '../types';
 import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue } from '../lib/tags';
+import { createSharePayload, payloadToBlob } from '../lib/share';
 
 export function ActionSheet(): JSX.Element | null {
   const trackId = useUI((s) => s.actionSheetTrackId);
@@ -103,6 +104,25 @@ export function ActionSheet(): JSX.Element | null {
               label: track.favouritedAt ? '♥ Favourited — tap to remove' : '♡ Add to Favourites',
               fn: () => {
                 void lib.toggleFavourite(track.id);
+                close();
+              }
+            },
+            {
+              label: 'Share Song',
+              fn: () => {
+                const payload = createSharePayload([track]);
+                const blob = payloadToBlob(payload);
+                const file = new File([blob], `${track.title} — ${track.artist}.vispr.json`, { type: 'application/json' });
+                if (navigator.share && navigator.canShare?.({ files: [file] })) {
+                  navigator.share({ files: [file], title: track.title, text: `${track.title} — ${track.artist}` }).catch(() => {});
+                } else {
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${track.title} — ${track.artist}.vispr.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }
                 close();
               }
             },

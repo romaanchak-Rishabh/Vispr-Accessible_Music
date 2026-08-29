@@ -153,6 +153,7 @@ interface LibraryState {
   removeFromPlaylist: (playlistId: string, trackId: string) => void;
   removeTrackFromLibrary: (trackId: string) => Promise<void>;
   resolveFile: (trackId: string) => Promise<File | null>;
+  addTracks: (tracks: Track[]) => Promise<void>;
 }
 
 export const useLibrary = create<LibraryState>((set, get) => ({
@@ -588,6 +589,10 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     } catch {
       return null;
     }
+  },
+
+  addTracks: async (newTracks) => {
+    await finalizeImport(set, get, newTracks);
   }
 }));
 

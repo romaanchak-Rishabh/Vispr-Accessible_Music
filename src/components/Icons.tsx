@@ -311,3 +311,20 @@ export const GearIcon = ({ size }: IconProps) => (
     />
   </S>
 );
+
+export const ShareIcon = ({ size }: IconProps) => (
+  <S size={size}>
+    <path
+      d="M12 2l5 5h-3v7h-4V7H7l5-5z"
+      fill="currentColor"
+    />
+    <path
+      d="M4 14v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </S>
+);
