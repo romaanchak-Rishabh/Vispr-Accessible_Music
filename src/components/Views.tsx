@@ -238,7 +238,7 @@ export function HeroSection(): JSX.Element {
             position: 'relative',
             borderRadius: 20,
             overflow: 'hidden',
-            background: 'linear-gradient(135deg, var(--accent-gradient), rgba(var(--aurora-accent), 0.6))',
+            background: 'linear-gradient(135deg, var(--accent-gradient), rgba(var(--aurora-accent), 1))',
             padding: 20,
             display: 'flex',
             flexDirection: 'column',
@@ -247,15 +247,15 @@ export function HeroSection(): JSX.Element {
           }}
         >
           <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-            <Artwork
-              src={topTrack.artwork}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                opacity: 0.25,
-                filter: 'blur(20px)',
-              }}
+              <Artwork
+                src={topTrack.artwork}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  opacity: 0.35,
+                  filter: 'blur(20px)',
+                }}
               placeholderSize={80}
               alt=""
             />
