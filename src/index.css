@@ -705,7 +705,6 @@ input:focus-visible {
 
 .icon-btn.disabled {
   opacity: 0.35;
-  pointer-events: none;
 }
 
 .progress-track-mini {
