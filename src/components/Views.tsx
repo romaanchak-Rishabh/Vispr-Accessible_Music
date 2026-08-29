@@ -301,20 +301,23 @@ interface MixCardProps {
   icon: React.ReactNode;
   gradient: string;
   tracks: Track[];
-  onPlay: () => void;
-  onShuffle: () => void;
 }
 
-function MixCard({ title, subtitle, icon, gradient, tracks, onPlay, onShuffle }: MixCardProps): JSX.Element | null {
+function MixCard({ title, subtitle, icon, gradient, tracks }: MixCardProps): JSX.Element | null {
   if (tracks.length === 0) return null;
 
   const primaryTrack = tracks[0];
   const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
+  const navigate = useUI((s) => s.navigate);
+
+  const handleOpen = () => {
+    navigate({ type: 'mix-detail', id: tracks[0].id, title, subtitle, icon, gradient, tracks });
+  };
 
   return (
     <button
       className="mix-card"
-      onClick={onPlay}
+      onClick={handleOpen}
       style={{
         position: 'relative',
         borderRadius: 16,
@@ -358,16 +361,8 @@ function MixCard({ title, subtitle, icon, gradient, tracks, onPlay, onShuffle }:
           <button
             className="pill-btn primary"
             style={{ padding: '8px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center', minWidth: 0, whiteSpace: 'nowrap' }}
-            onClick={(e) => { e.stopPropagation(); onPlay(); }}
           >
             <PlayIcon size={13} /> Play
-          </button>
-          <button
-            className="pill-btn"
-            style={{ padding: '8px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center', background: 'rgba(255,255,255,0.2)', color: '#fff', minWidth: 0, whiteSpace: 'nowrap' }}
-            onClick={(e) => { e.stopPropagation(); onShuffle(); }}
-          >
-            <ShuffleIcon size={13} /> Shuffle
           </button>
         </div>
       </div>
@@ -387,7 +382,6 @@ export function MadeForYouSection(): JSX.Element | null {
   const recentlyPlayed = usePlayer((s) => s.recentlyPlayed);
   const playlists = useLibrary((s) => s.playlists);
   const favourites = useLibrary((s) => s.tracks.filter((t) => !!t.favouritedAt));
-  const playTracks = usePlayer((s) => s.playTracks);
 
   const [recs, setRecs] = useState<Recommendation[]>([]);
 
@@ -431,8 +425,6 @@ export function MadeForYouSection(): JSX.Element | null {
             icon={mix.icon}
             gradient={mix.gradient}
             tracks={mix.tracks}
-            onPlay={() => playTracks(mix.tracks, 0, mix.title)}
-            onShuffle={() => playTracks(mix.tracks, Math.floor(Math.random() * mix.tracks.length), mix.title + ' — Shuffle')}
           />
         ))}
       </div>
