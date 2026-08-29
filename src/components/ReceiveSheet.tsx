@@ -30,7 +30,6 @@ function getShareTypeLabel(payload: SharePayload): string {
 
 export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element | null {
   const existingTracks = useLibrary((s) => s.tracks);
-  const existingPlaylists = useLibrary((s) => s.playlists);
   const createPlaylist = useLibrary((s) => s.createPlaylist);
   const addToPlaylist = useLibrary((s) => s.addToPlaylist);
   const ytdlpServer = useLibrary(() => {
@@ -48,7 +47,8 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
 
   const [payload, setPayload] = useState<SharePayload | null>(null);
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
-  const [phase, setPhase] = useState<'parsing' | 'review' | 'importing' | 'done'>('parsing');
+  const [phase, setPhase] = useState<'parsing' | 'review' | 'importing' | 'done' | 'error'>('parsing');
+  const [errorMsg, setErrorMsg] = useState('');
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0, label: '' });
   const [applyAllChoice, setApplyAllChoice] = useState<'mine' | 'incoming' | null>(null);
   const [imported, setImported] = useState(0);
@@ -59,34 +59,58 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
     let cancelled = false;
     (async () => {
       try {
+        const audioFiles = files.filter((f) => !f.name.endsWith('.json'));
         const metaFile = findMetadataFile(files);
-        if (!metaFile) {
-          const audioFiles = files.filter((f) => !f.name.endsWith('.json'));
-          if (audioFiles.length > 0) {
-            const items: ConflictItem[] = audioFiles.map((af) => ({
-              incoming: {
-                id: `import-${af.name}`,
-                title: af.name.replace(/\.[^.]+$/, ''),
-                artist: 'Unknown Artist',
-                album: 'Unknown Album',
-              },
-              existing: undefined,
-              audioFile: af,
-              status: 'new' as const,
-            }));
-            if (!cancelled) {
-              setConflicts(items);
-              setPhase('review');
-            }
+
+        if (!metaFile && audioFiles.length === 0) {
+          if (!cancelled) {
+            setErrorMsg('No shareable files found.');
+            setPhase('error');
           }
           return;
         }
 
-        const text = await metaFile.text();
-        const p = parseSharePayload(text);
+        if (!metaFile) {
+          const items: ConflictItem[] = audioFiles.map((af) => ({
+            incoming: {
+              id: `import-${af.name}`,
+              title: af.name.replace(/\.[^.]+$/, ''),
+              artist: 'Unknown Artist',
+              album: 'Unknown Album',
+            },
+            existing: undefined,
+            audioFile: af,
+            status: 'new' as const,
+          }));
+          if (!cancelled) {
+            setConflicts(items);
+            setPhase('review');
+          }
+          return;
+        }
+
+        let p: SharePayload;
+        try {
+          const text = await metaFile.text();
+          p = parseSharePayload(text);
+        } catch (err) {
+          if (!cancelled) {
+            setErrorMsg('Could not read share file. It may be corrupt or not a Vispr share file.');
+            setPhase('error');
+          }
+          return;
+        }
+
         if (cancelled) return;
 
-        const audioFiles = files.filter((f) => f !== metaFile && !f.name.endsWith('.json'));
+        if (!p.tracks || p.tracks.length === 0) {
+          if (!cancelled) {
+            setErrorMsg('Share file contains no tracks.');
+            setPhase('error');
+          }
+          return;
+        }
+
         const items = detectConflicts(p.tracks, existingTracks, audioFiles.length > 0 ? audioFiles : undefined);
         if (!cancelled) {
           setPayload(p);
@@ -94,7 +118,10 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
           setPhase('review');
         }
       } catch {
-        if (!cancelled) onClose();
+        if (!cancelled) {
+          setErrorMsg('Something went wrong while reading the share.');
+          setPhase('error');
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -103,16 +130,14 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
   const startImport = async (): Promise<void> => {
     setPhase('importing');
 
-    const totalNew = conflicts.filter((c) => c.status === 'new').length;
-    const totalConflict = conflicts.filter((c) => c.status === 'conflict').length;
-    const totalToImport = totalNew + (applyAllChoice === 'incoming' ? totalConflict : 0);
+    const totalToImport = conflicts.length;
     let done = 0;
-    const importedTrackIds: string[] = [];
+    const trackIdsForPlaylist: string[] = [];
 
     for (const item of conflicts) {
       if (item.status === 'exact') {
         setSkipped((s) => s + 1);
-        importedTrackIds.push(item.existing!.id);
+        trackIdsForPlaylist.push(item.existing!.id);
         done++;
         setImportProgress({ done, total: totalToImport, label: `Skipped: ${item.incoming.title} (already in library)` });
         continue;
@@ -120,8 +145,9 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
 
       if (item.status === 'conflict' && applyAllChoice !== 'incoming') {
         setSkipped((s) => s + 1);
-        importedTrackIds.push(item.existing!.id);
+        trackIdsForPlaylist.push(item.existing!.id);
         done++;
+        setImportProgress({ done, total: totalToImport, label: `Skipped: ${item.incoming.title} (kept yours)` });
         continue;
       }
 
@@ -158,7 +184,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
             const resp = await fetch(thumbUrl, { mode: 'cors', signal: ctrl.signal });
             clearTimeout(t);
             if (resp.ok) artwork = (await blobToDataUrl(await resp.blob())) ?? undefined;
-          } catch { /* optional */ }
+          } catch { /* thumbnail optional */ }
         }
 
         const trackId = inc.youtubeId ? `y-${inc.youtubeId}` : inc.id;
@@ -185,7 +211,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         const blobFile = new File([audioBlob], filename, { type: audioBlob.type || 'audio/mp4' });
         try { await db.saveFileBlob(trackId, blobFile); } catch { /* skip */ }
         await useLibrary.getState().addTracks([track]);
-        importedTrackIds.push(trackId);
+        trackIdsForPlaylist.push(trackId);
         setImported((i) => i + 1);
       } catch {
         setFailed((f) => f + 1);
@@ -194,16 +220,15 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
       done++;
     }
 
-    if (payload && importedTrackIds.length > 0) {
-      if (payload.type === 'playlist' && payload.playlistName) {
-        const existing = existingPlaylists.find((p) => p.name === payload.playlistName);
-        if (existing) {
-          const newIds = importedTrackIds.filter((id) => !existing.trackIds.includes(id));
-          if (newIds.length > 0) addToPlaylist(existing.id, newIds);
-        } else {
-          const id = createPlaylist(payload.playlistName);
-          addToPlaylist(id, importedTrackIds);
-        }
+    if (payload && trackIdsForPlaylist.length > 0 && payload.type === 'playlist' && payload.playlistName) {
+      const currentPlaylists = useLibrary.getState().playlists;
+      const existing = currentPlaylists.find((p) => p.name === payload.playlistName);
+      if (existing) {
+        const newIds = trackIdsForPlaylist.filter((id) => !existing.trackIds.includes(id));
+        if (newIds.length > 0) addToPlaylist(existing.id, newIds);
+      } else {
+        const id = createPlaylist(payload.playlistName);
+        addToPlaylist(id, trackIdsForPlaylist);
       }
     }
 
@@ -214,6 +239,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
   const conflictCount = conflicts.filter((c) => c.status === 'conflict').length;
   const newCount = conflicts.filter((c) => c.status === 'new').length;
   const withAudio = conflicts.filter((c) => c.audioFile).length;
+  const importableCount = newCount + (applyAllChoice === 'incoming' ? conflictCount : 0);
 
   return (
     <div className="sheet-overlay" style={{ alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
@@ -223,6 +249,18 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
             <SpinnerIcon size={32} />
             <div style={{ marginTop: 12, fontSize: 15 }}>Reading share file...</div>
           </div>
+        )}
+
+        {phase === 'error' && (
+          <>
+            <div className="action-sheet-head">
+              <div style={{ fontSize: 17, fontWeight: 600 }}>Could Not Import</div>
+            </div>
+            <div style={{ padding: '12px 16px', fontSize: 14, color: 'var(--label-secondary)' }}>{errorMsg}</div>
+            <div style={{ padding: '8px 16px 16px' }}>
+              <button className="pill-btn primary" style={{ width: '100%' }} onClick={onClose}>OK</button>
+            </div>
+          </>
         )}
 
         {phase === 'review' && (
@@ -278,8 +316,8 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
             )}
 
             <div style={{ display: 'flex', gap: 8, padding: '12px 16px 16px' }}>
-              <button className="pill-btn primary" style={{ flex: 1 }} onClick={() => void startImport()} disabled={conflictCount > 0 && applyAllChoice === null}>
-                Import {newCount + (applyAllChoice === 'incoming' ? conflictCount : 0)} songs
+              <button className="pill-btn primary" style={{ flex: 1 }} onClick={() => void startImport()} disabled={importableCount === 0 || (conflictCount > 0 && applyAllChoice === null)}>
+                Import {importableCount} song{importableCount !== 1 ? 's' : ''}
               </button>
               <button className="pill-btn" onClick={onClose}>Cancel</button>
             </div>

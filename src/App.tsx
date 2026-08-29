@@ -124,6 +124,7 @@ export default function App(): JSX.Element {
         <QueueSheet />
         <ActionSheet />
         <Toast />
+        {shareTargetFiles && <ReceiveSheet files={shareTargetFiles} onClose={() => setShareTargetFiles(null)} />}
       </div>
     );
   }

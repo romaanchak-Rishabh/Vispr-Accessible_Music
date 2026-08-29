@@ -135,7 +135,8 @@ async function sharePayload(payload: SharePayload, tracks: Track[]): Promise<voi
   for (const track of tracks) {
     const blob = await db.loadFileBlob(track.id);
     if (blob) {
-      const ext = track.fileName?.split('.').pop() ?? 'm4a';
+      const dotIdx = track.fileName?.lastIndexOf('.') ?? -1;
+      const ext = dotIdx > 0 ? track.fileName!.slice(dotIdx + 1) : 'm4a';
       const safeName = `${track.title} — ${track.artist}.${ext}`.replace(/[<>:"/\\|?*]/g, '_');
       audioFiles.push(new File([blob], safeName, { type: blob.type || 'audio/mp4' }));
     }
@@ -156,7 +157,7 @@ async function sharePayload(payload: SharePayload, tracks: Track[]): Promise<voi
     a.href = url;
     a.download = getFileName(payload);
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }
 
@@ -164,6 +165,15 @@ export function parseSharePayload(text: string): SharePayload {
   const data = JSON.parse(text);
   if (data.v !== 1 || !data.tracks || !Array.isArray(data.tracks)) {
     throw new Error('Invalid share file');
+  }
+  const validTypes = ['track', 'playlist', 'album', 'artist', 'mix'];
+  if (data.type && !validTypes.includes(data.type)) {
+    data.type = 'track';
+  }
+  for (const t of data.tracks) {
+    if (!t.id || !t.title || !t.artist || !t.album) {
+      throw new Error('Malformed track in share file');
+    }
   }
   return data as SharePayload;
 }
