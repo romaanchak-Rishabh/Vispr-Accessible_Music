@@ -641,7 +641,7 @@ export function StationsSection(): JSX.Element | null {
 // Mood / Genre Chips
 export function MoodGenreChips(): JSX.Element | null {
   const tracks = useLibrary((s) => s.tracks);
-  const playTracks = usePlayer((s) => s.playTracks);
+  const navigate = useUI((s) => s.navigate);
 
   if (tracks.length === 0) return null;
 
@@ -658,40 +658,41 @@ export function MoodGenreChips(): JSX.Element | null {
     <div style={{ padding: '0 16px 16px' }}>
       <h2 className="section-header">By Mood</h2>
       <div className="hscroll" style={{ gap: 10 }}>
-        {moods.map((mood) => (
-          <button
-            key={mood.name}
-            className="mood-chip"
-            style={{
-              padding: '14px 22px',
-              background: mood.gradient,
-              borderRadius: '999px',
-              fontSize: 15,
-              fontWeight: 600,
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-              border: 'none',
-              whiteSpace: 'nowrap',
-            }}
-            onClick={() => {
-              const moodTracks = tracks.filter((t) => {
-                const genre = (t.genre1 ?? t.genre2 ?? '').toLowerCase();
-                return genre.includes(mood.name.toLowerCase()) || genre === '';
-              }).slice(0, 50);
-              if (moodTracks.length > 0) {
-                playTracks(moodTracks, 0, mood.name);
-              } else {
-                playTracks(tracks.slice(0, 50), 0, mood.name);
-              }
-            }}
-          >
-            {mood.icon}
-            {mood.name}
-          </button>
-        ))}
+{moods.map((mood) => {
+            const moodTracks = tracks.filter((t) => {
+              const genre = (t.genre1 ?? t.genre2 ?? '').toLowerCase();
+              return genre.includes(mood.name.toLowerCase()) || genre === '';
+            }).slice(0, 50);
+
+            const finalTracks = moodTracks.length > 0 ? moodTracks : tracks.slice(0, 50);
+
+            return (
+            <button
+              key={mood.name}
+              className="mood-chip"
+              style={{
+                padding: '14px 22px',
+                background: mood.gradient,
+                borderRadius: '999px',
+                fontSize: 15,
+                fontWeight: 600,
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                border: 'none',
+                whiteSpace: 'nowrap',
+              }}
+              onClick={() => {
+                navigate({ type: 'mix-detail', id: `mood-${mood.name}`, title: mood.name, subtitle: `${moodTracks.length} songs`, icon: mood.icon, gradient: mood.gradient, tracks: finalTracks });
+              }}
+            >
+              {mood.icon}
+              {mood.name}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
