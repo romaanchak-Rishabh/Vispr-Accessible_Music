@@ -70,7 +70,7 @@ export function SettingsPage(): JSX.Element {
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [receiveFile, setReceiveFile] = useState<File | null>(null);
+  const [receiveFiles, setReceiveFiles] = useState<File[] | null>(null);
   const receiveInputRef = useRef<HTMLInputElement>(null);
 
   const trackCount = useLibrary((s) => s.tracks.length);
@@ -274,18 +274,21 @@ export function SettingsPage(): JSX.Element {
           <input
             ref={receiveInputRef}
             type="file"
-            accept=".vispr.json,.json"
+            accept=".vispr.json,.json,.m4a,.mp3,.mp4,.aac,.ogg,.opus,.flac"
+            multiple
             style={{ display: 'none' }}
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) setReceiveFile(file);
+              const fileList = e.target.files;
+              if (fileList && fileList.length > 0) {
+                setReceiveFiles(Array.from(fileList));
+              }
               e.target.value = '';
             }}
           />
         </Row>
       </div>
 
-      {receiveFile && <ReceiveSheet file={receiveFile} onClose={() => setReceiveFile(null)} />}
+      {receiveFiles && <ReceiveSheet files={receiveFiles} onClose={() => setReceiveFiles(null)} />}
 
       <SectionTitle>About</SectionTitle>
       <div className="group" style={{ marginTop: 0 }}>

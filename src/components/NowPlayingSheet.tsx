@@ -5,7 +5,7 @@ import { useUI } from '../store/ui';
 import { Artwork } from './Artwork';
 import { SeekBar, TimeRow } from './SeekBar';
 import { formatArtist } from '../types';
-import { createSharePayload, payloadToBlob } from '../lib/share';
+import { shareTracks } from '../lib/share';
 import {
   ChevronLeftIcon,
   EllipsisIcon,
@@ -68,21 +68,7 @@ export function NowPlayingSheet(): JSX.Element | null {
           <button
             className="icon-btn"
             style={{ color: '#fff' }}
-            onClick={() => {
-              const payload = createSharePayload([track]);
-              const blob = payloadToBlob(payload);
-              const file = new File([blob], `${track.title} — ${track.artist}.vispr.json`, { type: 'application/json' });
-              if (navigator.share && navigator.canShare?.({ files: [file] })) {
-                navigator.share({ files: [file], title: track.title, text: `${track.title} — ${track.artist}` }).catch(() => {});
-              } else {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${track.title} — ${track.artist}.vispr.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }
-            }}
+            onClick={() => void shareTracks([track])}
             aria-label="Share"
           >
             <ShareIcon size={22} />

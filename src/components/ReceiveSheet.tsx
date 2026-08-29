@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { JSX } from 'react';
 import { useLibrary } from '../store/library';
 import { Artwork } from './Artwork';
@@ -10,11 +10,15 @@ import type { Track } from '../types';
 import * as db from '../lib/db';
 
 interface ReceiveSheetProps {
-  file: File;
+  files: File[];
   onClose: () => void;
 }
 
-export function ReceiveSheet({ file, onClose }: ReceiveSheetProps): JSX.Element | null {
+function findMetadataFile(files: File[]): File | undefined {
+  return files.find((f) => f.name.endsWith('.vispr.json') || f.name === 'metadata.vispr.json');
+}
+
+export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element | null {
   const existingTracks = useLibrary((s) => s.tracks);
   const ytdlpServer = useLibrary(() => {
     try {
@@ -36,71 +40,102 @@ export function ReceiveSheet({ file, onClose }: ReceiveSheetProps): JSX.Element 
   const [imported, setImported] = useState(0);
   const [skipped, setSkipped] = useState(0);
   const [failed, setFailed] = useState(0);
-  const abortRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const text = await file.text();
+        const metaFile = findMetadataFile(files);
+        if (!metaFile) {
+          // No metadata file — try to import audio files directly
+          const audioFiles = files.filter((f) => !f.name.endsWith('.json'));
+          if (audioFiles.length > 0) {
+            const items: ConflictItem[] = audioFiles.map((af) => ({
+              incoming: {
+                id: `import-${af.name}`,
+                title: af.name.replace(/\.[^.]+$/, ''),
+                artist: 'Unknown Artist',
+                album: 'Unknown Album',
+              },
+              existing: undefined,
+              audioFile: af,
+              status: 'new' as const,
+            }));
+            if (!cancelled) {
+              setConflicts(items);
+              setPhase('review');
+            }
+          }
+          return;
+        }
+
+        const text = await metaFile.text();
         const payload = parseSharePayload(text);
         if (cancelled) return;
-        const items = detectConflicts(payload.tracks, existingTracks);
-        setConflicts(items);
-        setPhase('review');
+
+        const audioFiles = files.filter((f) => f !== metaFile && !f.name.endsWith('.json'));
+        const items = detectConflicts(payload.tracks, existingTracks, audioFiles.length > 0 ? audioFiles : undefined);
+        if (!cancelled) {
+          setConflicts(items);
+          setPhase('review');
+        }
       } catch {
         if (!cancelled) onClose();
       }
     })();
     return () => { cancelled = true; };
-  }, [file, existingTracks, onClose]);
+  }, [files, existingTracks, onClose]);
 
   const startImport = async (): Promise<void> => {
     setPhase('importing');
-    abortRef.current = false;
 
     const totalNew = conflicts.filter((c) => c.status === 'new').length;
-    const totalConflict = conflicts.filter((c) => c.status === 'conflict' && applyAllChoice === null).length;
-    const total = totalNew + totalConflict;
+    const totalConflict = conflicts.filter((c) => c.status === 'conflict').length;
+    const totalToImport = totalNew + (applyAllChoice === 'incoming' ? totalConflict : 0);
     let done = 0;
 
     for (const item of conflicts) {
-      if (abortRef.current) break;
-
       if (item.status === 'exact') {
         setSkipped((s) => s + 1);
+        done++;
+        setImportProgress({ done, total: totalToImport, label: `Skipped: ${item.incoming.title} (already in library)` });
         continue;
       }
 
-      if (item.status === 'conflict' && applyAllChoice === null) {
-        continue;
-      }
-
-      const keepMine = item.status === 'conflict' && applyAllChoice === 'mine';
-      if (keepMine) {
+      if (item.status === 'conflict' && applyAllChoice !== 'incoming') {
         setSkipped((s) => s + 1);
         done++;
-        setImportProgress({ done, total, label: `Skipped: ${item.incoming.title}` });
         continue;
       }
 
       const inc = item.incoming;
-      if (!inc.youtubeId) {
-        setSkipped((s) => s + 1);
-        done++;
-        continue;
-      }
-
-      setImportProgress({ done, total, label: `Downloading: ${inc.title}` });
+      setImportProgress({ done, total: totalToImport, label: `Importing: ${inc.title}` });
 
       try {
-        const videoUrl = `https://www.youtube.com/watch?v=${inc.youtubeId}`;
-        const dl = await downloadAudioViaYtDlp(ytdlpServer, ytdlpToken, videoUrl);
+        let audioBlob: Blob | undefined;
+        let filename = inc.fileName ?? `${inc.title} — ${inc.artist}.m4a`;
 
-        let artwork: string | undefined;
-        if (inc.artwork) {
-          artwork = inc.artwork;
-        } else {
+        // Try to use the audio file that came with the share
+        if (item.audioFile) {
+          audioBlob = item.audioFile;
+          filename = item.audioFile.name;
+        } else if (inc.youtubeId && ytdlpServer) {
+          // Fall back to downloading if no audio file provided
+          const videoUrl = `https://www.youtube.com/watch?v=${inc.youtubeId}`;
+          const dl = await downloadAudioViaYtDlp(ytdlpServer, ytdlpToken, videoUrl);
+          audioBlob = dl.blob;
+          filename = dl.filename;
+        }
+
+        if (!audioBlob) {
+          setFailed((f) => f + 1);
+          done++;
+          setImportProgress({ done, total: totalToImport, label: `Skipped: ${inc.title} (no audio)` });
+          continue;
+        }
+
+        let artwork = inc.artwork;
+        if (!artwork && inc.youtubeId) {
           const thumbUrl = `https://img.youtube.com/vi/${inc.youtubeId}/hqdefault.jpg`;
           try {
             const ctrl = new AbortController();
@@ -111,8 +146,9 @@ export function ReceiveSheet({ file, onClose }: ReceiveSheetProps): JSX.Element 
           } catch { /* optional */ }
         }
 
+        const trackId = inc.youtubeId ? `y-${inc.youtubeId}` : inc.id;
         const track: Track = {
-          id: `y-${inc.youtubeId}`,
+          id: trackId,
           title: inc.title,
           artist: inc.artist,
           artist2: inc.artist2,
@@ -122,17 +158,17 @@ export function ReceiveSheet({ file, onClose }: ReceiveSheetProps): JSX.Element 
           genre2: inc.genre2,
           year: inc.year,
           trackNo: inc.trackNo,
-          fileName: dl.filename,
-          path: dl.filename,
+          fileName: filename,
+          path: filename,
           source: 'file',
-          size: dl.blob.size,
+          size: audioBlob.size,
           addedAt: Date.now(),
           duration: inc.duration,
           artwork,
         };
 
-        const blobFile = new File([dl.blob], dl.filename, { type: dl.blob.type || 'audio/mp4' });
-        try { await db.saveFileBlob(track.id, blobFile); } catch { /* skip */ }
+        const blobFile = new File([audioBlob], filename, { type: audioBlob.type || 'audio/mp4' });
+        try { await db.saveFileBlob(trackId, blobFile); } catch { /* skip */ }
         await useLibrary.getState().addTracks([track]);
         setImported((i) => i + 1);
       } catch {
@@ -140,7 +176,6 @@ export function ReceiveSheet({ file, onClose }: ReceiveSheetProps): JSX.Element 
       }
 
       done++;
-      setImportProgress({ done, total, label: `Downloaded: ${inc.title}` });
     }
 
     setPhase('done');
@@ -149,6 +184,7 @@ export function ReceiveSheet({ file, onClose }: ReceiveSheetProps): JSX.Element 
   const exactCount = conflicts.filter((c) => c.status === 'exact').length;
   const conflictCount = conflicts.filter((c) => c.status === 'conflict').length;
   const newCount = conflicts.filter((c) => c.status === 'new').length;
+  const withAudio = conflicts.filter((c) => c.audioFile).length;
 
   return (
     <div className="sheet-overlay" style={{ alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
@@ -166,7 +202,8 @@ export function ReceiveSheet({ file, onClose }: ReceiveSheetProps): JSX.Element 
               <div style={{ fontSize: 17, fontWeight: 600 }}>Incoming Share</div>
             </div>
             <div style={{ padding: '8px 16px 12px', fontSize: 13, color: 'var(--label-secondary)' }}>
-              {conflicts.length} song{conflicts.length !== 1 ? 's' : ''} in share file
+              {conflicts.length} song{conflicts.length !== 1 ? 's' : ''}
+              {withAudio > 0 && <> — {withAudio} with audio</>}
               {exactCount > 0 && <>, {exactCount} already in library</>}
               {conflictCount > 0 && <>, {conflictCount} with different metadata</>}
               {newCount > 0 && <>, {newCount} new</>}
@@ -180,13 +217,20 @@ export function ReceiveSheet({ file, onClose }: ReceiveSheetProps): JSX.Element 
                     <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.incoming.title}</div>
                     <div style={{ fontSize: 12, color: 'var(--label-secondary)' }}>{item.incoming.artist}</div>
                   </div>
-                  <span style={{
-                    fontSize: 11, padding: '2px 8px', borderRadius: 10, fontWeight: 500,
-                    background: item.status === 'exact' ? 'var(--fill-1)' : item.status === 'conflict' ? 'rgba(255,149,0,0.15)' : 'rgba(52,199,89,0.15)',
-                    color: item.status === 'exact' ? 'var(--label-secondary)' : item.status === 'conflict' ? '#ff9500' : '#34c759',
-                  }}>
-                    {item.status === 'exact' ? 'Have it' : item.status === 'conflict' ? 'Differs' : 'New'}
-                  </span>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    {item.audioFile && (
+                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'rgba(52,199,89,0.15)', color: '#34c759' }}>
+                        Audio
+                      </span>
+                    )}
+                    <span style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 10, fontWeight: 500,
+                      background: item.status === 'exact' ? 'var(--fill-1)' : item.status === 'conflict' ? 'rgba(255,149,0,0.15)' : 'rgba(0,122,255,0.15)',
+                      color: item.status === 'exact' ? 'var(--label-secondary)' : item.status === 'conflict' ? '#ff9500' : '#007aff',
+                    }}>
+                      {item.status === 'exact' ? 'Have it' : item.status === 'conflict' ? 'Differs' : 'New'}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
