@@ -189,6 +189,7 @@ export function HeroSection(): JSX.Element {
   const playTracks = usePlayer((s) => s.playTracks);
   const recentlyPlayed = usePlayer((s) => s.recentlyPlayed);
   const tracks = useLibrary((s) => s.tracks);
+  const navigate = useUI((s) => s.navigate);
 
   const greeting = getGreeting();
   const topTrack = recentlyPlayed[0]?.track ?? tracks[0];
@@ -205,10 +206,10 @@ export function HeroSection(): JSX.Element {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="icon-btn" style={{ width: 40, height: 40 }} aria-label="Search">
+          <button className="icon-btn" style={{ width: 40, height: 40 }} aria-label="Search" onClick={() => navigate({ type: 'search' })}>
             <MagnifyingGlassIcon size={20} />
           </button>
-          <button className="icon-btn" style={{ width: 40, height: 40 }} aria-label="Settings">
+          <button className="icon-btn" style={{ width: 40, height: 40 }} aria-label="Settings" onClick={() => navigate({ type: 'settings' })}>
             <GearIcon size={20} />
           </button>
         </div>
@@ -308,6 +309,7 @@ function MixCard({ title, subtitle, icon, gradient, tracks, onPlay, onShuffle }:
   if (tracks.length === 0) return null;
 
   const primaryTrack = tracks[0];
+  const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
 
   return (
     <button
@@ -323,7 +325,8 @@ function MixCard({ title, subtitle, icon, gradient, tracks, onPlay, onShuffle }:
         flexDirection: 'column',
         gap: 12,
         minHeight: 160,
-        width: 180,
+        width: cardWidth,
+        flexShrink: 0,
       }}
     >
       <div style={{ position: 'absolute', inset: 0, zIndex: 0, opacity: 0.15 }}>
@@ -448,6 +451,7 @@ function EnhancedRecentCard({ track, playedAt }: EnhancedRecentCardProps): JSX.E
   const openNowPlaying = useUI((s) => s.openNowPlaying);
 
   const timeAgo = formatTimeAgo(playedAt);
+  const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
 
   return (
     <button
@@ -456,9 +460,9 @@ function EnhancedRecentCard({ track, playedAt }: EnhancedRecentCardProps): JSX.E
         playTracks([track], 0);
         openNowPlaying();
       }}
-      style={{ width: 180, background: 'none' }}
+      style={{ width: cardWidth, background: 'none', flexShrink: 0 }}
     >
-      <Artwork src={track.artwork} className="enhanced-card-artwork" placeholderSize={30} alt="" style={{ width: 180, height: 180 } as React.CSSProperties} />
+      <Artwork src={track.artwork} className="enhanced-card-artwork" placeholderSize={30} alt="" style={{ width: cardWidth, height: cardWidth } as React.CSSProperties} />
       <div className="card-title" style={{ marginTop: 10 }}>{track.title}</div>
       <div className="card-subtitle">{formatArtist(track)}</div>
       <div className="card-timestamp">{timeAgo}</div>
@@ -524,6 +528,8 @@ export function TopPicksSection(): JSX.Element | null {
 
   if (topArtists.length === 0) return null;
 
+  const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
+
   return (
     <div style={{ padding: '0 16px 16px' }}>
       <h2 className="section-header">Top Picks for You</h2>
@@ -534,21 +540,21 @@ export function TopPicksSection(): JSX.Element | null {
         {topArtists.map((artist, _i) => {
           const artistTracks = tracks.filter((t) => t.artist === artist).slice(0, 5);
           if (artistTracks.length === 0) return null;
-          return (
-            <button
-              key={artist}
-              className="top-pick-card"
-              style={{ width: 180, background: 'none' }}
-              onClick={() => playTracks(artistTracks, 0, artist)}
-            >
-              <Artwork src={artistTracks[0]?.artwork} className="top-pick-artwork" placeholderSize={30} alt="" style={{ width: 180, height: 180 } as React.CSSProperties} />
-              <div className="card-title" style={{ marginTop: 10 }}>{artist}</div>
-              <div className="card-subtitle">Artist · {artistTracks.length} songs</div>
-              <div className="top-pick-badge">
-                <StarIcon size={14} /> Top Pick
-              </div>
-            </button>
-          );
+return (
+    <button
+      key={artist}
+      className="top-pick-card"
+      style={{ width: cardWidth, background: 'none', flexShrink: 0 }}
+      onClick={() => playTracks(artistTracks, 0, artist)}
+    >
+      <Artwork src={artistTracks[0]?.artwork} className="top-pick-artwork" placeholderSize={30} alt="" style={{ width: cardWidth, height: cardWidth } as React.CSSProperties} />
+      <div className="card-title" style={{ marginTop: 10 }}>{artist}</div>
+      <div className="card-subtitle">Artist · {artistTracks.length} songs</div>
+      <div className="top-pick-badge">
+        <StarIcon size={14} /> Top Pick
+      </div>
+    </button>
+  );
         })}
       </div>
     </div>
@@ -573,13 +579,15 @@ export function StationsSection(): JSX.Element | null {
     { name: 'Party Radio', icon: <SparklesIcon size={28} />, gradient: 'linear-gradient(135deg, #ff9f0a, #ffb84d)' },
   ];
 
+  const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
+
   return (
     <div style={{ padding: '0 16px 16px' }}>
       <h2 className="section-header">Stations for You</h2>
       <div className="hscroll" style={{ gap: 14 }}>
         <button
           className="station-card"
-          style={{ width: 180, background: 'linear-gradient(135deg, #fa233b, #fb5c74)', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 160, overflow: 'hidden', position: 'relative' }}
+          style={{ width: cardWidth, background: 'linear-gradient(135deg, #fa233b, #fb5c74)', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 160, overflow: 'hidden', position: 'relative', flexShrink: 0 }}
           onClick={() => playTracks(yourStationTracks, 0, 'Your Station')}
         >
           <div style={{ position: 'absolute', inset: 0, zIndex: 0, opacity: 0.15, background: 'linear-gradient(135deg, #fa233b, #fb5c74)' }} />
@@ -599,7 +607,7 @@ export function StationsSection(): JSX.Element | null {
           <button
             key={station.name}
             className="station-card"
-            style={{ width: 180, background: station.gradient, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 160, overflow: 'hidden', position: 'relative' }}
+            style={{ width: cardWidth, background: station.gradient, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 160, overflow: 'hidden', position: 'relative', flexShrink: 0 }}
             onClick={() => {
               const genreTracks = tracks.filter((t) => t.genre1?.toLowerCase().includes(station.name.toLowerCase().split(' ')[0]) || t.genre2?.toLowerCase().includes(station.name.toLowerCase().split(' ')[0])).slice(0, 50);
               if (genreTracks.length === 0) {
@@ -703,6 +711,8 @@ export function EnhancedJumpBackInSection(): JSX.Element | null {
 
   if (albums.length === 0 && playlists.length === 0 && artists.length === 0) return null;
 
+  const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
+
   return (
     <div style={{ padding: '0 16px 16px' }}>
       <SectionRow
@@ -711,13 +721,13 @@ export function EnhancedJumpBackInSection(): JSX.Element | null {
       />
       <div className="hscroll" style={{ gap: 14 }}>
         {albums.slice(0, 12).map((a) => (
-          <EnhancedAlbumCard key={a.key} album={a} size={180} type="album" />
+          <EnhancedAlbumCard key={a.key} album={a} size={cardWidth} type="album" />
         ))}
         {playlists.slice(0, 6).map((p) => (
-          <EnhancedAlbumCard key={p.id} album={{ ...p, key: p.id, title: p.name, artist: '', artwork: p.trackIds[0] ? undefined : undefined }} size={180} type="playlist" trackIds={p.trackIds} />
+          <EnhancedAlbumCard key={p.id} album={{ ...p, key: p.id, title: p.name, artist: '', artwork: p.trackIds[0] ? undefined : undefined }} size={cardWidth} type="playlist" trackIds={p.trackIds} />
         ))}
         {artists.slice(0, 6).map((a) => (
-          <EnhancedAlbumCard key={a.name} album={{ key: a.name, title: a.name, artist: '', artwork: a.artwork }} size={180} type="artist" />
+          <EnhancedAlbumCard key={a.name} album={{ key: a.name, title: a.name, artist: '', artwork: a.artwork }} size={cardWidth} type="artist" />
         ))}
       </div>
     </div>

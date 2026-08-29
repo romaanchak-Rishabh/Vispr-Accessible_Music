@@ -3,12 +3,12 @@ import type { JSX } from 'react';
 import type { YtItem } from '../lib/ytdlp';
 import { fetchYtInfo } from '../lib/ytdlp';
 import { Artwork } from './Artwork';
-import { blobToDataUrl } from '../lib/metadata';
 import { TagInput } from './TagInput';
 import { useLibrary } from '../store/library';
 import { useSettings } from '../store/settings';
 import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue, formatGenre } from '../lib/tags';
 import { lookupMetadata, yearToEra, parseYoutubeDescription } from '../lib/metadataLookup';
+import { SparklesIcon } from './Icons';
 
 export interface ImportOverrides {
   title?: string;
@@ -46,10 +46,28 @@ const FIELDS: FieldDef[] = [
   { key: 'year', label: 'Year', hint: 'Release era of the song.', skipLabel: 'No year' }
 ];
 
+// Bulk fields for playlist import - applied to all songs at once
+const BULK_FIELDS: FieldDef[] = [
+  { key: 'album', label: 'Film / Album', hint: 'Same album for all songs (e.g., Aashiqui 2)', skipLabel: 'No album' },
+  { key: 'genre1', label: 'Tag 1', hint: 'Primary genre for all songs', skipLabel: 'No Tag 1' },
+  { key: 'genre2', label: 'Tag 2', hint: 'Second genre for all songs', skipLabel: 'No Tag 2' },
+  { key: 'artist', label: 'Artist 1', hint: 'Main artist for all songs', skipLabel: 'Use channel name' },
+];
+
+// Clean title by removing common YouTube suffixes
+function cleanTitle(title: string): string {
+  return title
+    .replace(/\s*\((official\s*)?(lyric|lyrics|audio|audio\s*only|video|official\s*video|music\s*video|full\s*song|song|hd|4k|extended|visualizer|visualiser)\)\s*$/i, '')
+    .replace(/\s*-\s*(topic|official|lyrics?)\s*$/i, '')
+    .replace(/\s*\[.*?(official|lyrics?|audio|video|hd|4k).*?\]\s*$/i, '')
+    .replace(/\s*\{.*?(official|lyrics?|audio|video|hd|4k).*?\}\s*$/i, '')
+    .trim();
+}
+
 const defaultForKey = (item: YtItem, key: FieldKey): string => {
   switch (key) {
     case 'title':
-      return item.title ?? '';
+      return cleanTitle(item.title ?? '');
     case 'artist':
       return item.uploader ?? '';
     case 'artist2':
@@ -65,7 +83,8 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   const [edits, setEdits] = useState<Record<string, ImportOverrides>>({});
   const [songIdx, setSongIdx] = useState(0);
   const [fieldIdx, setFieldIdx] = useState(0);
-  const [stage, setStage] = useState<'ask' | 'finish'>('ask');
+  const [stage, setStage] = useState<'bulk' | 'ask' | 'finish'>(items.length > 1 ? 'bulk' : 'ask');
+  const [bulkStage, setBulkStage] = useState<'album' | 'genre1' | 'genre2' | 'artist' | 'done'>('album');
   const [dontAsk, setDontAsk] = useState(false);
   const [lookup, setLookup] = useState<Record<string, 'pending' | 'done' | 'none'>>({});
   const fileRef = useRef<HTMLInputElement>(null);
@@ -194,13 +213,66 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   };
 
   const advance = (): void => {
-    if (fieldIdx < FIELDS.length - 1) {
-      setFieldIdx(fieldIdx + 1);
+    if (stage === 'bulk') {
+      if (bulkStage === 'album') setBulkStage('genre1');
+      else if (bulkStage === 'genre1') setBulkStage('genre2');
+      else if (bulkStage === 'genre2') setBulkStage('artist');
+      else if (bulkStage === 'artist') {
+        setBulkStage('done');
+        setStage('ask');
+        setFieldIdx(0);
+        setSongIdx(0);
+      }
+      return;
+    }
+    // Per-song advance
+    let nextFieldIdx = fieldIdx + 1;
+    while (nextFieldIdx < FIELDS.length && (['album', 'genre1', 'genre2', 'artist'].includes(FIELDS[nextFieldIdx].key) && edits[item.id]?.[FIELDS[nextFieldIdx].key])) {
+      nextFieldIdx++;
+    }
+    if (nextFieldIdx < FIELDS.length) {
+      setFieldIdx(nextFieldIdx);
     } else if (songIdx < items.length - 1) {
       setSongIdx(songIdx + 1);
-      setFieldIdx(0);
+      // Find first non-bulk field for next song
+      let firstField = 0;
+      while (firstField < FIELDS.length && ['album', 'genre1', 'genre2', 'artist'].includes(FIELDS[firstField].key)) {
+        firstField++;
+      }
+      setFieldIdx(firstField);
     } else {
       setStage('finish');
+    }
+  };
+
+  const skipBulk = (): void => {
+    // Clear any bulk value for current field and advance
+    const key = ['album', 'genre1', 'genre2', 'artist'].find(k => k === bulkStage) as keyof ImportOverrides | undefined;
+    if (key) {
+      setEdits((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach(id => {
+          if (next[id]?.[key]) {
+            const { [key]: _, ...rest } = next[id];
+            next[id] = rest;
+          }
+        });
+        return next;
+      });
+    }
+    advanceBulk();
+  };
+
+  // Bulk stage advance
+  const advanceBulk = (): void => {
+    if (bulkStage === 'album') setBulkStage('genre1');
+    else if (bulkStage === 'genre1') setBulkStage('genre2');
+    else if (bulkStage === 'genre2') setBulkStage('artist');
+    else if (bulkStage === 'artist') {
+      setBulkStage('done');
+      setStage('ask');
+      setFieldIdx(0);
+      setSongIdx(0);
     }
   };
 
@@ -238,6 +310,17 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
       setStage('ask');
       return;
     }
+    if (stage === 'bulk') {
+      if (bulkStage === 'album') {
+        onCancel();
+        return;
+      }
+      if (bulkStage === 'genre1') setBulkStage('album');
+      else if (bulkStage === 'genre2') setBulkStage('genre1');
+      else if (bulkStage === 'artist') setBulkStage('genre2');
+      return;
+    }
+    // Per-song back
     if (fieldIdx > 0) {
       setFieldIdx(fieldIdx - 1);
     } else if (songIdx > 0) {
@@ -268,6 +351,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   const answeredCount = () => Object.values(edits).filter((e) => e && (e.title?.trim() || e.artist?.trim() || e.artist2?.trim() || e.album?.trim() || e.genre1?.trim() || e.genre2?.trim() || e.year?.trim())).length;
 
   const pickArtwork = async (file: File): Promise<void> => {
+    const { blobToDataUrl } = await import('../lib/metadata');
     const dataUrl = await blobToDataUrl(file, 640);
     if (dataUrl) {
       setEdits((prev) => ({ ...prev, [item.id]: { ...prev[item.id], artwork: dataUrl } }));
@@ -306,7 +390,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
               Cancel
             </button>
             <span style={{ fontSize: 16, fontWeight: 600, flex: 1, textAlign: 'center' }}>
-              {stage === 'finish' ? 'Finish import' : `Song ${songIdx + 1} of ${items.length}`}
+              {stage === 'finish' ? 'Finish import' : stage === 'bulk' ? `Apply to all ${items.length} songs` : `Song ${songIdx + 1} of ${items.length}`}
             </span>
             <span style={{ fontSize: 12, color: 'var(--label-secondary)', minWidth: 40, textAlign: 'right' }}>{stepNo}/{totalSteps}</span>
           </div>
@@ -315,7 +399,35 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
             <div style={{ height: '100%', background: 'var(--accent)', transition: 'width 180ms ease', width: `${(stepNo / totalSteps) * 100}%` }} />
           </div>
 
-          {stage === 'ask' ? (
+          {stage === 'bulk' ? (
+            <div className="import-wizard-body">
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                  Apply to all {items.length} songs
+                </div>
+                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
+                  {BULK_FIELDS.find(f => f.key === bulkStage)?.label ?? ''}
+                </h3>
+                <p style={{ fontSize: 13, color: 'var(--label-secondary)', marginBottom: 20 }}>
+                  {BULK_FIELDS.find(f => f.key === bulkStage)?.hint}
+                </p>
+              </div>
+
+              <div className={lookup[item.id] === 'pending' ? 'field-loading' : undefined}>
+                <TagInput
+                  key={bulkStage}
+                  value={currentDisplayValue}
+                  onChange={handleValue}
+                  options={optionsFor(bulkStage as 'album' | 'genre1' | 'genre2' | 'artist')}
+                  placeholder={defaultForKey(item, bulkStage as 'album' | 'genre1' | 'genre2' | 'artist') || BULK_FIELDS.find(f => f.key === bulkStage)?.hint}
+                />
+              </div>
+
+              <button className="pill-btn" onClick={skipBulk} style={{ alignSelf: 'flex-end', fontSize: 13, padding: '5px 12px' }}>
+                Skip for all
+              </button>
+            </div>
+          ) : stage === 'ask' ? (
             <div className="import-wizard-body">
               <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 <button
@@ -351,26 +463,52 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
 
               {metaChip && <div style={{ marginBottom: -4 }}>{metaChip}</div>}
 
-              <div className={lookup[item.id] === 'pending' ? 'field-loading' : undefined}>
-                {field.key === 'title' ? (
-                  <input
-                    key={field.key}
-                    className="search-input"
-                    style={{ paddingLeft: 12, fontSize: 16, padding: '11px 12px 11px 34px' }}
-                    placeholder={item.title ?? 'Title'}
-                    value={currentValue}
-                    onChange={(e) => setField(item, 'title', e.target.value)}
-                  />
-                ) : (
-                  <TagInput
-                    key={field.key}
-                    value={currentDisplayValue}
-                    onChange={handleValue}
-                    options={optionsFor(field.key)}
-                    placeholder={defaultForKey(item, field.key) || field.hint}
-                  />
-                )}
-              </div>
+              {['album', 'genre1', 'genre2', 'artist'].includes(field.key) && edits[item.id]?.[field.key] ? (
+                <div style={{ 
+                  padding: '12px 16px', 
+                  background: 'var(--accent-soft)', 
+                  borderRadius: 12, 
+                  marginBottom: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  color: 'var(--accent)',
+                  fontSize: 13,
+                  fontWeight: 500
+                }}>
+                  <SparklesIcon size={16} /> Applied to all songs: <strong>{currentDisplayValue}</strong>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{field.label}?</div>
+                    <div style={{ fontSize: 12, color: 'var(--label-secondary)', marginBottom: 6 }}>{field.hint}</div>
+                  </div>
+
+                  {metaChip && <div style={{ marginBottom: -4 }}>{metaChip}</div>}
+
+                  <div className={lookup[item.id] === 'pending' ? 'field-loading' : undefined}>
+                    {field.key === 'title' ? (
+                      <input
+                        key={field.key}
+                        className="search-input"
+                        style={{ paddingLeft: 12, fontSize: 16, padding: '11px 12px 11px 34px' }}
+                        placeholder={cleanTitle(item.title ?? '') ?? 'Title'}
+                        value={currentValue}
+                        onChange={(e) => setField(item, 'title', e.target.value)}
+                      />
+                    ) : (
+                      <TagInput
+                        key={field.key}
+                        value={currentDisplayValue}
+                        onChange={handleValue}
+                        options={optionsFor(field.key)}
+                        placeholder={defaultForKey(item, field.key) || field.hint}
+                      />
+                    )}
+                  </div>
+                </>
+              )}
 
               <button className="pill-btn" onClick={() => setStage('finish')} style={{ alignSelf: 'flex-end', fontSize: 13, padding: '5px 12px' }}>
                 Skip All
@@ -395,6 +533,20 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                 <input type="checkbox" checked={dontAsk} onChange={(e) => setDontAsk(e.target.checked)} />
                 Don&apos;t ask again — save imports automatically
               </label>
+            </div>
+          )}
+
+          {stage === 'bulk' && (
+            <div className="import-wizard-actions">
+              <button className="pill-btn" onClick={back} disabled={bulkStage === 'album'} style={{ opacity: bulkStage === 'album' ? 0.4 : 1 }}>
+                Back
+              </button>
+              <button className="pill-btn" onClick={skipBulk}>
+                Skip for all
+              </button>
+              <button className="pill-btn primary" onClick={advanceBulk}>
+                {bulkStage === 'artist' ? 'Done' : 'Next'}
+              </button>
             </div>
           )}
 
