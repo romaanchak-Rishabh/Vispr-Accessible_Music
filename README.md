@@ -1,6 +1,6 @@
 # Vispr — Liquid Glass Music PWA
 
-A fully offline-capable Progressive Web App (React + TypeScript + Vite) with an Apple Music–inspired Liquid Glass interface that turns your own music files into a beautiful streaming-style experience on Android phones **and** desktops.
+A fully offline-capable Progressive Web App (React + TypeScript + Vite) with an Apple Music–inspired Liquid Glass interface that turns your own music files into a beautiful streaming-style experience on phones **and** desktops.
 
 ## ⚠️ Personal & Educational Use Only
 
@@ -16,24 +16,52 @@ A fully offline-capable Progressive Web App (React + TypeScript + Vite) with an 
 
 ## Features
 
+### Core Experience
 - **Liquid Glass UI** — Apple Music–style Listen Now / Browse / Library / Search with translucent blurred surfaces over an ambient color field, springy press feedback everywhere, animated tab highlighting, glass sheets & cards; switches to a macOS-style sidebar + player bar on desktop.
 - **Your files, your library** — connect your phone's `Music` folder once via the native folder picker (File System Access API). The connection persists across sessions. Individual file picking is also supported as a fallback.
-- **YouTube imports** — paste any video/playlist link; audio is downloaded server-side, tagged (title/artist/album + embedded cover art) via mutagen, deduplicated against your library, and stored offline in the app. Radio-mix links (`list=RD…`) import as a single song.
-- **Crossfade** — optional toggle in Now Playing; the next track fades in as the current one fades out (no silence gap).
-- **Lock-screen media controls** — MediaSession integration with artwork, play/pause/next/previous/seek and position scrubber on the Android notification & lock screen.
-- **Queue management** — Play Next / Play Later from any track's ⋯ menu, drag-to-reorder Up Next, remove items.
-- **Library insights** — the Library tab shows total songs/artists/albums/playlists and how much storage the offline library occupies; delete any track from its ⋯ menu to free space instantly.
-- **Recently Played, Top Plays, Jump Back In, Recently Added** suggestions that update as you listen.
-- **Playlists** — create playlists and add songs to them from anywhere.
-- **Album / Artist detail pages** with Play & Shuffle.
+- **Fully responsive** — optimized layouts for phones (375px–430px), tablets, and desktops. Detail pages stack vertically on small screens, controls resize, and cards reflow on rotation.
+- **Offline artwork** — all cover art is stored as data URLs in IndexedDB, so thumbnails and banners appear fully offline with no network dependency.
 - **Persistence** — library index, playlists, queue, playback history, play counts, shuffle/repeat/crossfade/volume all survive app restarts. Resumes where you left off.
 - **Installable PWA** — service worker precache, offline shell, install banner (native prompt on Android, "Add to Home Screen" instructions on iOS).
 
-## Supported audio formats
+### Playback
+- **Crossfade** — optional toggle in Now Playing; the next track fades in as the current one fades out (no silence gap).
+- **Lock-screen media controls** — MediaSession integration with artwork, play/pause/next/previous/seek and position scrubber on the Android notification & lock screen.
+- **Queue management** — Play Next / Play Later from any track's ⋯ menu, drag-to-reorder Up Next, remove items.
+- **Loop/Repeat** — toggle repeat from Now Playing.
 
-`.mp3` `.m4a` `.mp4` `.aac` `.flac` `.wav` `.ogg` `.opus` `.webm`
+### Library Management
+- **YouTube imports** — paste any video/playlist link; audio is downloaded server-side, tagged (title/artist/album + embedded cover art) via mutagen, deduplicated against your library, and stored offline in the app. Radio-mix links (`list=RD…`) import as a single song.
+- **Library Export/Import (Backup)** — export your entire library as a JSON file (strips artwork, includes YouTube IDs). Import on another device to restore playlists, albums, artists, and settings. YouTube tracks auto-download via yt-dlp if a server is configured.
+- **Library insights** — the Library tab shows total songs/artists/albums/playlists and how much storage the offline library occupies; delete any track from its ⋯ menu to free space instantly.
+- **Supported formats** — `.mp3` `.m4a` `.mp4` `.aac` `.flac` `.wav` `.ogg` `.opus` `.webm`. Metadata (title / artist / album / artwork / year / genre) is read from embedded ID3v2, MP4/iTunes and FLAC Vorbis tags; falls back to parsing `Song - Artist.mp3`-style filenames.
 
-Metadata (title / artist / album / artwork) is read from embedded ID3v2, MP4/iTunes and FLAC Vorbis tags; falls back to parsing `Song - Artist.mp3`-style filenames. Artwork is downscaled for performance.
+### Smart Features
+- **Smart recommender** — "Made For You" and "Top Picks" sections on the Listen Now page use USE embeddings and cosine similarity to suggest tracks based on your listening patterns, play counts, and recently played history.
+- **Enhanced Recently Played** — shows album artwork, artist name, and era badge for each recently played track.
+- **Jump Back In** — quick access to recently played albums, playlists, and artists.
+- **Recently Added** — highlights your newest additions with artwork cards.
+- **Stations for You** — genre-based radio stations (Bollywood, Rock, Chill, Party) that use the built-in classifier to match tracks by genre tags, not just filename strings.
+- **Mood & Genre chips** — horizontal scroll of genre/mood filters on the Listen Now page.
+- **Year/Era metadata** — tracks display their era (2020s, 2010s, 90s, etc.) in track lists, Now Playing, and detail pages. Year is editable via the ⋯ menu.
+
+### Organization
+- **Playlists** — create playlists and add songs to them from anywhere.
+- **Album / Artist detail pages** — with Play, Shuffle, and Share buttons.
+- **Mix detail pages** — view and play smart mixes (Made For You, Top Picks) in a dedicated detail view.
+
+### Sharing
+- **Share songs, playlists, albums, artists, and mixes** — tap Share on any detail page or use the ⋯ menu on a track. Creates a `.vispr.json` file with metadata + audio files.
+- **AirDrop & cross-platform** — uses `navigator.share()` on iOS/Android (sends audio files directly via AirDrop or other share sheets). Falls back to file download on desktop.
+- **Conflict detection** — when receiving a share, the app detects exact matches, conflicts (same song, different metadata), and new tracks. You can choose to keep yours or accept incoming for each conflict, or apply to all.
+- **Playlist merge** — receiving a playlist share auto-creates or merges into an existing playlist of the same name.
+- **Receive Share** — import shared files via the Library > Songs page or the Settings backup section.
+
+### Design
+- **No rectangular card backgrounds** — all cards have transparent backgrounds with no borders or inset shadows. Only a subtle hover shadow for depth.
+- **Smooth press interactions** — cards scale on press (0.96–0.98) with no rectangular tap highlights or sticky active states.
+- **Play button on hold** — enhanced album cards show a play overlay button on press/hold with smooth fade transition.
+- **Station cards** — play button always positioned at the bottom regardless of title/description length.
 
 ## Run locally
 
@@ -121,6 +149,8 @@ Files named `Song - Artist.mp3` or plain titles also work — tags always win wh
 
 ## Tech notes
 
-- State: Zustand (+persist), storage: IndexedDB via `idb-keyval` (file handles and picked file blobs live there, so they survive restarts).
-- Metadata parsing is hand-rolled and dependency-free (ID3v2.2/2.3/2.4, MP4 `ilst` atoms incl. `covr`, FLAC Vorbis comments + pictures).
-- PWA: `vite-plugin-pwa` (Workbox generateSW, auto-update, precached app shell).
+- **State**: Zustand (+persist), storage: IndexedDB via `idb-keyval` (file handles and picked file blobs live there, so they survive restarts).
+- **Metadata**: hand-rolled and dependency-free (ID3v2.2/2.3/2.4, MP4 `ilst` atoms incl. `covr`, FLAC Vorbis comments + pictures). Duration extracted from TLEN (MP3), `©dur` (MP4), and DURATION (FLAC) frames.
+- **Classifier**: keyword-based genre classification (Bollywood, Rock, Pop, Classical, etc.) with era inference from year. Used for smart recommendations and radio stations.
+- **Sharing**: custom `.vispr.json` format with conflict detection and resolution. Audio files transferred directly via Web Share API.
+- **PWA**: `vite-plugin-pwa` (Workbox generateSW, auto-update, precached app shell). Share target configured for Android/Chrome.
