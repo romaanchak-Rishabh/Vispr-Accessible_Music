@@ -125,7 +125,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
     // Indian/regional songs) fall back to reading the YouTube description.
     const fallback = async (res: { artist?: string; album?: string; year?: number; genre?: string } | null):
       Promise<{ artist?: string; album?: string; year?: number; genre?: string }> => {
-      if (res && (res.artist || res.album || res.genre || res.year)) return res;
+      if (res && res.artist && res.album && res.genre && res.year) return res;
       const videoUrl = it.webpage_url ?? (it.id ? `https://www.youtube.com/watch?v=${it.id}` : '');
       if (!videoUrl) return res ?? {};
       const info = await fetchYtInfo(ytdlpServer, ytdlpToken, videoUrl);
