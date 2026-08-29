@@ -129,17 +129,13 @@ export async function shareMix(name: string, tracks: Track[]): Promise<void> {
   await sharePayload(payload, tracks);
 }
 
-const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-
 async function sharePayload(payload: SharePayload, tracks: Track[]): Promise<void> {
-  if (IS_IOS) {
-    for (const track of tracks) {
-      const blob = await db.loadFileBlob(track.id);
-      if (blob) {
-        const b64 = await blobToBase64(blob);
-        const shareTrack = payload.tracks.find((t) => t.id === track.id);
-        if (shareTrack) shareTrack.audioData = b64;
-      }
+  for (const track of tracks) {
+    const blob = await db.loadFileBlob(track.id);
+    if (blob) {
+      const b64 = await blobToBase64(blob);
+      const shareTrack = payload.tracks.find((t) => t.id === track.id);
+      if (shareTrack) shareTrack.audioData = b64;
     }
   }
 
