@@ -29,8 +29,6 @@ export function ImportBar(): JSX.Element {
   const ytdlpServer = useSettings((s) => s.ytdlpServer);
   const ytdlpToken = useSettings((s) => s.ytdlpToken);
   const confirmImport = useSettings((s) => s.confirmImport);
-  const setYtdlpServer = useSettings((s) => s.setYtdlpServer);
-  const setYtdlpToken = useSettings((s) => s.setYtdlpToken);
   const setConfirmImport = useSettings((s) => s.setConfirmImport);
   const isYt = url.trim().length > 0 && isYouTubeUrl(url);
 
@@ -170,40 +168,6 @@ export function ImportBar(): JSX.Element {
               {label}
             </button>
           ))}
-        </div>
-      )}
-
-      {(isYt || (ytdlpServer.length > 0 && url.trim() === '')) && (
-        <div style={{ marginTop: 10 }}>
-          <input
-            className="search-input"
-            placeholder="yt-dlp server URL (e.g. https://my-ytdlp.fly.dev)"
-            value={ytdlpServer}
-            onChange={(e) => setYtdlpServer(e.target.value)}
-            autoCorrect="off"
-            autoCapitalize="off"
-            style={{ fontSize: 14 }}
-          />
-          <input
-            className="search-input"
-            placeholder="Shared secret (optional)"
-            value={ytdlpToken}
-            onChange={(e) => setYtdlpToken(e.target.value)}
-            type="password"
-            autoCorrect="off"
-            autoCapitalize="off"
-            style={{ fontSize: 14, marginTop: 6 }}
-          />
-          <p style={{ marginTop: 6, fontSize: 12, color: 'var(--label-secondary)' }}>
-            Leave empty to use this deployment's built-in yt-dlp API — or point to your own server (see README). Manual Song mode needs no server.
-          </p>
-          <div style={{ marginTop: 4, fontSize: 12, color: 'var(--accent)', background: 'var(--accent-bg)', padding: '8px 10px', borderRadius: 8, lineHeight: 1.5 }}>
-            <strong>Remote access?</strong> Run the Python backend on your laptop, then expose with:
-            <code style={{ display: 'block', marginTop: 4, fontSize: 11, fontFamily: 'monospace' }}>
-              cloudflared tunnel --url http://localhost:8080
-            </code>
-            Paste the <code>https://…trycloudflare.com</code> URL above.
-          </div>
         </div>
       )}
 
