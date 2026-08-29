@@ -23,6 +23,7 @@ export default defineConfig({
           {
             action: '/',
             accept: {
+              'application/octet-stream': ['.vpr'],
               'application/json': ['.vispr.json']
             }
           }
@@ -33,7 +34,7 @@ export default defineConfig({
           enctype: 'multipart/form-data',
           params: {
             files: [
-              { name: 'files', accept: ['application/json', 'audio/*', '.m4a', '.mp3', '.mp4', '.aac', '.ogg', '.opus', '.flac', '.vispr.json'] }
+              { name: 'files', accept: ['application/octet-stream', 'application/json', 'audio/*', '.vpr', '.vispr.json', '.m4a', '.mp3', '.mp4', '.aac', '.ogg', '.opus', '.flac'] }
             ]
           }
         },

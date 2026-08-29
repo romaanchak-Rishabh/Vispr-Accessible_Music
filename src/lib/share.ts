@@ -101,7 +101,7 @@ function getShareText(payload: SharePayload): string {
 
 function getFileName(payload: SharePayload): string {
   const name = getShareTitle(payload).replace(/[<>:"/\\|?*]/g, '_');
-  return `${name}.vispr.json`;
+  return `${name}.vpr`;
 }
 
 export async function shareTracks(tracks: Track[]): Promise<void> {

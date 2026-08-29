@@ -80,7 +80,7 @@ export default function App(): JSX.Element {
     }
   }, []);
 
-  // Handle file_handlers — .vispr.json opened from OS file manager / WhatsApp / etc.
+  // Handle file_handlers — .vpr file opened from OS file manager / WhatsApp / etc.
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (typeof window !== 'undefined' && 'launchQueue' in window) {

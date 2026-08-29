@@ -110,7 +110,7 @@ function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums'
                 const input = document.createElement('input');
                 input.type = 'file';
                 input.multiple = true;
-                input.accept = '.vispr.json,.json,.m4a,.mp3,.mp4,.aac,.ogg,.opus,.flac';
+                input.accept = '.vpr,.vispr.json,.json,.m4a,.mp3,.mp4,.aac,.ogg,.opus,.flac';
                 input.onchange = () => {
                   if (input.files && input.files.length > 0) {
                     useUI.getState().setReceiveFiles(Array.from(input.files));
