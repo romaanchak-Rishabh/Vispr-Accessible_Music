@@ -113,9 +113,15 @@ export async function importLibrary(
   onProgress?: (p: ImportProgress) => void
 ): Promise<{ imported: number; skipped: number; failed: number; localOnly: number }> {
   const text = await file.text();
-  const data: BackupData = JSON.parse(text);
+  let data: BackupData;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error('Invalid backup file');
+  }
 
   if (data.version !== 1) throw new Error('Unsupported backup version');
+  if (!data.tracks || !Array.isArray(data.tracks)) throw new Error('Invalid backup format');
 
   onProgress?.({ phase: 'reading', done: 0, total: data.tracks.length, label: 'Reading backup...' });
 
@@ -125,11 +131,20 @@ export async function importLibrary(
   const youtubeTracks = data.tracks.filter((t) => t.sourceType === 'youtube' && t.youtubeId);
   const localTracks = data.tracks.filter((t) => t.sourceType === 'local');
 
+  const hasYouTube = youtubeTracks.length > 0;
+  const hasServer = ytDlpServer.trim().length > 0;
+
+  if (hasYouTube && !hasServer) {
+    throw new Error('Configure yt-dlp server URL in Import settings before restoring YouTube tracks');
+  }
+
   let imported = 0;
   let skipped = 0;
   let failed = 0;
+  let localSkipped = 0;
 
   const { downloadAudioViaYtDlp } = await import('./ytdlp');
+  const { blobToDataUrl } = await import('./metadata');
 
   for (let i = 0; i < youtubeTracks.length; i++) {
     const bt = youtubeTracks[i];
@@ -155,7 +170,6 @@ export async function importLibrary(
         const resp = await fetch(thumbUrl, { mode: 'cors', signal: ctrl.signal });
         clearTimeout(t);
         if (resp.ok) {
-          const { blobToDataUrl } = await import('./metadata');
           artwork = (await blobToDataUrl(await resp.blob())) ?? undefined;
         }
       } catch { /* thumbnail optional */ }
@@ -181,9 +195,9 @@ export async function importLibrary(
         artwork,
       };
 
-      const file = new File([dl.blob], dl.filename, { type: dl.blob.type || 'audio/mp4' });
+      const blobFile = new File([dl.blob], dl.filename, { type: dl.blob.type || 'audio/mp4' });
       try {
-        await db.saveFileBlob(track.id, file);
+        await db.saveFileBlob(track.id, blobFile);
       } catch {
         console.warn('[backup] blob save skipped for', track.id);
       }
@@ -201,6 +215,7 @@ export async function importLibrary(
   for (const bt of localTracks) {
     if (existingIds.has(bt.id)) {
       skipped++;
+      localSkipped++;
       continue;
     }
     const track: Track = {
@@ -268,5 +283,5 @@ export async function importLibrary(
     } catch { /* ignore */ }
   }
 
-  return { imported, skipped, failed, localOnly: localTracks.length - skipped };
+  return { imported, skipped, failed, localOnly: localTracks.length - localSkipped };
 }

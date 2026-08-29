@@ -236,13 +236,12 @@ export function SettingsPage(): JSX.Element {
               try {
                 const result = await importLibrary(file, ytdlpServer, ytdlpToken, setImportProgress);
                 setImportProgress(null);
-                if (result.localOnly > 0) {
-                  setImportError(`Imported ${result.imported} songs. ${result.localOnly} local tracks need manual re-import.`);
-                } else if (result.imported === 0 && result.skipped > 0) {
-                  setImportError('All tracks already in library.');
-                } else {
-                  setImportError(`Done: ${result.imported} downloaded, ${result.skipped} skipped, ${result.failed} failed.`);
-                }
+                const parts: string[] = [];
+                if (result.imported > 0) parts.push(`${result.imported} downloaded`);
+                if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
+                if (result.failed > 0) parts.push(`${result.failed} failed`);
+                if (result.localOnly > 0) parts.push(`${result.localOnly} local tracks need manual re-import`);
+                setImportError(parts.length > 0 ? `Done: ${parts.join(', ')}.` : 'All tracks already in library.');
               } catch (err) {
                 setImportProgress(null);
                 setImportError('Import failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
