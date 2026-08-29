@@ -32,8 +32,7 @@ export interface ShareTrack {
 }
 
 function extractYoutubeId(trackId: string): string | undefined {
-  if (trackId.startsWith('y-')) return trackId.slice(2);
-  return undefined;
+  return trackId.startsWith('y-') ? trackId.slice(2) : undefined;
 }
 
 function trackToShareTrack(track: Track): ShareTrack {
@@ -71,62 +70,32 @@ export function createSharePayload(
   };
 }
 
-export function payloadToBlob(payload: SharePayload): Blob {
-  return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-}
-
-function getShareTitle(payload: SharePayload): string {
-  switch (payload.type) {
-    case 'playlist': return payload.playlistName ?? 'Playlist';
-    case 'album': return payload.albumTitle ?? 'Album';
-    case 'artist': return payload.artistName ?? 'Artist';
-    case 'mix': return payload.name ?? 'Mix';
-    case 'track': return payload.tracks.length === 1 ? payload.tracks[0].title : `${payload.tracks.length} songs`;
+function getShareTitle(p: SharePayload): string {
+  switch (p.type) {
+    case 'playlist': return p.playlistName ?? 'Playlist';
+    case 'album': return p.albumTitle ?? 'Album';
+    case 'artist': return p.artistName ?? 'Artist';
+    case 'mix': return p.name ?? 'Mix';
+    case 'track': return p.tracks.length === 1 ? p.tracks[0].title : `${p.tracks.length} songs`;
     default: return 'Vispr Share';
   }
 }
 
-function getShareText(payload: SharePayload): string {
-  switch (payload.type) {
-    case 'playlist': return `${payload.playlistName ?? 'Playlist'} — ${payload.tracks.length} songs`;
-    case 'album': return `${payload.albumTitle ?? 'Album'} — ${payload.tracks.length} songs`;
-    case 'artist': return `${payload.artistName ?? 'Artist'} — ${payload.tracks.length} songs`;
-    case 'mix': return `${payload.name ?? 'Mix'} — ${payload.tracks.length} songs`;
-    case 'track': return payload.tracks.length === 1
-      ? `${payload.tracks[0].title} — ${payload.tracks[0].artist}`
-      : `${payload.tracks.length} songs from Vispr`;
+function getShareText(p: SharePayload): string {
+  const n = p.tracks.length;
+  switch (p.type) {
+    case 'playlist': return `${p.playlistName ?? 'Playlist'} — ${n} songs`;
+    case 'album': return `${p.albumTitle ?? 'Album'} — ${n} songs`;
+    case 'artist': return `${p.artistName ?? 'Artist'} — ${n} songs`;
+    case 'mix': return `${p.name ?? 'Mix'} — ${n} songs`;
+    case 'track': return n === 1 ? `${p.tracks[0].title} — ${p.tracks[0].artist}` : `${n} songs from Vispr`;
     default: return 'Vispr Share';
   }
 }
 
-function getFileName(payload: SharePayload): string {
-  const name = getShareTitle(payload).replace(/[<>:"/\\|?*]/g, '_');
+function getFileName(p: SharePayload): string {
+  const name = getShareTitle(p).replace(/[<>:"/\\|?*]/g, '_');
   return `${name}.json`;
-}
-
-export async function shareTracks(tracks: Track[]): Promise<void> {
-  const payload = createSharePayload(tracks, 'track');
-  await sharePayload(payload, tracks);
-}
-
-export async function sharePlaylist(name: string, tracks: Track[]): Promise<void> {
-  const payload = createSharePayload(tracks, 'playlist', { playlistName: name });
-  await sharePayload(payload, tracks);
-}
-
-export async function shareAlbum(title: string, tracks: Track[]): Promise<void> {
-  const payload = createSharePayload(tracks, 'album', { albumTitle: title });
-  await sharePayload(payload, tracks);
-}
-
-export async function shareArtist(name: string, tracks: Track[]): Promise<void> {
-  const payload = createSharePayload(tracks, 'artist', { artistName: name });
-  await sharePayload(payload, tracks);
-}
-
-export async function shareMix(name: string, tracks: Track[]): Promise<void> {
-  const payload = createSharePayload(tracks, 'mix', { name });
-  await sharePayload(payload, tracks);
 }
 
 async function sharePayload(payload: SharePayload, tracks: Track[]): Promise<void> {
@@ -134,26 +103,20 @@ async function sharePayload(payload: SharePayload, tracks: Track[]): Promise<voi
     const blob = await db.loadFileBlob(track.id);
     if (blob) {
       const b64 = await blobToBase64(blob);
-      const shareTrack = payload.tracks.find((t) => t.id === track.id);
-      if (shareTrack) shareTrack.audioData = b64;
+      const st = payload.tracks.find((t) => t.id === track.id);
+      if (st) st.audioData = b64;
     }
   }
 
-  const jsonBlob = payloadToBlob(payload);
+  const jsonBlob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const jsonFile = new File([jsonBlob], getFileName(payload), { type: 'application/json' });
 
   try {
     if (navigator.share && navigator.canShare?.({ files: [jsonFile] })) {
-      await navigator.share({
-        files: [jsonFile],
-        title: getShareTitle(payload),
-        text: getShareText(payload),
-      });
+      await navigator.share({ files: [jsonFile], title: getShareTitle(payload), text: getShareText(payload) });
       return;
     }
-  } catch {
-    // user cancelled or share failed — fall through to download
-  }
+  } catch { /* cancelled or unsupported — fall through to download */ }
 
   const url = URL.createObjectURL(jsonBlob);
   const a = document.createElement('a');
@@ -172,19 +135,35 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+export async function shareTracks(tracks: Track[]): Promise<void> {
+  await sharePayload(createSharePayload(tracks, 'track'), tracks);
+}
+
+export async function sharePlaylist(name: string, tracks: Track[]): Promise<void> {
+  await sharePayload(createSharePayload(tracks, 'playlist', { playlistName: name }), tracks);
+}
+
+export async function shareAlbum(title: string, tracks: Track[]): Promise<void> {
+  await sharePayload(createSharePayload(tracks, 'album', { albumTitle: title }), tracks);
+}
+
+export async function shareArtist(name: string, tracks: Track[]): Promise<void> {
+  await sharePayload(createSharePayload(tracks, 'artist', { artistName: name }), tracks);
+}
+
+export async function shareMix(name: string, tracks: Track[]): Promise<void> {
+  await sharePayload(createSharePayload(tracks, 'mix', { name }), tracks);
+}
+
 export function parseSharePayload(text: string): SharePayload {
   const data = JSON.parse(text);
   if (data.v !== 1 || !data.tracks || !Array.isArray(data.tracks)) {
     throw new Error('Invalid share file');
   }
   const validTypes = ['track', 'playlist', 'album', 'artist', 'mix'];
-  if (data.type && !validTypes.includes(data.type)) {
-    data.type = 'track';
-  }
+  if (data.type && !validTypes.includes(data.type)) data.type = 'track';
   for (const t of data.tracks) {
-    if (!t.id || !t.title || !t.artist || !t.album) {
-      throw new Error('Malformed track in share file');
-    }
+    if (!t.id || !t.title || !t.artist || !t.album) throw new Error('Malformed track in share file');
   }
   return data as SharePayload;
 }
@@ -195,38 +174,20 @@ export interface ConflictItem {
   status: 'new' | 'exact' | 'conflict';
 }
 
-export function detectConflicts(
-  incoming: ShareTrack[],
-  existingTracks: Track[]
-): ConflictItem[] {
+export function detectConflicts(incoming: ShareTrack[], existingTracks: Track[]): ConflictItem[] {
   const byId = new Map(existingTracks.map((t) => [t.id, t]));
-  const byYtId = new Map(
-    existingTracks.filter((t) => t.id.startsWith('y-')).map((t) => [t.id.slice(2), t])
-  );
+  const byYtId = new Map(existingTracks.filter((t) => t.id.startsWith('y-')).map((t) => [t.id.slice(2), t]));
 
   return incoming.map((inc) => {
-    let existing: Track | undefined;
+    const existing = inc.youtubeId
+      ? (byId.get(`y-${inc.youtubeId}`) ?? byYtId.get(inc.youtubeId))
+      : byId.get(inc.id);
 
-    if (inc.youtubeId) {
-      existing = byId.get(`y-${inc.youtubeId}`) ?? byYtId.get(inc.youtubeId);
-    } else {
-      existing = byId.get(inc.id);
-    }
+    if (!existing) return { incoming: inc, existing: undefined, status: 'new' as const };
 
-    if (!existing) {
-      return { incoming: inc, existing: undefined, status: 'new' as const };
-    }
+    const same = existing.title === inc.title && existing.artist === inc.artist &&
+      existing.album === inc.album && (existing.duration ?? 0) === (inc.duration ?? 0);
 
-    const same =
-      existing.title === inc.title &&
-      existing.artist === inc.artist &&
-      existing.album === inc.album &&
-      (existing.duration ?? 0) === (inc.duration ?? 0);
-
-    if (same) {
-      return { incoming: inc, existing, status: 'exact' as const };
-    }
-
-    return { incoming: inc, existing, status: 'conflict' as const };
+    return { incoming: inc, existing, status: same ? 'exact' : 'conflict' };
   });
 }

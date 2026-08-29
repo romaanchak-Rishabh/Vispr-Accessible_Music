@@ -159,7 +159,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         if (!audioBlob) {
           setFailed((f) => f + 1);
           done++;
-          setImportProgress({ done, total: totalToImport, label: `Skipped: ${inc.title} (no audio)` });
+          setImportProgress({ done, total: totalToImport, label: `Failed: ${inc.title} (no audio — need yt-dlp server)` });
           continue;
         }
 
@@ -334,7 +334,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
             <div style={{ padding: '12px 16px', fontSize: 14 }}>
               {imported > 0 && <div>{imported} song{imported !== 1 ? 's' : ''} imported</div>}
               {skipped > 0 && <div>{skipped} skipped (already in library)</div>}
-              {failed > 0 && <div style={{ color: '#ff3b30' }}>{failed} failed</div>}
+              {failed > 0 && <div style={{ color: '#ff3b30' }}>{failed} failed — no audio available. Set up a yt-dlp server in Settings to download from YouTube.</div>}
               {payload?.type === 'playlist' && <div style={{ marginTop: 8, color: 'var(--accent)' }}>Playlist "{payload.playlistName}" saved</div>}
             </div>
             <div style={{ padding: '8px 16px 16px' }}>
