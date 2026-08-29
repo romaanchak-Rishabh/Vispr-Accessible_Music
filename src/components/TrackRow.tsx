@@ -6,6 +6,16 @@ import { formatArtist } from '../types';
 import { Artwork } from './Artwork';
 import { EllipsisIcon, PauseIcon } from './Icons';
 
+function formatYearLabel(year?: number): string {
+  if (!year) return '';
+  if (year >= 2020) return '2020s';
+  if (year >= 2010) return '2010s';
+  if (year >= 2000) return '2000s';
+  if (year >= 1990) return '90s';
+  if (year >= 1980) return '80s';
+  return '70s';
+}
+
 export function TrackRow({
   track,
   showArtwork = true,
@@ -55,7 +65,7 @@ export function TrackRow({
             {track.title}
           </span>
           <span className="row-subtitle" style={{ display: 'block' }}>
-            {formatArtist(track)}
+            {formatArtist(track)}{track.year ? ` · ${formatYearLabel(track.year)}` : ''}
           </span>
         </span>
         {trailingDuration && (

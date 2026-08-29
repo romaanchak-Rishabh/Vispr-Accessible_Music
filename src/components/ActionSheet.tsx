@@ -6,7 +6,7 @@ import { useUI, type Page } from '../store/ui';
 import { Artwork } from './Artwork';
 import { blobToDataUrl } from '../lib/metadata';
 import { formatArtist } from '../types';
-import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue } from '../lib/tags';
+import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue, eraToYear } from '../lib/tags';
 import { shareTracks } from '../lib/share';
 
 export function ActionSheet(): JSX.Element | null {
@@ -42,7 +42,14 @@ export function ActionSheet(): JSX.Element | null {
     setAlbum(track.album);
     setGenre1(track.genre1 ?? '');
     setGenre2(track.genre2 ?? '');
-    setYear(track.year ? String(track.year) : '');
+    setYear(track.year ? eraToDisplayValue(
+      track.year >= 2020 ? '2020s' :
+      track.year >= 2010 ? '2010s' :
+      track.year >= 2000 ? '2000s' :
+      track.year >= 1990 ? '1990s' :
+      track.year >= 1980 ? '1980s' :
+      '1970s'
+    ) : '');
     setArtwork(track.artwork);
     setSubmenu('edit');
   };
@@ -54,7 +61,7 @@ export function ActionSheet(): JSX.Element | null {
 
   const saveEdit = async (): Promise<void> => {
     const y = year.trim();
-    const yearNum = y && /^\d{4}$/.test(y) ? parseInt(y, 10) : undefined;
+    const yearNum = eraToYear(y);
     await useLibrary.getState().updateTrackMeta(track.id, { title, artist, artist2, album, artwork, genre1, genre2, year: yearNum });
     close();
   };

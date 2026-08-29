@@ -89,7 +89,7 @@ export function NowPlayingSheet(): JSX.Element | null {
 
         <div className="np-titles">
           <div className="np-title">{track.title}</div>
-          <div className="np-artist">{formatArtist(track)}</div>
+          <div className="np-artist">{formatArtist(track)}{track.year ? ` · ${track.year >= 2020 ? '2020s' : track.year >= 2010 ? '2010s' : track.year >= 2000 ? '2000s' : track.year >= 1990 ? '90s' : track.year >= 1980 ? '80s' : '70s'}` : ''}</div>
         </div>
 
         <SeekBar current={currentTime} duration={duration} onSeek={seek} light />

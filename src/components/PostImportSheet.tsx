@@ -41,12 +41,16 @@ export function PostImportSheet({ trackIds, onClose }: Props): JSX.Element | nul
   const getEdit = (id: string): TrackEdits =>
     edits[id] ?? (() => {
       const t = byId[id];
+      const yr = t?.year;
+      const era = yr != null
+        ? yr >= 2020 ? '2020s' : yr >= 2010 ? '2010s' : yr >= 2000 ? '2000s' : yr >= 1990 ? '1990s' : yr >= 1980 ? '1980s' : '1970s'
+        : '';
       return {
         artist: t?.artist ?? '',
         artist2: t?.artist2 ?? '',
         genre1: t?.genre1 ?? '',
         genre2: t?.genre2 ?? '',
-        year: t?.year ? String(t.year) : '',
+        year: era,
         album: (t?.album && t.album !== 'YouTube') ? t.album : ''
       };
     })();
