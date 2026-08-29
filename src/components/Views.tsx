@@ -192,7 +192,8 @@ export function HeroSection(): JSX.Element {
   const navigate = useUI((s) => s.navigate);
 
   const greeting = getGreeting();
-  const topTrack = recentlyPlayed[0]?.track ?? tracks[0];
+  const rawTopTrack = recentlyPlayed[0]?.track ?? tracks[0];
+  const topTrack = rawTopTrack ? (useLibrary.getState().byId[rawTopTrack.id] ?? rawTopTrack) : undefined;
 
   return (
     <div style={{ padding: '0 16px 16px' }}>
@@ -443,6 +444,8 @@ function EnhancedRecentCard({ track, playedAt }: EnhancedRecentCardProps): JSX.E
 
   const playTracks = usePlayer((s) => s.playTracks);
   const openNowPlaying = useUI((s) => s.openNowPlaying);
+  const fullTrack = useLibrary((s) => s.byId[track.id]);
+  const displayTrack = fullTrack ?? track;
 
   const timeAgo = formatTimeAgo(playedAt);
   const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
@@ -451,12 +454,12 @@ function EnhancedRecentCard({ track, playedAt }: EnhancedRecentCardProps): JSX.E
     <button
       className="enhanced-recent-card"
       onClick={() => {
-        playTracks([track], 0);
+        playTracks([displayTrack], 0);
         openNowPlaying();
       }}
       style={{ width: cardWidth, background: 'none', flexShrink: 0 }}
     >
-      <Artwork src={track.artwork} className="enhanced-card-artwork" placeholderSize={30} alt="" style={{ width: cardWidth, height: cardWidth } as React.CSSProperties} />
+      <Artwork src={displayTrack.artwork} className="enhanced-card-artwork" placeholderSize={30} alt="" style={{ width: cardWidth, height: cardWidth } as React.CSSProperties} />
       <div className="card-title" style={{ marginTop: 10 }}>{track.title}</div>
       <div className="card-subtitle">{formatArtist(track)}</div>
       <div className="card-timestamp">{timeAgo}</div>
