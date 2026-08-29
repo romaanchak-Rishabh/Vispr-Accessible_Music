@@ -46,6 +46,8 @@ function pageTitle(): string {
     }
     case 'settings':
       return 'Settings';
+    case 'mix-detail':
+      return page.title;
   }
 }
 

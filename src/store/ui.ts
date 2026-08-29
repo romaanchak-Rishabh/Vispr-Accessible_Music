@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { Track } from '../types';
 
 export type Page =
   | { type: 'listen' }
@@ -9,6 +10,7 @@ export type Page =
   | { type: 'album'; key: string }
   | { type: 'artist'; name: string }
   | { type: 'playlist'; id: string }
+  | { type: 'mix-detail'; id: string; title: string; subtitle: string; icon: React.ReactNode; gradient: string; tracks: Track[] }
   | { type: 'settings' };
 
 interface UIState {

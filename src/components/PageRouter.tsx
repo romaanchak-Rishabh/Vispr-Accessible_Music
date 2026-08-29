@@ -3,7 +3,7 @@ import type { JSX } from 'react';
 import { useLibrary, getFavourites, getMostListened, isAutoPlaylist, AUTO_FAVOURITES_ID, AUTO_MOST_LISTENED_ID } from '../store/library';
 import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
-import type { Album, Artist } from '../types';
+import type { Album, Artist, Track } from '../types';
 import { formatArtist } from '../types';
 import { TrackRow } from './TrackRow';
 import { Artwork } from './Artwork';
@@ -35,6 +35,8 @@ export function PageRouter(): JSX.Element {
       return <ArtistDetailView name={page.name} />;
     case 'playlist':
       return <PlaylistDetailView playlistId={page.id} />;
+    case 'mix-detail':
+      return <MixDetailView mix={page} />;
     case 'settings':
       return <SettingsPage />;
   }
@@ -688,6 +690,51 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+
+/* ── Mix Detail View ────────────────────────────────────────────────── */
+
+function MixDetailView({ mix }: { mix: { id: string; title: string; subtitle: string; icon: React.ReactNode; gradient: string; tracks: Track[] } }): JSX.Element | null {
+  const playTracks = usePlayer((s) => s.playTracks);
+
+  if (!mix || mix.tracks.length === 0) {
+    return <div style={{ padding: 40, textAlign: 'center', color: 'var(--label-secondary)' }}>Mix not found</div>;
+  }
+
+  return (
+    <div className="fade-page">
+      <DetailHeader
+        kicker="Mix"
+        title={mix.title}
+        subtitle={mix.subtitle}
+        artwork={mix.tracks[0]?.artwork}
+      >
+        <button
+          className="pill-btn primary"
+          disabled={mix.tracks.length === 0}
+          style={mix.tracks.length === 0 ? { opacity: 0.5 } : undefined}
+          onClick={() => playTracks(mix.tracks, 0, mix.title)}
+        >
+          <PlayIcon size={15} /> Play
+        </button>
+        <button
+          className="pill-btn"
+          onClick={() => {
+            const shuffled = [...mix.tracks].sort(() => Math.random() - 0.5);
+            playTracks(shuffled, 0, mix.title + ' — Shuffle');
+          }}
+        >
+          <ShuffleIcon size={15} /> Shuffle
+        </button>
+      </DetailHeader>
+      <div className="group">
+        {mix.tracks.map((t) => (
+          <TrackRow key={t.id} track={t} />
+        ))}
+      </div>
     </div>
   );
 }
