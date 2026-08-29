@@ -58,11 +58,11 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
     let cancelled = false;
     (async () => {
       try {
-        const shareFile = files.find((f) => f.name.endsWith('.vpr') || f.name.endsWith('.vispr.json') || f.name.endsWith('.json'));
+        const shareFile = files.find((f) => f.name.endsWith('.json') || f.name.endsWith('.vpr') || f.name.endsWith('.vispr.json') || f.name.endsWith('.bin'));
 
         if (!shareFile) {
           if (!cancelled) {
-            setErrorMsg('No shareable files found. Send a .vpr file from Vispr.');
+            setErrorMsg('No shareable files found. Send a JSON file from Vispr.');
             setPhase('error');
           }
           return;

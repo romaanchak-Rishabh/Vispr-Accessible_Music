@@ -274,7 +274,7 @@ export function SettingsPage(): JSX.Element {
           <input
             ref={receiveInputRef}
             type="file"
-            accept=".vpr,.vispr.json,.json,.m4a,.mp3,.mp4,.aac,.ogg,.opus,.flac"
+            accept=".json,.vispr.json,.vpr,.m4a,.mp3,.mp4,.aac,.ogg,.opus,.flac"
             multiple
             style={{ display: 'none' }}
             onChange={(e) => {
