@@ -14,10 +14,6 @@ interface ReceiveSheetProps {
   onClose: () => void;
 }
 
-function findMetadataFile(files: File[]): File | undefined {
-  return files.find((f) => f.name.endsWith('.vispr.json') || f.name === 'metadata.vispr.json');
-}
-
 function getShareTypeLabel(payload: SharePayload): string {
   switch (payload.type) {
     case 'playlist': return `Playlist: ${payload.playlistName ?? 'Untitled'}`;
@@ -59,32 +55,12 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
     let cancelled = false;
     (async () => {
       try {
-        const audioFiles = files.filter((f) => !f.name.endsWith('.json'));
-        const metaFile = findMetadataFile(files);
+        const metaFile = files.find((f) => f.name.endsWith('.vispr.json') || f.name === 'metadata.vispr.json');
 
-        if (!metaFile && audioFiles.length === 0) {
+        if (!metaFile) {
           if (!cancelled) {
             setErrorMsg('No shareable files found.');
             setPhase('error');
-          }
-          return;
-        }
-
-        if (!metaFile) {
-          const items: ConflictItem[] = audioFiles.map((af) => ({
-            incoming: {
-              id: `import-${af.name}`,
-              title: af.name.replace(/\.[^.]+$/, ''),
-              artist: 'Unknown Artist',
-              album: 'Unknown Album',
-            },
-            existing: undefined,
-            audioFile: af,
-            status: 'new' as const,
-          }));
-          if (!cancelled) {
-            setConflicts(items);
-            setPhase('review');
           }
           return;
         }
@@ -111,7 +87,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
           return;
         }
 
-        const items = detectConflicts(p.tracks, existingTracks, audioFiles.length > 0 ? audioFiles : undefined);
+        const items = detectConflicts(p.tracks, existingTracks);
         if (!cancelled) {
           setPayload(p);
           setConflicts(items);
@@ -158,9 +134,9 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         let audioBlob: Blob | undefined;
         let filename = inc.fileName ?? `${inc.title} — ${inc.artist}.m4a`;
 
-        if (item.audioFile) {
-          audioBlob = item.audioFile;
-          filename = item.audioFile.name;
+        if (inc.audioData) {
+          const resp = await fetch(inc.audioData);
+          audioBlob = await resp.blob();
         } else if (inc.youtubeId && ytdlpServer) {
           const videoUrl = `https://www.youtube.com/watch?v=${inc.youtubeId}`;
           const dl = await downloadAudioViaYtDlp(ytdlpServer, ytdlpToken, videoUrl);
@@ -238,7 +214,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
   const exactCount = conflicts.filter((c) => c.status === 'exact').length;
   const conflictCount = conflicts.filter((c) => c.status === 'conflict').length;
   const newCount = conflicts.filter((c) => c.status === 'new').length;
-  const withAudio = conflicts.filter((c) => c.audioFile).length;
+  const withAudio = conflicts.filter((c) => c.incoming.audioData).length;
   const importableCount = newCount + (applyAllChoice === 'incoming' ? conflictCount : 0);
 
   return (
@@ -285,7 +261,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
                     <div style={{ fontSize: 12, color: 'var(--label-secondary)' }}>{item.incoming.artist}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    {item.audioFile && (
+                    {item.incoming.audioData && (
                       <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'rgba(52,199,89,0.15)', color: '#34c759' }}>
                         Audio
                       </span>

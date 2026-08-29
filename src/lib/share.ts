@@ -28,6 +28,7 @@ export interface ShareTrack {
   youtubeId?: string;
   artwork?: string;
   fileName?: string;
+  audioData?: string;
 }
 
 function extractYoutubeId(trackId: string): string | undefined {
@@ -129,25 +130,21 @@ export async function shareMix(name: string, tracks: Track[]): Promise<void> {
 }
 
 async function sharePayload(payload: SharePayload, tracks: Track[]): Promise<void> {
-  const jsonBlob = payloadToBlob(payload);
-
-  const audioFiles: File[] = [];
   for (const track of tracks) {
     const blob = await db.loadFileBlob(track.id);
     if (blob) {
-      const dotIdx = track.fileName?.lastIndexOf('.') ?? -1;
-      const ext = dotIdx > 0 ? track.fileName!.slice(dotIdx + 1) : 'm4a';
-      const safeName = `${track.title} — ${track.artist}.${ext}`.replace(/[<>:"/\\|?*]/g, '_');
-      audioFiles.push(new File([blob], safeName, { type: blob.type || 'audio/mp4' }));
+      const b64 = await blobToBase64(blob);
+      const shareTrack = payload.tracks.find((t) => t.id === track.id);
+      if (shareTrack) shareTrack.audioData = b64;
     }
   }
 
+  const jsonBlob = payloadToBlob(payload);
   const jsonFile = new File([jsonBlob], getFileName(payload), { type: 'application/json' });
-  const allFiles = [...audioFiles, jsonFile];
 
-  if (navigator.share && navigator.canShare?.({ files: allFiles })) {
+  if (navigator.share && navigator.canShare?.({ files: [jsonFile] })) {
     await navigator.share({
-      files: allFiles,
+      files: [jsonFile],
       title: getShareTitle(payload),
       text: getShareText(payload),
     });
@@ -159,6 +156,15 @@ async function sharePayload(payload: SharePayload, tracks: Track[]): Promise<voi
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function parseSharePayload(text: string): SharePayload {
@@ -181,14 +187,12 @@ export function parseSharePayload(text: string): SharePayload {
 export interface ConflictItem {
   incoming: ShareTrack;
   existing?: Track;
-  audioFile?: File;
   status: 'new' | 'exact' | 'conflict';
 }
 
 export function detectConflicts(
   incoming: ShareTrack[],
-  existingTracks: Track[],
-  audioFiles?: File[]
+  existingTracks: Track[]
 ): ConflictItem[] {
   const byId = new Map(existingTracks.map((t) => [t.id, t]));
   const byYtId = new Map(
@@ -204,14 +208,8 @@ export function detectConflicts(
       existing = byId.get(inc.id);
     }
 
-    const audioFile = audioFiles?.find((f) => {
-      const name = f.name.replace(/\.[^.]+$/, '').toLowerCase();
-      const key = `${inc.title} — ${inc.artist}`.replace(/[<>:"/\\|?*]/g, '_').toLowerCase();
-      return name === key || name.includes(inc.title.toLowerCase());
-    });
-
     if (!existing) {
-      return { incoming: inc, existing: undefined, audioFile, status: 'new' as const };
+      return { incoming: inc, existing: undefined, status: 'new' as const };
     }
 
     const same =
@@ -221,9 +219,9 @@ export function detectConflicts(
       (existing.duration ?? 0) === (inc.duration ?? 0);
 
     if (same) {
-      return { incoming: inc, existing, audioFile, status: 'exact' as const };
+      return { incoming: inc, existing, status: 'exact' as const };
     }
 
-    return { incoming: inc, existing, audioFile, status: 'conflict' as const };
+    return { incoming: inc, existing, status: 'conflict' as const };
   });
 }
