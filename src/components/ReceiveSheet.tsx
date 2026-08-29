@@ -9,6 +9,15 @@ import { SpinnerIcon } from './Icons';
 import type { Track } from '../types';
 import * as db from '../lib/db';
 
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [header, b64] = dataUrl.split(',');
+  const mime = header.match(/:(.*?);/)?.[1] ?? 'audio/mp4';
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
 interface ReceiveSheetProps {
   files: File[];
   onClose: () => void;
@@ -139,8 +148,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         let filename = inc.fileName ?? `${inc.title} — ${inc.artist}.m4a`;
 
         if (inc.audioData) {
-          const resp = await fetch(inc.audioData);
-          audioBlob = await resp.blob();
+          audioBlob = dataUrlToBlob(inc.audioData);
         } else if (inc.youtubeId && ytdlpServer) {
           const videoUrl = `https://www.youtube.com/watch?v=${inc.youtubeId}`;
           const dl = await downloadAudioViaYtDlp(ytdlpServer, ytdlpToken, videoUrl);
