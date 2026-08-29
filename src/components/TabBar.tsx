@@ -1,10 +1,10 @@
 import { useUI } from '../store/ui';
-import { ListenIcon, SparklesIcon, BrowseIcon, LibraryIcon, SearchIcon, SettingsIcon } from './Icons';
+import { ListenIcon, BrowseIcon, LibraryIcon, SearchIcon, SettingsIcon } from './Icons';
 import type { JSX } from 'react';
 
 const tabs = [
   { id: 'listen', label: 'Listen Now', icon: ListenIcon },
-  { id: 'forYou', label: 'For You', icon: SparklesIcon },
+  // { id: 'forYou', label: 'For You', icon: SparklesIcon }, // Temporarily disabled
   { id: 'browse', label: 'Browse', icon: BrowseIcon },
   { id: 'library', label: 'Library', icon: LibraryIcon },
   { id: 'search', label: 'Search', icon: SearchIcon },
