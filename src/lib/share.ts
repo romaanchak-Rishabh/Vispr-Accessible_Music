@@ -1,4 +1,5 @@
 import type { Track } from '../types';
+import * as db from './db';
 
 export type ShareType = 'track' | 'playlist' | 'album' | 'artist' | 'mix';
 
@@ -27,6 +28,7 @@ export interface ShareTrack {
   youtubeId?: string;
   artwork?: string;
   fileName?: string;
+  audioData?: string;
 }
 
 function extractYoutubeId(trackId: string): string | undefined {
@@ -127,7 +129,20 @@ export async function shareMix(name: string, tracks: Track[]): Promise<void> {
   await sharePayload(payload, tracks);
 }
 
-async function sharePayload(payload: SharePayload, _tracks: Track[]): Promise<void> {
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+
+async function sharePayload(payload: SharePayload, tracks: Track[]): Promise<void> {
+  if (IS_IOS) {
+    for (const track of tracks) {
+      const blob = await db.loadFileBlob(track.id);
+      if (blob) {
+        const b64 = await blobToBase64(blob);
+        const shareTrack = payload.tracks.find((t) => t.id === track.id);
+        if (shareTrack) shareTrack.audioData = b64;
+      }
+    }
+  }
+
   const jsonBlob = payloadToBlob(payload);
   const jsonFile = new File([jsonBlob], getFileName(payload), { type: 'application/json' });
 
@@ -145,6 +160,15 @@ async function sharePayload(payload: SharePayload, _tracks: Track[]): Promise<vo
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function parseSharePayload(text: string): SharePayload {
