@@ -323,6 +323,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             source: 'file',
             size: file.size,
             addedAt: Date.now(),
+            duration: tags.duration,
             artwork
           };
           newTracks.push(track);

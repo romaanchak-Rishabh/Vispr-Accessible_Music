@@ -115,6 +115,7 @@ export async function scanMusicDirectory(
         source: 'dir',
         size: file.size,
         addedAt: Date.now(),
+        duration: tags.duration,
         artwork
       };
       tracks.push(track);
