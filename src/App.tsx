@@ -80,6 +80,19 @@ export default function App(): JSX.Element {
     }
   }, []);
 
+  // Handle file_handlers — .vispr.json opened from OS file manager / WhatsApp / etc.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'launchQueue' in window) {
+      const w = window as unknown as { launchQueue: { setConsumer: (cb: (params: { files: Array<{ getFile: () => Promise<File> }> }) => void) => void } };
+      w.launchQueue.setConsumer(async (params) => {
+        if (!params.files || params.files.length === 0) return;
+        const filePromises = params.files.map((entry) => entry.getFile());
+        const files = await Promise.all(filePromises);
+        useUI.getState().setReceiveFiles(files);
+      });
+    }
+  }, []);
+
   useEffect(() => {
     void init().then(() => {
       // Re-attach live track data (artwork, durations) to the restored player session

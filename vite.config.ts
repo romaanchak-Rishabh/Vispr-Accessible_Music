@@ -19,6 +19,14 @@ export default defineConfig({
         background_color: '#000000',
         theme_color: '#000000',
         categories: ['music', 'entertainment'],
+        file_handlers: [
+          {
+            action: '/',
+            accept: {
+              'application/json': ['.vispr.json']
+            }
+          }
+        ],
         share_target: {
           action: '/?share-target',
           method: 'GET',
