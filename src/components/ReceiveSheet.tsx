@@ -134,10 +134,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         let audioBlob: Blob | undefined;
         let filename = inc.fileName ?? `${inc.title} — ${inc.artist}.m4a`;
 
-        if (inc.audioData) {
-          const resp = await fetch(inc.audioData);
-          audioBlob = await resp.blob();
-        } else if (inc.youtubeId && ytdlpServer) {
+        if (inc.youtubeId && ytdlpServer) {
           const videoUrl = `https://www.youtube.com/watch?v=${inc.youtubeId}`;
           const dl = await downloadAudioViaYtDlp(ytdlpServer, ytdlpToken, videoUrl);
           audioBlob = dl.blob;
@@ -214,7 +211,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
   const exactCount = conflicts.filter((c) => c.status === 'exact').length;
   const conflictCount = conflicts.filter((c) => c.status === 'conflict').length;
   const newCount = conflicts.filter((c) => c.status === 'new').length;
-  const withAudio = conflicts.filter((c) => c.incoming.audioData).length;
+  const withYt = conflicts.filter((c) => c.incoming.youtubeId).length;
   const importableCount = newCount + (applyAllChoice === 'incoming' ? conflictCount : 0);
 
   return (
@@ -246,7 +243,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
             </div>
             <div style={{ padding: '8px 16px 12px', fontSize: 13, color: 'var(--label-secondary)' }}>
               {payload ? getShareTypeLabel(payload) : `${conflicts.length} songs`}
-              {withAudio > 0 && <> — {withAudio} with audio</>}
+              {withYt > 0 && <> — {withYt} from YouTube</>}
               {exactCount > 0 && <>, {exactCount} already in library</>}
               {conflictCount > 0 && <>, {conflictCount} with different metadata</>}
               {newCount > 0 && <>, {newCount} new</>}
@@ -261,11 +258,6 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
                     <div style={{ fontSize: 12, color: 'var(--label-secondary)' }}>{item.incoming.artist}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    {item.incoming.audioData && (
-                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'rgba(52,199,89,0.15)', color: '#34c759' }}>
-                        Audio
-                      </span>
-                    )}
                     <span style={{
                       fontSize: 11, padding: '2px 8px', borderRadius: 10, fontWeight: 500,
                       background: item.status === 'exact' ? 'var(--fill-1)' : item.status === 'conflict' ? 'rgba(255,149,0,0.15)' : 'rgba(0,122,255,0.15)',
