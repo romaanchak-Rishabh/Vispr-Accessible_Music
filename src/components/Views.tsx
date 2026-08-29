@@ -357,17 +357,17 @@ function MixCard({ title, subtitle, icon, gradient, tracks, onPlay, onShuffle }:
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <button
             className="pill-btn primary"
-            style={{ padding: '8px 16px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center' }}
+            style={{ padding: '8px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center', minWidth: 0, whiteSpace: 'nowrap' }}
             onClick={(e) => { e.stopPropagation(); onPlay(); }}
           >
-            <PlayIcon size={14} /> Play
+            <PlayIcon size={13} /> Play
           </button>
           <button
             className="pill-btn"
-            style={{ padding: '8px 16px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center', background: 'rgba(255,255,255,0.2)', color: '#fff' }}
+            style={{ padding: '8px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center', background: 'rgba(255,255,255,0.2)', color: '#fff', minWidth: 0, whiteSpace: 'nowrap' }}
             onClick={(e) => { e.stopPropagation(); onShuffle(); }}
           >
-            <ShuffleIcon size={14} /> Shuffle
+            <ShuffleIcon size={13} /> Shuffle
           </button>
         </div>
       </div>
