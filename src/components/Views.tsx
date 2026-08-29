@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLibrary } from '../store/library';
 import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
@@ -9,10 +9,10 @@ import { PostImportSheet } from './PostImportSheet';
 import { FolderIcon, SpinnerIcon, ChevronRightIcon, MagnifyingGlassIcon, GearIcon } from './Icons';
 import type { Album, Track } from '../types';
 import { formatArtist } from '../types';
+import { getSmartRecommendations, getRecommendations, type Recommendation } from '../lib/recommender';
 import {
   HeartFillIcon,
   RadioIcon,
-  ClockIcon,
   MusicMixIcon,
   WaveformIcon,
   MoodIcon,
@@ -384,44 +384,46 @@ function MixCard({ title, subtitle, icon, gradient, tracks, onPlay, onShuffle }:
 export function MadeForYouSection(): JSX.Element | null {
   const tracks = useLibrary((s) => s.tracks);
   const playCounts = usePlayer((s) => s.playCounts);
+  const recentlyPlayed = usePlayer((s) => s.recentlyPlayed);
+  const playlists = useLibrary((s) => s.playlists);
+  const favourites = useLibrary((s) => s.tracks.filter((t) => !!t.favouritedAt));
   const playTracks = usePlayer((s) => s.playTracks);
+
+  const [recs, setRecs] = useState<Recommendation[]>([]);
+
+  const refresh = useCallback(async () => {
+    const recentTracks = recentlyPlayed.map((e) => e.track);
+    try {
+      const results = await getSmartRecommendations(
+        tracks, playCounts, recentTracks, playlists, new Set(favourites.map(t => t.id)), 10
+      );
+      setRecs(results);
+    } catch {
+      const results = getRecommendations(tracks, playCounts, recentTracks, playlists, new Set(favourites.map(t => t.id)), 10, Date.now());
+      setRecs(results);
+    }
+  }, [tracks, playCounts, recentlyPlayed, playlists, favourites]);
+
+  useEffect(() => {
+    if (tracks.length > 0 && recs.length === 0) {
+      refresh();
+    }
+  }, [tracks.length, refresh]);
 
   if (tracks.length === 0) return null;
 
-  // Favorites Mix - top played
-  const favIds = [...Object.entries(playCounts)]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 25)
-    .map(([id]) => id);
-  const favoritesMix = favIds.map((id) => tracks.find((t) => t.id === id)).filter(Boolean) as Track[];
-
-  // Chill Mix - low energy (placeholder - use recently played low energy)
-  const chillMix = tracks.slice(0, 25);
-
-  // New Music Mix - recently added
-  const newMusicMix = [...tracks].sort((a, b) => b.addedAt - a.addedAt).slice(0, 25);
-
-  // Replay Mix - top of year
-  const replayMix = favIds.slice(0, 25).map((id) => tracks.find((t) => t.id === id)).filter(Boolean) as Track[];
-
-  // Discovery Mix - less played tracks
-  const discoveryMix = tracks
-    .filter((t) => (playCounts[t.id] ?? 0) < 3)
-    .slice(0, 25);
-
-  const mixes = [
-    { title: 'Favorites Mix', subtitle: 'Your top songs, updated weekly', icon: <HeartFillIcon size={28} />, gradient: 'linear-gradient(135deg, #fa233b, #fb5c74)', tracks: favoritesMix },
-    { title: 'Chill Mix', subtitle: 'Relax and unwind', icon: <MoodIcon size={28} />, gradient: 'linear-gradient(135deg, #30d158, #63e284)', tracks: chillMix },
-    { title: 'New Music Mix', subtitle: 'Fresh tracks from your library', icon: <SparklesIcon size={28} />, gradient: 'linear-gradient(135deg, #0a84ff, #409cff)', tracks: newMusicMix },
-    { title: 'Replay Mix', subtitle: 'Your top songs this year', icon: <ClockIcon size={28} />, gradient: 'linear-gradient(135deg, #bf5af2, #d18cf5)', tracks: replayMix },
-    { title: 'Discovery Mix', subtitle: 'Songs you might like', icon: <StarIcon size={28} />, gradient: 'linear-gradient(135deg, #ff9f0a, #ffb84d)', tracks: discoveryMix },
+  const smartMixes = [
+    { title: 'Favorites Mix', subtitle: 'Your top songs, updated weekly', icon: <HeartFillIcon size={28} />, gradient: 'linear-gradient(135deg, #fa233b, #fb5c74)', tracks: recs.map(r => r.track).slice(0, 25) },
+    { title: 'Chill Mix', subtitle: 'Relax and unwind', icon: <MoodIcon size={28} />, gradient: 'linear-gradient(135deg, #30d158, #63e284)', tracks: tracks.filter(t => (t.genre1 ?? '').toLowerCase().includes('chill') || (t.genre2 ?? '').toLowerCase().includes('chill') || (t.genre1 ?? '').toLowerCase().includes('ambient')).slice(0, 25) },
+    { title: 'New Music Mix', subtitle: 'Fresh tracks from your library', icon: <SparklesIcon size={28} />, gradient: 'linear-gradient(135deg, #0a84ff, #409cff)', tracks: [...tracks].sort((a, b) => b.addedAt - a.addedAt).slice(0, 25) },
+    { title: 'Discovery Mix', subtitle: 'Songs you might like', icon: <StarIcon size={28} />, gradient: 'linear-gradient(135deg, #ff9f0a, #ffb84d)', tracks: recs.filter(r => (playCounts[r.track.id] ?? 0) < 3).map(r => r.track).slice(0, 25) },
   ];
 
   return (
     <div style={{ padding: '0 16px 16px' }}>
       <h2 className="section-header">Made For You</h2>
       <div className="hscroll" style={{ gap: 14 }}>
-        {mixes.map((mix, _i) => (
+        {smartMixes.map((mix, _i) => (
           <MixCard
             key={mix.title}
             title={mix.title}
