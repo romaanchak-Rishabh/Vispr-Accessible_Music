@@ -55,11 +55,14 @@ export function ManualImportSheet({ url, onClose }: Props): JSX.Element {
     if (!thumb) return undefined;
     try {
       const resp = await fetch(thumb, { mode: 'cors' });
-      if (resp.ok) return (await blobToDataUrl(await resp.blob())) ?? thumb;
+      if (resp.ok) {
+        const dataUrl = await blobToDataUrl(await resp.blob());
+        if (dataUrl) return dataUrl;
+      }
     } catch {
-      /* fall through to remote URL */
+      /* artwork unavailable */
     }
-    return thumb;
+    return undefined;
   };
 
   const save = async (): Promise<void> => {
