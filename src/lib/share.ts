@@ -1,10 +1,16 @@
 import type { Track } from '../types';
 import * as db from './db';
 
+export type ShareType = 'track' | 'playlist' | 'album' | 'artist' | 'mix';
+
 export interface SharePayload {
   v: 1;
-  type: 'track';
+  type: ShareType;
+  name?: string;
   tracks: ShareTrack[];
+  playlistName?: string;
+  albumTitle?: string;
+  artistName?: string;
 }
 
 export interface ShareTrack {
@@ -30,7 +36,6 @@ function extractYoutubeId(trackId: string): string | undefined {
 }
 
 function trackToShareTrack(track: Track): ShareTrack {
-  const ytId = extractYoutubeId(track.id);
   return {
     id: track.id,
     title: track.title,
@@ -43,27 +48,87 @@ function trackToShareTrack(track: Track): ShareTrack {
     year: track.year,
     trackNo: track.trackNo,
     duration: track.duration,
-    youtubeId: ytId,
+    youtubeId: extractYoutubeId(track.id),
     artwork: track.artwork,
     fileName: track.fileName,
   };
 }
 
-export function createSharePayload(tracks: Track[]): SharePayload {
+export function createSharePayload(
+  tracks: Track[],
+  type: ShareType = 'track',
+  meta?: { name?: string; playlistName?: string; albumTitle?: string; artistName?: string }
+): SharePayload {
   return {
     v: 1,
-    type: 'track',
+    type,
+    name: meta?.name,
     tracks: tracks.map(trackToShareTrack),
+    playlistName: meta?.playlistName,
+    albumTitle: meta?.albumTitle,
+    artistName: meta?.artistName,
   };
 }
 
 export function payloadToBlob(payload: SharePayload): Blob {
-  const json = JSON.stringify(payload, null, 2);
-  return new Blob([json], { type: 'application/json' });
+  return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+}
+
+function getShareTitle(payload: SharePayload): string {
+  switch (payload.type) {
+    case 'playlist': return payload.playlistName ?? 'Playlist';
+    case 'album': return payload.albumTitle ?? 'Album';
+    case 'artist': return payload.artistName ?? 'Artist';
+    case 'mix': return payload.name ?? 'Mix';
+    case 'track': return payload.tracks.length === 1 ? payload.tracks[0].title : `${payload.tracks.length} songs`;
+    default: return 'Vispr Share';
+  }
+}
+
+function getShareText(payload: SharePayload): string {
+  switch (payload.type) {
+    case 'playlist': return `${payload.playlistName ?? 'Playlist'} — ${payload.tracks.length} songs`;
+    case 'album': return `${payload.albumTitle ?? 'Album'} — ${payload.tracks.length} songs`;
+    case 'artist': return `${payload.artistName ?? 'Artist'} — ${payload.tracks.length} songs`;
+    case 'mix': return `${payload.name ?? 'Mix'} — ${payload.tracks.length} songs`;
+    case 'track': return payload.tracks.length === 1
+      ? `${payload.tracks[0].title} — ${payload.tracks[0].artist}`
+      : `${payload.tracks.length} songs from Vispr`;
+    default: return 'Vispr Share';
+  }
+}
+
+function getFileName(payload: SharePayload): string {
+  const name = getShareTitle(payload).replace(/[<>:"/\\|?*]/g, '_');
+  return `${name}.vispr.json`;
 }
 
 export async function shareTracks(tracks: Track[]): Promise<void> {
-  const payload = createSharePayload(tracks);
+  const payload = createSharePayload(tracks, 'track');
+  await sharePayload(payload, tracks);
+}
+
+export async function sharePlaylist(name: string, tracks: Track[]): Promise<void> {
+  const payload = createSharePayload(tracks, 'playlist', { playlistName: name });
+  await sharePayload(payload, tracks);
+}
+
+export async function shareAlbum(title: string, tracks: Track[]): Promise<void> {
+  const payload = createSharePayload(tracks, 'album', { albumTitle: title });
+  await sharePayload(payload, tracks);
+}
+
+export async function shareArtist(name: string, tracks: Track[]): Promise<void> {
+  const payload = createSharePayload(tracks, 'artist', { artistName: name });
+  await sharePayload(payload, tracks);
+}
+
+export async function shareMix(name: string, tracks: Track[]): Promise<void> {
+  const payload = createSharePayload(tracks, 'mix', { name });
+  await sharePayload(payload, tracks);
+}
+
+async function sharePayload(payload: SharePayload, tracks: Track[]): Promise<void> {
   const jsonBlob = payloadToBlob(payload);
 
   const audioFiles: File[] = [];
@@ -76,25 +141,20 @@ export async function shareTracks(tracks: Track[]): Promise<void> {
     }
   }
 
-  const jsonFile = new File([jsonBlob], 'metadata.vispr.json', { type: 'application/json' });
+  const jsonFile = new File([jsonBlob], getFileName(payload), { type: 'application/json' });
   const allFiles = [...audioFiles, jsonFile];
 
   if (navigator.share && navigator.canShare?.({ files: allFiles })) {
     await navigator.share({
       files: allFiles,
-      title: tracks.length === 1 ? tracks[0].title : `${tracks.length} songs`,
-      text: tracks.length === 1
-        ? `${tracks[0].title} — ${tracks[0].artist}`
-        : `${tracks.length} songs from Vispr`,
+      title: getShareTitle(payload),
+      text: getShareText(payload),
     });
   } else {
-    // Fallback: download the JSON (audio can't be transferred this way)
     const url = URL.createObjectURL(jsonBlob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = tracks.length === 1
-      ? `${tracks[0].title} — ${tracks[0].artist}.vispr.json`
-      : 'vispr-share.vispr.json';
+    a.download = getFileName(payload);
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -125,14 +185,6 @@ export function detectConflicts(
     existingTracks.filter((t) => t.id.startsWith('y-')).map((t) => [t.id.slice(2), t])
   );
 
-  const audioByTitle = new Map<string, File>();
-  if (audioFiles) {
-    for (const f of audioFiles) {
-      const name = f.name.replace(/\.[^.]+$/, '').toLowerCase();
-      audioByTitle.set(name, f);
-    }
-  }
-
   return incoming.map((inc) => {
     let existing: Track | undefined;
 
@@ -142,10 +194,10 @@ export function detectConflicts(
       existing = byId.get(inc.id);
     }
 
-    const audioKey = `${inc.title} — ${inc.artist}`.replace(/[<>:"/\\|?*]/g, '_').toLowerCase();
     const audioFile = audioFiles?.find((f) => {
       const name = f.name.replace(/\.[^.]+$/, '').toLowerCase();
-      return name === audioKey || name.includes(inc.title.toLowerCase());
+      const key = `${inc.title} — ${inc.artist}`.replace(/[<>:"/\\|?*]/g, '_').toLowerCase();
+      return name === key || name.includes(inc.title.toLowerCase());
     });
 
     if (!existing) {

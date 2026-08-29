@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import type { JSX } from 'react';
 import { useLibrary } from '../store/library';
 import { Artwork } from './Artwork';
-import { parseSharePayload, detectConflicts, type ConflictItem } from '../lib/share';
+import { parseSharePayload, detectConflicts, type ConflictItem, type SharePayload } from '../lib/share';
 import { downloadAudioViaYtDlp } from '../lib/ytdlp';
 import { blobToDataUrl } from '../lib/metadata';
 import { SpinnerIcon } from './Icons';
@@ -18,8 +18,21 @@ function findMetadataFile(files: File[]): File | undefined {
   return files.find((f) => f.name.endsWith('.vispr.json') || f.name === 'metadata.vispr.json');
 }
 
+function getShareTypeLabel(payload: SharePayload): string {
+  switch (payload.type) {
+    case 'playlist': return `Playlist: ${payload.playlistName ?? 'Untitled'}`;
+    case 'album': return `Album: ${payload.albumTitle ?? 'Untitled'}`;
+    case 'artist': return `Artist: ${payload.artistName ?? 'Untitled'}`;
+    case 'mix': return `Mix: ${payload.name ?? 'Untitled'}`;
+    default: return `${payload.tracks.length} song${payload.tracks.length !== 1 ? 's' : ''}`;
+  }
+}
+
 export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element | null {
   const existingTracks = useLibrary((s) => s.tracks);
+  const existingPlaylists = useLibrary((s) => s.playlists);
+  const createPlaylist = useLibrary((s) => s.createPlaylist);
+  const addToPlaylist = useLibrary((s) => s.addToPlaylist);
   const ytdlpServer = useLibrary(() => {
     try {
       const raw = localStorage.getItem('app-settings');
@@ -33,6 +46,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
     } catch { return ''; }
   });
 
+  const [payload, setPayload] = useState<SharePayload | null>(null);
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
   const [phase, setPhase] = useState<'parsing' | 'review' | 'importing' | 'done'>('parsing');
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0, label: '' });
@@ -47,7 +61,6 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
       try {
         const metaFile = findMetadataFile(files);
         if (!metaFile) {
-          // No metadata file — try to import audio files directly
           const audioFiles = files.filter((f) => !f.name.endsWith('.json'));
           if (audioFiles.length > 0) {
             const items: ConflictItem[] = audioFiles.map((af) => ({
@@ -70,12 +83,13 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         }
 
         const text = await metaFile.text();
-        const payload = parseSharePayload(text);
+        const p = parseSharePayload(text);
         if (cancelled) return;
 
         const audioFiles = files.filter((f) => f !== metaFile && !f.name.endsWith('.json'));
-        const items = detectConflicts(payload.tracks, existingTracks, audioFiles.length > 0 ? audioFiles : undefined);
+        const items = detectConflicts(p.tracks, existingTracks, audioFiles.length > 0 ? audioFiles : undefined);
         if (!cancelled) {
+          setPayload(p);
           setConflicts(items);
           setPhase('review');
         }
@@ -93,10 +107,12 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
     const totalConflict = conflicts.filter((c) => c.status === 'conflict').length;
     const totalToImport = totalNew + (applyAllChoice === 'incoming' ? totalConflict : 0);
     let done = 0;
+    const importedTrackIds: string[] = [];
 
     for (const item of conflicts) {
       if (item.status === 'exact') {
         setSkipped((s) => s + 1);
+        importedTrackIds.push(item.existing!.id);
         done++;
         setImportProgress({ done, total: totalToImport, label: `Skipped: ${item.incoming.title} (already in library)` });
         continue;
@@ -104,6 +120,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
 
       if (item.status === 'conflict' && applyAllChoice !== 'incoming') {
         setSkipped((s) => s + 1);
+        importedTrackIds.push(item.existing!.id);
         done++;
         continue;
       }
@@ -115,12 +132,10 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         let audioBlob: Blob | undefined;
         let filename = inc.fileName ?? `${inc.title} — ${inc.artist}.m4a`;
 
-        // Try to use the audio file that came with the share
         if (item.audioFile) {
           audioBlob = item.audioFile;
           filename = item.audioFile.name;
         } else if (inc.youtubeId && ytdlpServer) {
-          // Fall back to downloading if no audio file provided
           const videoUrl = `https://www.youtube.com/watch?v=${inc.youtubeId}`;
           const dl = await downloadAudioViaYtDlp(ytdlpServer, ytdlpToken, videoUrl);
           audioBlob = dl.blob;
@@ -170,12 +185,26 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         const blobFile = new File([audioBlob], filename, { type: audioBlob.type || 'audio/mp4' });
         try { await db.saveFileBlob(trackId, blobFile); } catch { /* skip */ }
         await useLibrary.getState().addTracks([track]);
+        importedTrackIds.push(trackId);
         setImported((i) => i + 1);
       } catch {
         setFailed((f) => f + 1);
       }
 
       done++;
+    }
+
+    if (payload && importedTrackIds.length > 0) {
+      if (payload.type === 'playlist' && payload.playlistName) {
+        const existing = existingPlaylists.find((p) => p.name === payload.playlistName);
+        if (existing) {
+          const newIds = importedTrackIds.filter((id) => !existing.trackIds.includes(id));
+          if (newIds.length > 0) addToPlaylist(existing.id, newIds);
+        } else {
+          const id = createPlaylist(payload.playlistName);
+          addToPlaylist(id, importedTrackIds);
+        }
+      }
     }
 
     setPhase('done');
@@ -202,7 +231,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
               <div style={{ fontSize: 17, fontWeight: 600 }}>Incoming Share</div>
             </div>
             <div style={{ padding: '8px 16px 12px', fontSize: 13, color: 'var(--label-secondary)' }}>
-              {conflicts.length} song{conflicts.length !== 1 ? 's' : ''}
+              {payload ? getShareTypeLabel(payload) : `${conflicts.length} songs`}
               {withAudio > 0 && <> — {withAudio} with audio</>}
               {exactCount > 0 && <>, {exactCount} already in library</>}
               {conflictCount > 0 && <>, {conflictCount} with different metadata</>}
@@ -278,6 +307,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
               {imported > 0 && <div>{imported} song{imported !== 1 ? 's' : ''} imported</div>}
               {skipped > 0 && <div>{skipped} skipped (already in library)</div>}
               {failed > 0 && <div style={{ color: '#ff3b30' }}>{failed} failed</div>}
+              {payload?.type === 'playlist' && <div style={{ marginTop: 8, color: 'var(--accent)' }}>Playlist "{payload.playlistName}" saved</div>}
             </div>
             <div style={{ padding: '8px 16px 16px' }}>
               <button className="pill-btn primary" style={{ width: '100%' }} onClick={onClose}>Done</button>

@@ -9,10 +9,11 @@ import { TrackRow } from './TrackRow';
 import { Artwork } from './Artwork';
 import { EmptyLibrary, AlbumCard } from './Views';
 import { ImportBar } from './ImportBar';
-import { ChevronRightIcon, PlusCircleIcon, EllipsisIcon, ShuffleIcon, PlayIcon, SparklesIcon } from './Icons';
+import { ChevronRightIcon, PlusCircleIcon, EllipsisIcon, ShuffleIcon, PlayIcon, SparklesIcon, ShareIcon } from './Icons';
 import { getRecommendations, getSmartRecommendations, type Recommendation } from '../lib/recommender';
 import { getTrackProfile } from '../lib/classifier';
 import { formatGenre } from '../lib/tags';
+import { shareAlbum, shareArtist, sharePlaylist, shareMix } from '../lib/share';
 
 export function PageRouter(): JSX.Element {
   const pageStack = useUI((s) => s.pageStack);
@@ -529,6 +530,9 @@ function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null
         }}>
           <ShuffleIcon size={15} /> Shuffle
         </button>
+        <button className="pill-btn" onClick={() => void shareAlbum(album.title, tracks)}>
+          <ShareIcon size={15} /> Share
+        </button>
       </DetailHeader>
       <div className="group">
         {tracks.map((t, i) => (
@@ -554,6 +558,9 @@ function ArtistDetailView({ name }: { name: string }): JSX.Element | null {
       <DetailHeader kicker="Artist" title={artist.name} subtitle={`${artist.trackIds.length} songs`} artwork={artist.artwork}>
         <button className="pill-btn primary" onClick={() => playTracks(tracks, 0, artist.name)}>
           <PlayIcon size={15} /> Play
+        </button>
+        <button className="pill-btn" onClick={() => void shareArtist(artist.name, tracks)}>
+          <ShareIcon size={15} /> Share
         </button>
       </DetailHeader>
 
@@ -636,6 +643,9 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
           >
             <PlayIcon size={15} /> Play
           </button>
+          <button className="pill-btn" disabled={list.length === 0} style={list.length === 0 ? { opacity: 0.5 } : undefined} onClick={() => void sharePlaylist(isFav ? 'Favourites' : 'Most Listened', list)}>
+            <ShareIcon size={15} /> Share
+          </button>
         </DetailHeader>
 
         {list.length === 0 ? (
@@ -674,6 +684,9 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
       <DetailHeader kicker="Playlist" title={playlist.name} subtitle={`${plTracks.length} songs`} artwork={plTracks[0]?.artwork}>
         <button className="pill-btn primary" disabled={plTracks.length === 0} style={plTracks.length === 0 ? { opacity: 0.5 } : undefined} onClick={() => playTracks(plTracks, 0, playlist.name)}>
           <PlayIcon size={15} /> Play
+        </button>
+        <button className="pill-btn" disabled={plTracks.length === 0} style={plTracks.length === 0 ? { opacity: 0.5 } : undefined} onClick={() => void sharePlaylist(playlist.name, plTracks)}>
+          <ShareIcon size={15} /> Share
         </button>
         <button
           className="pill-btn"
@@ -745,6 +758,9 @@ function MixDetailView({ mix }: { mix: { id: string; title: string; subtitle: st
           }}
         >
           <ShuffleIcon size={15} /> Shuffle
+        </button>
+        <button className="pill-btn" onClick={() => void shareMix(mix.title, mix.tracks)}>
+          <ShareIcon size={15} /> Share
         </button>
       </DetailHeader>
       <div className="group">
