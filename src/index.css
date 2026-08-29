@@ -13,8 +13,8 @@
   --bg-elevated: #ffffff;
   --bg-secondary: rgba(118, 118, 128, 0.12);
   --label: #000000;
-  --label-secondary: rgba(60, 60, 67, 0.6);
-  --label-tertiary: rgba(60, 60, 67, 0.3);
+  --label-secondary: rgba(60, 60, 67, 0.8);
+  --label-tertiary: rgba(60, 60, 67, 0.5);
   --separator: rgba(60, 60, 67, 0.29);
   --fill-1: rgba(120, 120, 128, 0.2);
 
@@ -68,8 +68,8 @@ html[data-theme='light'] {
   --bg-elevated: #ffffff;
   --bg-secondary: rgba(118, 118, 128, 0.12);
   --label: #000000;
-  --label-secondary: rgba(60, 60, 67, 0.6);
-  --label-tertiary: rgba(60, 60, 67, 0.3);
+  --label-secondary: rgba(60, 60, 67, 0.8);
+  --label-tertiary: rgba(60, 60, 67, 0.5);
   --separator: rgba(60, 60, 67, 0.29);
   --fill-1: rgba(120, 120, 128, 0.2);
 
@@ -354,13 +354,10 @@ input:focus-visible {
    ============================================================ */
 .group {
   background: var(--surface);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
   border-radius: 16px;
   margin: 0 16px 22px;
   overflow: hidden;
-  box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 0 0 0.5px var(--glass-hairline),
-    0 4px 18px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 .rowwrap {
@@ -1524,12 +1521,9 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 .chip {
   padding: 10px 19px;
   background: var(--surface);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
   border-radius: 999px;
   font-size: 15px;
   font-weight: 500;
-  box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 0 0 0.5px var(--glass-hairline);
 }
 
 .chip:active {
@@ -1738,6 +1732,7 @@ input[type='range'].slider:active::-webkit-slider-thumb {
    ============================================================ */
 
 .hero-mix-card {
+  width: 100%;
   transition: transform 0.3s var(--spring), box-shadow 0.3s ease;
 }
 
@@ -1907,81 +1902,55 @@ input[type='range'].slider:active::-webkit-slider-thumb {
   filter: brightness(0.95) !important;
 }
 
-/* Enhanced glass materials for new cards */
+/* Glass materials for cards — clean, no borders */
 .hero-mix-card,
 .mix-card,
-.station-card,
-.mood-chip {
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  border: 0.5px solid var(--glass-hairline);
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    inset 0 0 0 0.5px var(--glass-hairline),
-    0 8px 32px rgba(0, 0, 0, 0.12),
-    0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
 .enhanced-recent-card,
 .top-pick-card,
+.station-card,
+.mood-chip,
 .enhanced-album-card {
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: none;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: none;
+}
+
+.hero-mix-card:hover,
+.mix-card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.enhanced-recent-card:hover,
+.top-pick-card:hover,
+.enhanced-album-card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
 }
 
 @media (prefers-color-scheme: dark) {
-  .hero-mix-card,
-  .mix-card,
-  .station-card,
-  .mood-chip {
-    box-shadow:
-      inset 0 1px 0 var(--glass-highlight),
-      inset 0 0 0 0.5px var(--glass-hairline),
-      0 8px 32px rgba(0, 0, 0, 0.45),
-      0 2px 8px rgba(0, 0, 0, 0.3);
-  }
-
-  .enhanced-recent-card,
-  .top-pick-card,
-  .enhanced-album-card {
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  .hero-mix-card:hover,
+  .mix-card:hover,
+  .enhanced-recent-card:hover,
+  .top-pick-card:hover,
+  .enhanced-album-card:hover {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   }
 }
 
-html[data-theme='light'] .hero-mix-card,
-html[data-theme='light'] .mix-card,
-html[data-theme='light'] .station-card,
-html[data-theme='light'] .mood-chip {
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    inset 0 0 0 0.5px var(--glass-hairline),
-    0 8px 32px rgba(0, 0, 0, 0.12),
-    0 2px 8px rgba(0, 0, 0, 0.06);
+html[data-theme='light'] .hero-mix-card:hover,
+html[data-theme='light'] .mix-card:hover,
+html[data-theme='light'] .enhanced-recent-card:hover,
+html[data-theme='light'] .top-pick-card:hover,
+html[data-theme='light'] .enhanced-album-card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
 }
 
-html[data-theme='light'] .enhanced-recent-card,
-html[data-theme='light'] .top-pick-card,
-html[data-theme='light'] .enhanced-album-card {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-html[data-theme='dark'] .hero-mix-card,
-html[data-theme='dark'] .mix-card,
-html[data-theme='dark'] .station-card,
-html[data-theme='dark'] .mood-chip {
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    inset 0 0 0 0.5px var(--glass-hairline),
-    0 8px 32px rgba(0, 0, 0, 0.45),
-    0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-html[data-theme='dark'] .enhanced-recent-card,
-html[data-theme='dark'] .top-pick-card,
-html[data-theme='dark'] .enhanced-album-card {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+html[data-theme='dark'] .hero-mix-card:hover,
+html[data-theme='dark'] .mix-card:hover,
+html[data-theme='dark'] .enhanced-recent-card:hover,
+html[data-theme='dark'] .top-pick-card:hover,
+html[data-theme='dark'] .enhanced-album-card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Phone breakpoints ────────────────────────────────────────────── */
