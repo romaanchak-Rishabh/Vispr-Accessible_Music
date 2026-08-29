@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { JSX } from 'react';
 import { useLibrary } from '../store/library';
 import { usePlayer } from '../store/player';
 import { ACCENTS, applyAppearance, useSettings } from '../store/settings';
 import type { AccentId, ThemeMode } from '../store/settings';
+import { exportLibrary, importLibrary, type ImportProgress } from '../lib/backup';
 
 function SectionTitle({ children }: { children: string }): JSX.Element {
   return (
@@ -64,6 +65,10 @@ export function SettingsPage(): JSX.Element {
 
   const crossfade = usePlayer((s) => s.crossfade);
   const toggleCrossfade = usePlayer((s) => s.toggleCrossfade);
+
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const trackCount = useLibrary((s) => s.tracks.length);
   const albumCount = useLibrary((s) => s.albums.length);
@@ -185,6 +190,77 @@ export function SettingsPage(): JSX.Element {
             {totalBytes > 1024 * 1024 ? `${(totalBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(totalBytes / 1024)} KB`}
           </span>
         </Row>
+      </div>
+
+      <SectionTitle>Backup</SectionTitle>
+      <div className="group" style={{ marginTop: 0 }}>
+        <Row label="Export library">
+          <button
+            className="pill-btn primary"
+            style={{ padding: '5px 14px', fontSize: 13 }}
+            onClick={async () => {
+              try {
+                const blob = await exportLibrary();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `vispr-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch (e) {
+                console.error('Export failed', e);
+              }
+            }}
+          >
+            Export
+          </button>
+        </Row>
+        <Row label="Import library">
+          <button
+            className="pill-btn"
+            style={{ padding: '5px 14px', fontSize: 13 }}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!!importProgress}
+          >
+            {importProgress ? `${importProgress.done}/${importProgress.total}` : 'Import'}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setImportError(null);
+              try {
+                const result = await importLibrary(file, ytdlpServer, ytdlpToken, setImportProgress);
+                setImportProgress(null);
+                if (result.localOnly > 0) {
+                  setImportError(`Imported ${result.imported} songs. ${result.localOnly} local tracks need manual re-import.`);
+                } else if (result.imported === 0 && result.skipped > 0) {
+                  setImportError('All tracks already in library.');
+                } else {
+                  setImportError(`Done: ${result.imported} downloaded, ${result.skipped} skipped, ${result.failed} failed.`);
+                }
+              } catch (err) {
+                setImportProgress(null);
+                setImportError('Import failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+              }
+              e.target.value = '';
+            }}
+          />
+        </Row>
+        {importProgress && (
+          <div style={{ padding: '8px 16px', borderTop: '0.5px solid var(--separator)', fontSize: 13, color: 'var(--accent)' }}>
+            {importProgress.label}
+          </div>
+        )}
+        {importError && (
+          <div style={{ padding: '8px 16px', borderTop: '0.5px solid var(--separator)', fontSize: 13, color: 'var(--label-secondary)' }}>
+            {importError}
+          </div>
+        )}
       </div>
 
       <SectionTitle>About</SectionTitle>
