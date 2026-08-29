@@ -6,6 +6,7 @@ interface RawTags {
   genre?: string;
   year?: number;
   trackNo?: number;
+  duration?: number;
   pictureBlob?: Blob;
 }
 
@@ -74,6 +75,9 @@ async function readID3(file: File): Promise<RawTags> {
       const t = cleanTag(decodeText(body.subarray(1), body[0]));
       const n = parseInt(t.split('/')[0], 10);
       if (!isNaN(n)) tags.trackNo = n;
+    } else if (frameId === 'TLEN') {
+      const ms = parseInt(cleanTag(decodeText(body.subarray(1), body[0])), 10);
+      if (!isNaN(ms) && ms > 0) tags.duration = Math.floor(ms / 1000);
     } else if (frameId === 'TYER' || frameId === 'TDRC' || frameId === 'TYE') {
       const y = parseInt(cleanTag(decodeText(body.subarray(1), body[0])).slice(0, 4), 10);
       if (!isNaN(y)) tags.year = y;
@@ -128,7 +132,8 @@ const MP4_TAGS: Record<string, keyof RawTags> = {
   aART: 'albumArtist',
   '\u00a9gen': 'genre',
   '\u00a9day': 'year',
-  trkn: 'trackNo'
+  trkn: 'trackNo',
+  '\u00a9dur': 'duration'
 };
 
 async function readMP4(file: File): Promise<RawTags> {
@@ -156,6 +161,11 @@ async function readMP4(file: File): Promise<RawTags> {
         const s = cleanTag(new TextDecoder('utf-8').decode(buf.subarray(payloadStart, payloadEnd)));
         const y = parseInt(s.slice(0, 4), 10);
         if (!isNaN(y)) tags.year = y;
+      } else if (key === 'duration') {
+        // '\u00a9dur' duration in milliseconds
+        const s = cleanTag(new TextDecoder('utf-8').decode(buf.subarray(payloadStart, payloadEnd)));
+        const ms = parseInt(s, 10);
+        if (!isNaN(ms)) tags.duration = Math.floor(ms / 1000);
       } else if (key === 'title' || key === 'artist' || key === 'album' || key === 'albumArtist' || key === 'genre') {
         const s = cleanTag(new TextDecoder('utf-8').decode(buf.subarray(payloadStart, payloadEnd)));
         if (s) (tags as Record<string, unknown>)[key] = s;
@@ -215,6 +225,9 @@ async function readFlac(file: File): Promise<RawTags> {
         } else if (k === 'TRACKNUMBER') {
           const n = parseInt(v, 10);
           if (!isNaN(n)) tags.trackNo = n;
+        } else if (k === 'DURATION') {
+          const ms = parseInt(v, 10);
+          if (!isNaN(ms) && ms > 0) tags.duration = Math.floor(ms / 1000);
         }
       }
     } else if (blockType === 6) {
