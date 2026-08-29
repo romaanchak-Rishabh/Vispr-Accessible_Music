@@ -510,6 +510,20 @@ input:focus-visible {
 .group .row,
 .pill-btn {
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  outline: none;
+}
+
+.card:focus-visible,
+.hero-mix-card:focus-visible,
+.mix-card:focus-visible,
+.enhanced-recent-card:focus-visible,
+.top-pick-card:focus-visible,
+.station-card:focus-visible,
+.mood-chip:focus-visible,
+.enhanced-album-card:focus-visible,
+.album-grid-card:focus-visible {
+  outline: none;
 }
 
 .card-artwork {
@@ -1754,7 +1768,6 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 
 .hero-mix-card:active {
   transform: scale(0.98);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   background-color: transparent;
 }
 
@@ -1775,7 +1788,6 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 
 .mix-card:active {
   transform: scale(0.97);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   background-color: transparent;
 }
 
@@ -1850,7 +1862,6 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 
 .station-card:active {
   transform: scale(0.97);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   background-color: transparent;
 }
 
@@ -1860,7 +1871,6 @@ input[type='range'].slider:active::-webkit-slider-thumb {
 
 .mood-chip:active {
   transform: scale(0.95);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   background-color: transparent;
 }
 
