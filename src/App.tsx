@@ -82,14 +82,18 @@ export default function App(): JSX.Element {
 
   // Handle file_handlers — .vispr.json opened from OS file manager / WhatsApp / etc.
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (typeof window !== 'undefined' && 'launchQueue' in window) {
-      const w = window as unknown as { launchQueue: { setConsumer: (cb: (params: { files: Array<{ getFile: () => Promise<File> }> }) => void) => void } };
-      w.launchQueue.setConsumer(async (params) => {
-        if (!params.files || params.files.length === 0) return;
-        const filePromises = params.files.map((entry) => entry.getFile());
-        const files = await Promise.all(filePromises);
-        useUI.getState().setReceiveFiles(files);
-      });
+      // launchQueue API: https://developer.chrome.com/docs/web-platform/launch-handler
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const lq = (window as any).launchQueue;
+      if (lq && typeof lq.setConsumer === 'function') {
+        lq.setConsumer(async (params: { files: Array<{ getFile: () => Promise<File> }> }) => {
+          if (!params.files || params.files.length === 0) return;
+          const files = await Promise.all(params.files.map((entry) => entry.getFile()));
+          useUI.getState().setReceiveFiles(files);
+        });
+      }
     }
   }, []);
 

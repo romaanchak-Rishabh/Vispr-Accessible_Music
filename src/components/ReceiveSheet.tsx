@@ -55,11 +55,12 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
     let cancelled = false;
     (async () => {
       try {
-        const metaFile = files.find((f) => f.name.endsWith('.vispr.json') || f.name === 'metadata.vispr.json');
+        const jsonFiles = files.filter((f) => f.name.endsWith('.json'));
+        const metaFile = jsonFiles[0];
 
         if (!metaFile) {
           if (!cancelled) {
-            setErrorMsg('No shareable files found.');
+            setErrorMsg('No shareable files found. Send a .vispr.json file.');
             setPhase('error');
           }
           return;
@@ -69,9 +70,9 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         try {
           const text = await metaFile.text();
           p = parseSharePayload(text);
-        } catch (err) {
+        } catch {
           if (!cancelled) {
-            setErrorMsg('Could not read share file. It may be corrupt or not a Vispr share file.');
+            setErrorMsg('This file is not a Vispr share. Make sure the sender shared from Vispr.');
             setPhase('error');
           }
           return;
