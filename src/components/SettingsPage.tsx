@@ -9,7 +9,7 @@ import { ReceiveSheet } from './ReceiveSheet';
 
 function SectionTitle({ children }: { children: string }): JSX.Element {
   return (
-    <div style={{ margin: '0 28px 8px', fontSize: 13, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--label-secondary)' }}>
+    <div style={{ margin: '0 16px 8px', fontSize: 13, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--label-secondary)' }}>
       {children}
     </div>
   );

@@ -1968,3 +1968,122 @@ html[data-theme='dark'] .enhanced-album-card {
     0 8px 32px rgba(0, 0, 0, 0.45),
     0 2px 8px rgba(0, 0, 0, 0.3);
 }
+
+/* ── Phone breakpoints ────────────────────────────────────────────── */
+
+@media (max-width: 430px) {
+  .nowplaying-content {
+    padding: calc(env(safe-area-inset-top) + 8px) 16px calc(env(safe-area-inset-bottom) + 16px);
+  }
+
+  .np-art {
+    width: min(80vw, 300px, calc(100vh - 400px));
+    min-width: 160px;
+  }
+
+  .np-title { font-size: 19px; }
+  .np-artist { font-size: 17px; }
+
+  .np-controls { gap: 0; }
+
+  .np-playpause {
+    width: 64px;
+    height: 64px;
+  }
+
+  .np-skip-btn {
+    width: 46px;
+    height: 46px;
+  }
+
+  .detail-hero {
+    gap: 14px;
+    padding: 12px 14px;
+  }
+
+  .detail-hero-art {
+    width: 110px;
+    height: 110px;
+  }
+
+  .detail-title { font-size: 22px; }
+
+  .detail-actions {
+    gap: 8px;
+    padding: 4px 14px 12px;
+  }
+
+  .pill-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .empty-state {
+    padding: 40px 20px;
+  }
+
+  .grid-albums {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+    padding: 8px 12px 20px;
+  }
+
+  .action-sheet {
+    width: calc(100% - 12px);
+  }
+
+  .volume-row { gap: 6px; }
+
+  .np-secondary { margin-top: 12px; }
+}
+
+@media (max-width: 375px) {
+  .np-art {
+    width: min(82vw, 260px, calc(100vh - 380px));
+    min-width: 140px;
+  }
+
+  .np-title { font-size: 17px; }
+  .np-artist { font-size: 15px; }
+
+  .np-playpause {
+    width: 56px;
+    height: 56px;
+  }
+
+  .np-skip-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .detail-hero {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .detail-hero-art {
+    width: 130px;
+    height: 130px;
+  }
+
+  .detail-hero-texts { text-align: center; }
+
+  .detail-actions {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .detail-title { font-size: 20px; }
+
+  .empty-state { padding: 30px 16px; }
+
+  .grid-albums {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 8px 10px 16px;
+  }
+}

@@ -949,7 +949,7 @@ function ForYouCard({ rec, index, onPlay }: { rec: Recommendation; index: number
           </span>
         )}
       </span>
-      <span style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+      <span style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0, maxWidth: '30vw', overflow: 'hidden' }}>
         {profile.genre1 !== 'unknown' && (
           <span style={{ fontSize: 10, background: 'var(--accent-bg)', color: 'var(--accent)', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>
             {genreLabel(profile.genre1)}

@@ -10,6 +10,16 @@ import { FolderIcon, SpinnerIcon, ChevronRightIcon, MagnifyingGlassIcon, GearIco
 import type { Album, Track } from '../types';
 import { formatArtist } from '../types';
 import { getSmartRecommendations, getRecommendations, type Recommendation } from '../lib/recommender';
+
+function useResponsiveCardWidth(): number {
+  const [w, setW] = useState(() => Math.min(180, Math.max(140, (window.innerWidth - 48) / 2 - 8)));
+  useEffect(() => {
+    const onResize = () => setW(Math.min(180, Math.max(140, (window.innerWidth - 48) / 2 - 8)));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return w;
+}
 import {
   HeartFillIcon,
   RadioIcon,
@@ -308,7 +318,7 @@ function MixCard({ title, subtitle, icon, gradient, tracks }: MixCardProps): JSX
   if (tracks.length === 0) return null;
 
   const primaryTrack = tracks[0];
-  const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
+  const cardWidth = useResponsiveCardWidth();
   const navigate = useUI((s) => s.navigate);
 
   const handleOpen = () => {
@@ -448,7 +458,7 @@ function EnhancedRecentCard({ track, playedAt }: EnhancedRecentCardProps): JSX.E
   const displayTrack = fullTrack ?? track;
 
   const timeAgo = formatTimeAgo(playedAt);
-  const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
+  const cardWidth = useResponsiveCardWidth();
 
   return (
     <button
@@ -525,7 +535,7 @@ export function TopPicksSection(): JSX.Element | null {
 
   if (topArtists.length === 0) return null;
 
-  const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
+  const cardWidth = useResponsiveCardWidth();
 
   return (
     <div style={{ padding: '0 16px 16px' }}>
@@ -576,7 +586,7 @@ export function StationsSection(): JSX.Element | null {
     { name: 'Party Radio', icon: <SparklesIcon size={28} />, gradient: 'linear-gradient(135deg, #ff9f0a, #ffb84d)' },
   ];
 
-  const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
+  const cardWidth = useResponsiveCardWidth();
 
   return (
     <div style={{ padding: '0 16px 16px' }}>
@@ -709,7 +719,7 @@ export function EnhancedJumpBackInSection(): JSX.Element | null {
 
   if (albums.length === 0 && playlists.length === 0 && artists.length === 0) return null;
 
-  const cardWidth = Math.min(180, Math.max(150, (window.innerWidth - 48) / 2 - 8));
+  const cardWidth = useResponsiveCardWidth();
 
   return (
     <div style={{ padding: '0 16px 16px' }}>
