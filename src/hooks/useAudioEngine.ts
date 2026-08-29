@@ -64,7 +64,8 @@ export function useAudioEngine(): void {
         if (ratio > 0.8 && ratio < 1.25) return saned;
         return known;
       }
-      return isFinite(d) && d > 0 ? d : 0;
+      const saned = isFinite(d) && d > 0 ? d : 0;
+      return saned > 0 ? saned : 0;
     };
 
     const applyVol = (v: number): void => {
@@ -125,13 +126,32 @@ export function useAudioEngine(): void {
       if (st.isPlaying) setTimeout(() => st.next(false), 300);
     };
 
+    // Fallback: fetch duration after a delay if loadedmetadata doesn't fire
+    const durationFallbackTimeouts: Map<HTMLAudioElement, number> = new Map();
+    const scheduleDurationFallback = (a: HTMLAudioElement): void => {
+      if (durationFallbackTimeouts.has(a)) return;
+      const timeout = window.setTimeout(() => {
+        if (a.duration && isFinite(a.duration) && a.duration > 0) {
+          usePlayer.getState().setDuration(a.duration);
+          syncPositionState();
+        }
+        durationFallbackTimeouts.delete(a);
+      }, 3000);
+      durationFallbackTimeouts.set(a, timeout);
+    };
+
     els.forEach((a) => {
-      a.addEventListener('loadedmetadata', onLoaded);
+      a.addEventListener('loadedmetadata', (e) => {
+        onLoaded(e);
+        const timeout = durationFallbackTimeouts.get(e.currentTarget as HTMLAudioElement);
+        if (timeout) { clearTimeout(timeout); durationFallbackTimeouts.delete(e.currentTarget as HTMLAudioElement); }
+      });
       a.addEventListener('loadeddata', onLoaded);
       a.addEventListener('durationchange', onLoaded);
       a.addEventListener('ended', onEnded);
       a.addEventListener('timeupdate', onTimeUpdate);
       a.addEventListener('error', onError);
+      scheduleDurationFallback(a);
     });
 
     const startFade = async (nextTrack: Track): Promise<void> => {
