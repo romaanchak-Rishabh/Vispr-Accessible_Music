@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
 import { useLibrary } from '../store/library';
 import { Artwork } from './Artwork';
@@ -51,7 +51,10 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
   const [skipped, setSkipped] = useState(0);
   const [failed, setFailed] = useState(0);
 
+  const parsedRef = useRef(false);
+
   useEffect(() => {
+    if (parsedRef.current) return;
     let cancelled = false;
     (async () => {
       try {
@@ -89,6 +92,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
 
         const items = detectConflicts(p.tracks, existingTracks);
         if (!cancelled) {
+          parsedRef.current = true;
           setPayload(p);
           setConflicts(items);
           setPhase('review');

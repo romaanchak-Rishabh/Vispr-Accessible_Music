@@ -146,20 +146,25 @@ async function sharePayload(payload: SharePayload, tracks: Track[]): Promise<voi
   const jsonBlob = payloadToBlob(payload);
   const jsonFile = new File([jsonBlob], getFileName(payload), { type: 'application/json' });
 
-  if (navigator.share && navigator.canShare?.({ files: [jsonFile] })) {
-    await navigator.share({
-      files: [jsonFile],
-      title: getShareTitle(payload),
-      text: getShareText(payload),
-    });
-  } else {
-    const url = URL.createObjectURL(jsonBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = getFileName(payload);
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  try {
+    if (navigator.share && navigator.canShare?.({ files: [jsonFile] })) {
+      await navigator.share({
+        files: [jsonFile],
+        title: getShareTitle(payload),
+        text: getShareText(payload),
+      });
+      return;
+    }
+  } catch {
+    // user cancelled or share failed — fall through to download
   }
+
+  const url = URL.createObjectURL(jsonBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = getFileName(payload);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
