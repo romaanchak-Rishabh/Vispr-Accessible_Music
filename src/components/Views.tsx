@@ -753,6 +753,7 @@ function EnhancedAlbumCard({ album, size = 180, type, trackIds }: EnhancedAlbumC
   const navigate = useUI((s) => s.navigate);
   const playTracks = usePlayer((s) => s.playTracks);
   const tracks = useLibrary((s) => s.tracks);
+  const [pressed, setPressed] = useState(false);
 
   const handlePlay = () => {
     if (type === 'album' && trackIds) {
@@ -767,7 +768,17 @@ function EnhancedAlbumCard({ album, size = 180, type, trackIds }: EnhancedAlbumC
   };
 
   return (
-    <button className="enhanced-album-card" style={{ width: size, background: 'none' }} onClick={() => handlePlay()}>
+    <button
+      className={`enhanced-album-card${pressed ? ' pressed' : ''}`}
+      style={{ width: size, background: 'none' }}
+      onClick={() => handlePlay()}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      onMouseLeave={() => setPressed(false)}
+      onTouchStart={() => setPressed(true)}
+      onTouchEnd={() => setPressed(false)}
+      onTouchCancel={() => setPressed(false)}
+    >
       <Artwork src={album.artwork} className="enhanced-album-art" placeholderSize={30} alt={album.title} style={{ width: size, height: size, borderRadius: 12 } as React.CSSProperties} />
       <div className="card-title" style={{ marginTop: 10 }}>{album.title}</div>
       <div className="card-subtitle">
@@ -777,23 +788,6 @@ function EnhancedAlbumCard({ album, size = 180, type, trackIds }: EnhancedAlbumC
       <button
         className="play-overlay-btn"
         onClick={(e) => { e.stopPropagation(); handlePlay(); }}
-style={{
-              position: 'absolute',
-              bottom: 8,
-              right: 8,
-              width: 40,
-              height: 40,
-              borderRadius: '50%',
-              background: 'var(--accent-gradient)',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 16px rgba(250, 35, 59, 0.4)',
-              opacity: 0,
-              transform: 'translateY(8px)',
-              transition: 'opacity 0.2s ease, transform 0.2s ease',
-            }}
       >
         <PlayIcon size={18} />
       </button>
