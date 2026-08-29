@@ -19,6 +19,16 @@ export default defineConfig({
         background_color: '#000000',
         theme_color: '#000000',
         categories: ['music', 'entertainment'],
+        share_target: {
+          action: '/?share-target',
+          method: 'GET',
+          enctype: 'multipart/form-data',
+          params: {
+            files: [
+              { name: 'files', accept: ['application/json', 'audio/*', '.m4a', '.mp3', '.mp4', '.aac', '.ogg', '.opus', '.flac', '.vispr.json'] }
+            ]
+          }
+        },
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },

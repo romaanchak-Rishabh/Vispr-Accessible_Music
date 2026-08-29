@@ -18,6 +18,7 @@ import { DesktopPlayerBar } from './components/DesktopPlayerBar';
 import { InstallBanner } from './components/InstallBanner';
 import { Toast } from './components/Toast';
 import { PageRouter } from './components/PageRouter';
+import { ReceiveSheet } from './components/ReceiveSheet';
 import { ChevronLeftIcon } from './components/Icons';
 
 function pageTitle(): string {
@@ -68,6 +69,16 @@ export default function App(): JSX.Element {
 
   // keep the backend server URL in sync with the published (auto-healed) tunnel
   useEffect(() => startTunnelSync(), []);
+
+  // Handle share_target (Android/Chrome PWA share target)
+  const shareTargetFiles = useUI((s) => s.receiveFiles);
+  const setShareTargetFiles = useUI((s) => s.setReceiveFiles);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('share-target') !== null) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
     void init().then(() => {
@@ -144,6 +155,7 @@ export default function App(): JSX.Element {
       <ActionSheet />
       <InstallBanner />
       <Toast />
+      {shareTargetFiles && <ReceiveSheet files={shareTargetFiles} onClose={() => setShareTargetFiles(null)} />}
     </div>
   );
 }

@@ -103,6 +103,23 @@ function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums'
             <button className="pill-btn primary" onClick={() => playTracks(tracks, Math.floor(Math.random() * tracks.length), 'Shuffle All')}>
               <ShuffleIcon size={16} /> Shuffle
             </button>
+            <button
+              className="pill-btn"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.multiple = true;
+                input.accept = '.vispr.json,.json,.m4a,.mp3,.mp4,.aac,.ogg,.opus,.flac';
+                input.onchange = () => {
+                  if (input.files && input.files.length > 0) {
+                    useUI.getState().setReceiveFiles(Array.from(input.files));
+                  }
+                };
+                input.click();
+              }}
+            >
+              Receive Share
+            </button>
             <span style={{ fontSize: 13, color: 'var(--label-secondary)' }}>{tracks.length} songs</span>
           </div>
           <div className="group">

@@ -21,6 +21,7 @@ interface UIState {
   actionSheetTrackId: string | null;
   installBannerDismissed: boolean;
   toast: { msg: string; nonce: number } | null;
+  receiveFiles: File[] | null;
 
   setTab: (tab: UIState['tab']) => void;
   navigate: (page: Page) => void;
@@ -31,6 +32,7 @@ interface UIState {
   setActionSheet: (trackId: string | null) => void;
   dismissInstall: () => void;
   showToast: (msg: string) => void;
+  setReceiveFiles: (files: File[] | null) => void;
 }
 
 export const useUI = create<UIState>((set, get) => ({
@@ -41,6 +43,7 @@ export const useUI = create<UIState>((set, get) => ({
   actionSheetTrackId: null,
   installBannerDismissed: false,
   toast: null,
+  receiveFiles: null,
 
   setTab: (tab) =>
     set({
@@ -87,5 +90,7 @@ export const useUI = create<UIState>((set, get) => ({
       const t = get().toast;
       if (t && t.msg === msg) set({ toast: null });
     }, 2200);
-  }
+  },
+
+  setReceiveFiles: (files) => set({ receiveFiles: files }),
 }));
