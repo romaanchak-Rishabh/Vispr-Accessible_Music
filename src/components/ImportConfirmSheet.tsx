@@ -227,19 +227,11 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
     }
     // Per-song advance
     let nextFieldIdx = fieldIdx + 1;
-    while (nextFieldIdx < FIELDS.length && (['album', 'genre1', 'genre2', 'artist'].includes(FIELDS[nextFieldIdx].key) && edits[item.id]?.[FIELDS[nextFieldIdx].key])) {
-      nextFieldIdx++;
-    }
     if (nextFieldIdx < FIELDS.length) {
       setFieldIdx(nextFieldIdx);
     } else if (songIdx < items.length - 1) {
       setSongIdx(songIdx + 1);
-      // Find first non-bulk field for next song
-      let firstField = 0;
-      while (firstField < FIELDS.length && ['album', 'genre1', 'genre2', 'artist'].includes(FIELDS[firstField].key)) {
-        firstField++;
-      }
-      setFieldIdx(firstField);
+      setFieldIdx(0);
     } else {
       setStage('finish');
     }
@@ -463,52 +455,43 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
 
               {metaChip && <div style={{ marginBottom: -4 }}>{metaChip}</div>}
 
-              {['album', 'genre1', 'genre2', 'artist'].includes(field.key) && edits[item.id]?.[field.key] ? (
+              {['album', 'genre1', 'genre2', 'artist'].includes(field.key) && edits[item.id]?.[field.key] && (
                 <div style={{ 
-                  padding: '12px 16px', 
+                  padding: '6px 10px', 
                   background: 'var(--accent-soft)', 
-                  borderRadius: 12, 
-                  marginBottom: 8,
-                  display: 'flex',
+                  borderRadius: 8, 
+                  marginBottom: 6,
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 8,
+                  gap: 6,
                   color: 'var(--accent)',
-                  fontSize: 13,
+                  fontSize: 11,
                   fontWeight: 500
                 }}>
-                  <SparklesIcon size={16} /> Applied to all songs: <strong>{currentDisplayValue}</strong>
+                  <SparklesIcon size={12} /> Pre-filled from bulk
                 </div>
-              ) : (
-                <>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{field.label}?</div>
-                    <div style={{ fontSize: 12, color: 'var(--label-secondary)', marginBottom: 6 }}>{field.hint}</div>
-                  </div>
-
-                  {metaChip && <div style={{ marginBottom: -4 }}>{metaChip}</div>}
-
-                  <div className={lookup[item.id] === 'pending' ? 'field-loading' : undefined}>
-                    {field.key === 'title' ? (
-                      <input
-                        key={field.key}
-                        className="search-input"
-                        style={{ paddingLeft: 12, fontSize: 16, padding: '11px 12px 11px 34px' }}
-                        placeholder={cleanTitle(item.title ?? '') ?? 'Title'}
-                        value={currentValue}
-                        onChange={(e) => setField(item, 'title', e.target.value)}
-                      />
-                    ) : (
-                      <TagInput
-                        key={field.key}
-                        value={currentDisplayValue}
-                        onChange={handleValue}
-                        options={optionsFor(field.key)}
-                        placeholder={defaultForKey(item, field.key) || field.hint}
-                      />
-                    )}
-                  </div>
-                </>
               )}
+
+              <div className={lookup[item.id] === 'pending' ? 'field-loading' : undefined}>
+                {field.key === 'title' ? (
+                  <input
+                    key={field.key}
+                    className="search-input"
+                    style={{ paddingLeft: 12, fontSize: 16, padding: '11px 12px 11px 34px' }}
+                    placeholder={cleanTitle(item.title ?? '') ?? 'Title'}
+                    value={currentValue}
+                    onChange={(e) => setField(item, 'title', e.target.value)}
+                  />
+                ) : (
+                  <TagInput
+                    key={field.key}
+                    value={currentDisplayValue}
+                    onChange={handleValue}
+                    options={optionsFor(field.key)}
+                    placeholder={defaultForKey(item, field.key) || field.hint}
+                  />
+                )}
+              </div>
 
               <button className="pill-btn" onClick={() => setStage('finish')} style={{ alignSelf: 'flex-end', fontSize: 13, padding: '5px 12px' }}>
                 Skip All

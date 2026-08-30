@@ -173,17 +173,22 @@ export const usePlayer = create<PlayerState>()(
           const rest = queue.filter((_, i) => i !== index);
           const shuffled = [current, ...shuffleArray(rest)];
           set({ shuffle: true, queue: shuffled, index: 0, originalQueue: originalQueue.length ? originalQueue : [...queue] });
+          useUI.getState().showToast('Shuffle On');
         } else {
           const currentId = queue[index]?.id;
           const restored = [...originalQueue];
           let newIndex = restored.findIndex((t) => t.id === currentId);
           if (newIndex < 0) newIndex = 0;
           set({ shuffle: false, queue: restored, index: newIndex });
+          useUI.getState().showToast('Shuffle Off');
         }
       },
 
-      cycleRepeat: () =>
-        set((s) => ({ repeat: s.repeat === 'off' ? 'all' : s.repeat === 'all' ? 'one' : 'off' })),
+      cycleRepeat: () => {
+        const next = get().repeat === 'off' ? 'all' : get().repeat === 'all' ? 'one' : 'off';
+        set({ repeat: next });
+        useUI.getState().showToast(next === 'off' ? 'Repeat Off' : next === 'all' ? 'Repeat All' : 'Repeat One');
+      },
 
       toggleCrossfade: () => set((s) => ({ crossfade: !s.crossfade })),
 

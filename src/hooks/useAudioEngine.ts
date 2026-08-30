@@ -113,7 +113,21 @@ export function useAudioEngine(): void {
       const a = e.currentTarget as HTMLAudioElement;
       if (a !== els[cur]) return;
       const st = usePlayer.getState();
-      if (!st.seekTo) st.setCurrentTime(a.currentTime);
+      if (!st.seekTo) {
+        const dur = durationFor(a);
+        if (dur > 0) {
+          if (a.currentTime >= dur - 0.15 && a.currentTime < dur) {
+            a.currentTime = dur;
+          } else if (a.currentTime >= dur && !fading) {
+            st.setCurrentTime(dur);
+            a.pause();
+            st.next(true);
+            return;
+          }
+        }
+        const t = dur > 0 ? Math.min(a.currentTime, dur) : a.currentTime;
+        st.setCurrentTime(t);
+      }
       syncPositionState();
       maybeStartFade(a);
     };
