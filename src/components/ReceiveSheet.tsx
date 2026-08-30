@@ -110,6 +110,18 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
   const startImport = async (): Promise<void> => {
     setPhase('importing');
 
+    // Health-check backend before starting
+    let backendAlive = false;
+    if (ytdlpServer) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const r = await fetch(`${ytdlpServer.replace(/\/+$/, '')}/api/ping`, { signal: ctrl.signal, cache: 'no-store' });
+        clearTimeout(t);
+        backendAlive = r.ok;
+      } catch { /* dead */ }
+    }
+
     const totalToImport = conflicts.length;
     let done = 0;
     const trackIdsForPlaylist: string[] = [];
@@ -141,6 +153,12 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         if (inc.audioData) {
           audioBlob = dataUrlToBlob(inc.audioData);
         } else if (inc.youtubeId && ytdlpServer) {
+          if (!backendAlive) {
+            setFailed((f) => f + 1);
+            done++;
+            setImportProgress({ done, total: totalToImport, label: `Skipped: ${inc.title} (backend offline)` });
+            continue;
+          }
           const videoUrl = `https://www.youtube.com/watch?v=${inc.youtubeId}`;
           const dl = await downloadAudioViaYtDlp(ytdlpServer, ytdlpToken, videoUrl);
           audioBlob = dl.blob;
@@ -150,7 +168,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         if (!audioBlob) {
           setFailed((f) => f + 1);
           done++;
-          setImportProgress({ done, total: totalToImport, label: `Failed: ${inc.title} (no audio — need yt-dlp server)` });
+          setImportProgress({ done, total: totalToImport, label: `Failed: ${inc.title} (no audio source)` });
           continue;
         }
 
@@ -325,7 +343,7 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
             <div style={{ padding: '12px 16px', fontSize: 14 }}>
               {imported > 0 && <div>{imported} song{imported !== 1 ? 's' : ''} imported</div>}
               {skipped > 0 && <div>{skipped} skipped (already in library)</div>}
-              {failed > 0 && <div style={{ color: '#ff3b30' }}>{failed} failed — no audio available. Set up a yt-dlp server in Settings to download from YouTube.</div>}
+              {failed > 0 && <div style={{ color: '#ff3b30' }}>{failed} failed — {ytdlpServer ? 'backend offline, try again when server is running' : 'no yt-dlp server configured'}</div>}
               {payload?.type === 'playlist' && <div style={{ marginTop: 8, color: 'var(--accent)' }}>Playlist "{payload.playlistName}" saved</div>}
             </div>
             <div style={{ padding: '8px 16px 16px' }}>
