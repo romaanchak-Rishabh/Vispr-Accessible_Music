@@ -1,0 +1,6 @@
+name = "vispr-ytdlp"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+# Set YTDLP_SECRET env var via: wrangler secret put YTDLP_SECRET
