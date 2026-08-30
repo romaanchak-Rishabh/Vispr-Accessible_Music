@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
 import { useLibrary } from '../store/library';
+import { useSettings } from '../store/settings';
 import { Artwork } from './Artwork';
 import { parseSharePayload, detectConflicts, type ConflictItem, type SharePayload } from '../lib/share';
 import { downloadAudioViaYtDlp } from '../lib/ytdlp';
@@ -37,18 +38,8 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
   const existingTracks = useLibrary((s) => s.tracks);
   const createPlaylist = useLibrary((s) => s.createPlaylist);
   const addToPlaylist = useLibrary((s) => s.addToPlaylist);
-  const ytdlpServer = useLibrary(() => {
-    try {
-      const raw = localStorage.getItem('app-settings');
-      return raw ? JSON.parse(raw).state?.ytdlpServer ?? '' : '';
-    } catch { return ''; }
-  });
-  const ytdlpToken = useLibrary(() => {
-    try {
-      const raw = localStorage.getItem('app-settings');
-      return raw ? JSON.parse(raw).state?.ytdlpToken ?? '' : '';
-    } catch { return ''; }
-  });
+  const ytdlpServer = useSettings((s) => s.ytdlpServer);
+  const ytdlpToken = useSettings((s) => s.ytdlpToken);
 
   const [payload, setPayload] = useState<SharePayload | null>(null);
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);

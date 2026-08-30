@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { JSX } from 'react';
 import { useLibrary } from '../store/library';
+import { useSettings } from '../store/settings';
 import { Artwork } from './Artwork';
 import { detectConflicts, type ConflictItem, type SharePayload } from '../lib/share';
 import { downloadAudioViaYtDlp } from '../lib/ytdlp';
@@ -28,18 +29,8 @@ export function ReceiveTextSheet({ payload, onClose }: ReceiveTextSheetProps): J
   const existingTracks = useLibrary((s) => s.tracks);
   const createPlaylist = useLibrary((s) => s.createPlaylist);
   const addToPlaylist = useLibrary((s) => s.addToPlaylist);
-  const ytdlpServer = useLibrary(() => {
-    try {
-      const raw = localStorage.getItem('app-settings');
-      return raw ? JSON.parse(raw).state?.ytdlpServer ?? '' : '';
-    } catch { return ''; }
-  });
-  const ytdlpToken = useLibrary(() => {
-    try {
-      const raw = localStorage.getItem('app-settings');
-      return raw ? JSON.parse(raw).state?.ytdlpToken ?? '' : '';
-    } catch { return ''; }
-  });
+  const ytdlpServer = useSettings((s) => s.ytdlpServer);
+  const ytdlpToken = useSettings((s) => s.ytdlpToken);
 
   const [conflicts] = useState<ConflictItem[]>(() => detectConflicts(payload.tracks, existingTracks));
   const [phase, setPhase] = useState<'review' | 'importing' | 'done'>('review');
