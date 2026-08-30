@@ -6,6 +6,8 @@ import { useUI } from '../store/ui';
 import { Artwork } from './Artwork';
 import { ImportBar } from './ImportBar';
 import { PostImportSheet } from './PostImportSheet';
+import { ReceiveTextSheet } from './ReceiveTextSheet';
+import { PasteShareSheet } from './PasteShareSheet';
 import { FolderIcon, SpinnerIcon, ChevronRightIcon, MagnifyingGlassIcon, GearIcon } from './Icons';
 import type { Album, Track } from '../types';
 import { formatArtist } from '../types';
@@ -83,6 +85,8 @@ export function EmptyLibrary(): JSX.Element {
   const connectFolder = useLibrary((s) => s.connectFolder);
   const addFiles = useLibrary((s) => s.addFiles);
   const [postImportIds, setPostImportIds] = useState<string[] | null>(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pastedPayload, setPastedPayload] = useState<import('../lib/share').SharePayload | null>(null);
 
   const pickFilesAndTag = (): void => {
     const input = document.createElement('input');
@@ -147,9 +151,38 @@ export function EmptyLibrary(): JSX.Element {
           </button>
         </>
       )}
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <button className="pill-btn" onClick={() => setPasteOpen(true)}>
+          Paste Share
+        </button>
+        <button
+          className="pill-btn"
+          onClick={() => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.accept = '.json,.vispr.json,.vpr,.m4a,.mp3,.mp4,.aac,.ogg,.opus,.flac';
+            input.onchange = () => {
+              if (input.files && input.files.length > 0) {
+                useUI.getState().setReceiveFiles(Array.from(input.files));
+              }
+            };
+            input.click();
+          }}
+        >
+          Receive Share
+        </button>
+      </div>
       <ImportBar />
       {postImportIds && (
         <PostImportSheet trackIds={postImportIds} onClose={() => setPostImportIds(null)} />
+      )}
+      {pastedPayload && <ReceiveTextSheet payload={pastedPayload} onClose={() => setPastedPayload(null)} />}
+      {pasteOpen && (
+        <PasteShareSheet
+          onParse={(payload) => { setPasteOpen(false); setPastedPayload(payload); }}
+          onClose={() => setPasteOpen(false)}
+        />
       )}
     </div>
   );

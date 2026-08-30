@@ -4,6 +4,7 @@ import { usePlayer } from '../store/player';
 import { useLibrary } from '../store/library';
 import { useUI, type Page } from '../store/ui';
 import { Artwork } from './Artwork';
+import { SpinnerIcon } from './Icons';
 import { blobToDataUrl } from '../lib/metadata';
 import { formatArtist } from '../types';
 import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue, eraToYear } from '../lib/tags';
@@ -25,6 +26,8 @@ export function ActionSheet(): JSX.Element | null {
   const [genre2, setGenre2] = useState('');
   const [year, setYear] = useState('');
   const [artwork, setArtwork] = useState<string | undefined>(undefined);
+  const [ytUrl, setYtUrl] = useState('');
+  const [artworkLoading, setArtworkLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!trackId || !track) return null;
@@ -57,6 +60,29 @@ export function ActionSheet(): JSX.Element | null {
   const pickArtwork = async (file: File): Promise<void> => {
     const dataUrl = await blobToDataUrl(file, 640);
     if (dataUrl) setArtwork(dataUrl);
+  };
+
+  const fetchArtworkFromUrl = async (): Promise<void> => {
+    const trimmed = ytUrl.trim();
+    if (!trimmed) return;
+    // Extract video ID from various YouTube URL formats
+    const match = trimmed.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/);
+    const videoId = match?.[1];
+    if (!videoId) return;
+    setArtworkLoading(true);
+    try {
+      const thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 10000);
+      const resp = await fetch(thumbUrl, { mode: 'cors', signal: ctrl.signal });
+      clearTimeout(t);
+      if (resp.ok) {
+        const blob = await resp.blob();
+        const dataUrl = await blobToDataUrl(blob, 640);
+        if (dataUrl) setArtwork(dataUrl);
+      }
+    } catch { /* ignore */ }
+    setArtworkLoading(false);
   };
 
   const saveEdit = async (): Promise<void> => {
@@ -204,8 +230,26 @@ export function ActionSheet(): JSX.Element | null {
                 style={{ alignSelf: 'center', padding: '5px 14px', fontSize: 13 }}
                 onClick={() => fileInputRef.current?.click()}
               >
-                Change Cover…
+                Choose from Photos…
               </button>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  className="search-input"
+                  style={{ flex: 1, paddingLeft: 12, fontSize: 13 }}
+                  placeholder="YouTube URL for artwork"
+                  value={ytUrl}
+                  onChange={(e) => setYtUrl(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void fetchArtworkFromUrl(); }}
+                />
+                <button
+                  className="pill-btn"
+                  style={{ padding: '5px 10px', fontSize: 12, flexShrink: 0 }}
+                  onClick={() => void fetchArtworkFromUrl()}
+                  disabled={artworkLoading || !ytUrl.trim()}
+                >
+                  {artworkLoading ? <SpinnerIcon size={14} /> : 'Fetch'}
+                </button>
+              </div>
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Artist 1" value={artist} onChange={(e) => setArtist(e.target.value)} />
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Artist 2 (feat.)" value={artist2} onChange={(e) => setArtist2(e.target.value)} />
