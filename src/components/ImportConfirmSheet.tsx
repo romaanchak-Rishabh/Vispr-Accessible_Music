@@ -472,7 +472,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                 </div>
               )}
 
-              <div className={lookup[item.id] === 'pending' ? 'field-loading' : undefined}>
+              <div>
                 {field.key === 'title' ? (
                   <input
                     key={field.key}
