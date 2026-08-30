@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { JSX } from 'react';
 import { useLibrary } from '../store/library';
 import { useSettings } from '../store/settings';
@@ -29,6 +29,8 @@ export function ReceiveTextSheet({ payload, onClose }: ReceiveTextSheetProps): J
   const existingTracks = useLibrary((s) => s.tracks);
   const createPlaylist = useLibrary((s) => s.createPlaylist);
   const addToPlaylist = useLibrary((s) => s.addToPlaylist);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const ytdlpServer = useSettings((s) => s.ytdlpServer);
   const ytdlpToken = useSettings((s) => s.ytdlpToken);
 
@@ -43,7 +45,6 @@ export function ReceiveTextSheet({ payload, onClose }: ReceiveTextSheetProps): J
   const startImport = async (): Promise<void> => {
     setPhase('importing');
 
-    // Health-check backend before starting
     let backendAlive = false;
     if (ytdlpServer) {
       try {
@@ -60,6 +61,8 @@ export function ReceiveTextSheet({ payload, onClose }: ReceiveTextSheetProps): J
     const trackIdsForPlaylist: string[] = [];
 
     for (const item of conflicts) {
+      if (!mountedRef.current) return;
+
       if (item.status === 'exact') {
         setSkipped((s) => s + 1);
         trackIdsForPlaylist.push(item.existing!.id);
@@ -140,13 +143,15 @@ export function ReceiveTextSheet({ payload, onClose }: ReceiveTextSheetProps): J
         try { await db.saveFileBlob(trackId, blobFile); } catch { /* skip */ }
         await useLibrary.getState().addTracks([track]);
         trackIdsForPlaylist.push(trackId);
-        setImported((i) => i + 1);
+        if (mountedRef.current) setImported((i) => i + 1);
       } catch {
-        setFailed((f) => f + 1);
+        if (mountedRef.current) setFailed((f) => f + 1);
       }
 
       done++;
     }
+
+    if (!mountedRef.current) return;
 
     if (trackIdsForPlaylist.length > 0 && payload.type === 'playlist' && payload.playlistName) {
       const currentPlaylists = useLibrary.getState().playlists;

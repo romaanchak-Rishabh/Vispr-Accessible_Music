@@ -26,28 +26,20 @@ export function registerMediaSession(track: Track): void {
 
 export function useAudioEngine(): void {
   useEffect(() => {
-    // iOS workaround: tell the OS this is a playback session so the lock-screen
-    // controls stay active when the page is backgrounded.
     if ('audioSession' in navigator) {
       try { (navigator as any).audioSession.type = 'playback'; } catch { /* ignore */ }
     }
 
-    // iOS workaround: a silent looping audio element keeps the audio context
-    // alive when the page is backgrounded / screen locked. Without this, iOS
-    // suspends the main audio elements and the lock-screen play button stops
-    // working after a few seconds of inactivity.
     const silentEl = new Audio();
     silentEl.loop = true;
     silentEl.volume = 0;
     silentEl.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
 
     const els: [HTMLAudioElement, HTMLAudioElement] = [new Audio(), new Audio()];
-    els.forEach((a) => {
-      a.preload = 'auto';
-    });
+    els.forEach((a) => { a.preload = 'auto'; });
 
-    // Start silent element immediately to keep iOS audio context alive
     silentEl.play().catch(() => { /* ignore */ });
+
     const urls: (string | null)[] = [null, null];
     const loadedFor: (string | null)[] = [null, null];
     let cur = 0;
@@ -60,6 +52,11 @@ export function useAudioEngine(): void {
     let fadeRaf = 0;
     let fadeTargetId: string | null = null;
 
+    // Guard against double-advance: after a crossfade swap or track advance,
+    // set this flag so onTimeUpdate/onEnded skip the end-of-track logic on
+    // the element that was just made active.
+    let justAdvanced = false;
+
     const revokeSlot = (slot: number): void => {
       if (urls[slot]) {
         URL.revokeObjectURL(urls[slot]!);
@@ -67,13 +64,9 @@ export function useAudioEngine(): void {
       }
     };
 
-    // Media duration is often 0/Infinity (Android) or wrong/doubled (iOS Safari
-    // misreads some m4a moov atoms from blob URLs). We already have the accurate
-    // duration from yt-dlp, so use it as the source of truth and only trust the
-    // element's reported duration when it agrees closely with the known value.
-    const durationFor = (a: HTMLAudioElement): number => {
+    const durationFor = (a: HTMLAudioElement, overrideTrack?: Track): number => {
       const d = a.duration;
-      const t = usePlayer.getState().queue[usePlayer.getState().index];
+      const t = overrideTrack ?? usePlayer.getState().queue[usePlayer.getState().index];
       const known = typeof t?.duration === 'number' && isFinite(t.duration) && t.duration > 0 ? t.duration : 0;
       if (known > 0) {
         const saned = isFinite(d) && d > 0 ? d : 0;
@@ -90,7 +83,6 @@ export function useAudioEngine(): void {
       els[cur].volume = Math.max(0, Math.min(1, v));
     };
 
-    // keeps the lockscreen/notification scrubber in sync
     const syncPositionState = (): void => {
       const a = els[cur];
       const dur = durationFor(a);
@@ -101,9 +93,7 @@ export function useAudioEngine(): void {
           playbackRate: a.playbackRate,
           position: Math.max(0, Math.min(a.currentTime, dur))
         });
-      } catch {
-        /* unsupported */
-      }
+      } catch { /* unsupported */ }
     };
 
     const abortFade = (): void => {
@@ -116,6 +106,17 @@ export function useAudioEngine(): void {
       fadeTargetId = null;
     };
 
+    // -- Event handlers (registered as named references so they can be removed) --
+
+    const onLoadedMeta = (e: Event): void => {
+      if ((e.currentTarget as HTMLAudioElement) !== els[cur]) return;
+      usePlayer.getState().setDuration(durationFor(els[cur]));
+      syncPositionState();
+      // Clear the duration fallback timeout for this element
+      const tid = durationFallbackTimeouts.get(e.currentTarget as HTMLAudioElement);
+      if (tid !== undefined) { clearTimeout(tid); durationFallbackTimeouts.delete(e.currentTarget as HTMLAudioElement); }
+    };
+
     const onLoaded = (e: Event): void => {
       if ((e.currentTarget as HTMLAudioElement) !== els[cur]) return;
       usePlayer.getState().setDuration(durationFor(els[cur]));
@@ -123,7 +124,8 @@ export function useAudioEngine(): void {
     };
 
     const onEnded = (e: Event): void => {
-      if ((e.currentTarget as HTMLAudioElement) !== els[cur]) return; // stale fade-out element
+      if ((e.currentTarget as HTMLAudioElement) !== els[cur]) return;
+      if (justAdvanced) return;
       usePlayer.getState().next(true);
     };
 
@@ -131,6 +133,12 @@ export function useAudioEngine(): void {
       const a = e.currentTarget as HTMLAudioElement;
       if (a !== els[cur]) return;
       const st = usePlayer.getState();
+
+      if (justAdvanced) {
+        justAdvanced = false;
+        return;
+      }
+
       if (!st.seekTo) {
         const dur = durationFor(a);
         if (dur > 0) {
@@ -158,6 +166,10 @@ export function useAudioEngine(): void {
       if (st.isPlaying) setTimeout(() => st.next(false), 300);
     };
 
+    const onPlaying = (): void => {
+      registerMediaHandlers();
+    };
+
     // Fallback: fetch duration after a delay if loadedmetadata doesn't fire
     const durationFallbackTimeouts: Map<HTMLAudioElement, number> = new Map();
     const scheduleDurationFallback = (a: HTMLAudioElement): void => {
@@ -173,18 +185,17 @@ export function useAudioEngine(): void {
     };
 
     els.forEach((a) => {
-      a.addEventListener('loadedmetadata', (e) => {
-        onLoaded(e);
-        const timeout = durationFallbackTimeouts.get(e.currentTarget as HTMLAudioElement);
-        if (timeout) { clearTimeout(timeout); durationFallbackTimeouts.delete(e.currentTarget as HTMLAudioElement); }
-      });
+      a.addEventListener('loadedmetadata', onLoadedMeta);
       a.addEventListener('loadeddata', onLoaded);
       a.addEventListener('durationchange', onLoaded);
       a.addEventListener('ended', onEnded);
       a.addEventListener('timeupdate', onTimeUpdate);
       a.addEventListener('error', onError);
+      a.addEventListener('playing', onPlaying);
       scheduleDurationFallback(a);
     });
+
+    // -- Crossfade --
 
     const startFade = async (nextTrack: Track): Promise<void> => {
       fading = true;
@@ -209,10 +220,8 @@ export function useAudioEngine(): void {
         await other.play();
       } catch {
         console.warn('[audio] crossfade start failed');
-        if (fadeTargetId === nextTrack.id) {
-          fading = false;
-          fadeTargetId = null;
-        }
+        fading = false;
+        fadeTargetId = null;
         return;
       }
 
@@ -238,7 +247,7 @@ export function useAudioEngine(): void {
         applyVol(usePlayer.getState().volume);
         fading = false;
         fadeTargetId = null;
-        // advance player state without reloading audio (already loaded & playing)
+        justAdvanced = true;
         usePlayer.getState().next(true);
       };
       fadeRaf = requestAnimationFrame(step);
@@ -260,78 +269,78 @@ export function useAudioEngine(): void {
       void startFade(nextTrack);
     };
 
+    // -- Playback check --
+
     const checking = { busy: false, rerun: false };
     const check = async (): Promise<void> => {
-      // guard against overlapping runs: timeupdate ticks fire this constantly,
-      // and concurrent runs race the file-load for a newly selected track
-      if (checking.busy) {
-        checking.rerun = true;
-        return;
-      }
+      if (checking.busy) { checking.rerun = true; return; }
       checking.busy = true;
       try {
         await runCheck();
       } finally {
         checking.busy = false;
-        if (checking.rerun) {
-          checking.rerun = false;
-          void check();
-        }
+        if (checking.rerun) { checking.rerun = false; void check(); }
       }
     };
 
     const runCheck = async (): Promise<void> => {
-      const st = usePlayer.getState();
+      try {
+        const st = usePlayer.getState();
 
-      // any manual intervention during a fade hard-cuts to the new intent
-      if (fading && (!st.isPlaying || st.seekTo || (st.queue[st.index]?.id ?? null) !== fadeTargetId)) {
-        abortFade();
-      }
-
-      // apply pending seek
-      if (st.seekTo && st.seekTo.nonce !== lastNonce) {
-        lastNonce = st.seekTo.nonce;
-        if (isFinite(st.seekTo.time)) els[cur].currentTime = st.seekTo.time;
-        usePlayer.setState({ currentTime: st.seekTo?.time ?? st.currentTime, seekTo: null });
-        return;
-      }
-
-      const track = st.queue[st.index];
-      const trackId = track?.id ?? null;
-
-      if (trackId !== loadedFor[cur] && track) {
-        const file = await useLibrary.getState().resolveFile(track.id);
-        if (file && !fading) {
-          revokeSlot(cur);
-          urls[cur] = URL.createObjectURL(file);
-          els[cur].src = urls[cur]!;
-          loadedFor[cur] = trackId;
-          registerMediaSession(track);
-          usePlayer.getState().setDuration(track.duration || 0);
-          els[cur].load();
-        } else if (!file) {
-          console.warn('[audio] could not resolve file for track:', track.id, track.title);
+        if (fading && (!st.isPlaying || st.seekTo || (st.queue[st.index]?.id ?? null) !== fadeTargetId)) {
+          abortFade();
         }
-      }
 
-      const playState = st.isPlaying && !!track;
-      if (playState !== lastPlaying || (trackId !== lastQueueId && track)) {
-        lastPlaying = playState;
-        lastQueueId = trackId;
-        if (playState) {
-          applyVol(st.volume);
-          try {
-            await els[cur].play();
-          } catch (err) {
-            console.warn('[audio] play() rejected:', err);
+        // apply pending seek
+        if (st.seekTo && st.seekTo.nonce !== lastNonce) {
+          lastNonce = st.seekTo.nonce;
+          if (isFinite(st.seekTo.time)) els[cur].currentTime = st.seekTo.time;
+          usePlayer.setState({ currentTime: st.seekTo?.time ?? st.currentTime, seekTo: null });
+          return;
+        }
+
+        const track = st.queue[st.index];
+        const trackId = track?.id ?? null;
+
+        if (trackId !== loadedFor[cur] && track) {
+          const file = await useLibrary.getState().resolveFile(track.id);
+          // Re-read state — track may have changed during await
+          const freshSt = usePlayer.getState();
+          if (freshSt.queue[freshSt.index]?.id !== trackId) return;
+          if (file && !fading) {
+            revokeSlot(cur);
+            urls[cur] = URL.createObjectURL(file);
+            els[cur].src = urls[cur]!;
+            loadedFor[cur] = trackId;
+            registerMediaSession(track);
+            usePlayer.getState().setDuration(track.duration || 0);
+            els[cur].load();
+          } else if (!file) {
+            console.warn('[audio] could not resolve file for track:', track.id, track.title);
           }
-        } else {
-          els[cur].pause();
         }
-      }
 
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = playState ? 'playing' : 'paused';
+        const playState = st.isPlaying && !!track;
+        if (playState !== lastPlaying || (trackId !== lastQueueId && track)) {
+          lastPlaying = playState;
+          lastQueueId = trackId;
+          if (playState) {
+            applyVol(st.volume);
+            try {
+              await els[cur].play();
+            } catch (err) {
+              console.warn('[audio] play() rejected:', err);
+            }
+          } else {
+            els[cur].pause();
+          }
+        }
+
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = playState ? 'playing' : 'paused';
+        }
+      } catch (err) {
+        console.warn('[audio] check error:', err);
       }
     };
 
@@ -339,8 +348,6 @@ export function useAudioEngine(): void {
 
     const unsub = usePlayer.subscribe((state, prev) => {
       if (state.volume !== prev.volume && !fading) applyVol(state.volume);
-      // currentTime updates fire many times per second; only re-run the full
-      // engine check when something that can change playback actually changed
       const significant =
         state.queue !== prev.queue ||
         state.index !== prev.index ||
@@ -350,17 +357,11 @@ export function useAudioEngine(): void {
     });
 
     // Media session action handlers (lock screen / notification controls)
-    // On iOS, handlers must be re-registered when audio starts playing —
-    // iOS clears them when the page is backgrounded or audio is suspended.
     const registerMediaHandlers = (): void => {
       if (!('mediaSession' in navigator)) return;
       const ms = navigator.mediaSession;
       const setHandler = (action: MediaSessionAction, fn: MediaSessionActionHandler): void => {
-        try {
-          ms.setActionHandler(action, fn);
-        } catch {
-          /* unsupported action */
-        }
+        try { ms.setActionHandler(action, fn); } catch { /* unsupported */ }
       };
       setHandler('play', () => {
         silentEl.play().catch(() => { /* ignore */ });
@@ -370,35 +371,29 @@ export function useAudioEngine(): void {
       setHandler('stop', () => usePlayer.getState().pause());
       setHandler('nexttrack', () => usePlayer.getState().next(false));
       setHandler('previoustrack', () => usePlayer.getState().previous());
-      // NOTE: no seekforward/seekbackward — on iOS they REPLACE the
-      // Previous/Next buttons with -10/+10 seek buttons.
       setHandler('seekto', (details) => {
         if (details.seekTime != null) usePlayer.getState().seek(details.seekTime);
       });
     };
 
-    // Register once at init
     registerMediaHandlers();
 
-    // Re-register on every `playing` event so iOS always has the correct
-    // handlers active when the lock screen / Dynamic Island controls appear.
-    els.forEach((a) => {
-      a.addEventListener('playing', registerMediaHandlers);
-    });
-
+    // -- Cleanup --
     return () => {
       unsub();
       abortFade();
+      durationFallbackTimeouts.forEach((t) => clearTimeout(t));
+      durationFallbackTimeouts.clear();
       silentEl.pause();
-      silentEl.removeAttribute('src');
+      silentEl.src = '';
       els.forEach((a, i) => {
-        a.removeEventListener('loadedmetadata', onLoaded);
+        a.removeEventListener('loadedmetadata', onLoadedMeta);
         a.removeEventListener('loadeddata', onLoaded);
         a.removeEventListener('durationchange', onLoaded);
         a.removeEventListener('ended', onEnded);
         a.removeEventListener('timeupdate', onTimeUpdate);
         a.removeEventListener('error', onError);
-        a.removeEventListener('playing', registerMediaHandlers);
+        a.removeEventListener('playing', onPlaying);
         a.pause();
         a.removeAttribute('src');
         revokeSlot(i);

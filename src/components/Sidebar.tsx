@@ -13,7 +13,12 @@ export function Sidebar(): JSX.Element {
   const playlists = useLibrary((s) => s.playlists);
   const status = useLibrary((s) => s.status);
 
-  const isPage = (p: Page): boolean => JSON.stringify(page) === JSON.stringify(p);
+  const isPage = (p: Page): boolean => {
+    if (!page || page.type !== p.type) return false;
+    const aKey = 'key' in page ? page.key : 'id' in page ? page.id : 'name' in page ? page.name : null;
+    const bKey = 'key' in p ? p.key : 'id' in p ? p.id : 'name' in p ? p.name : null;
+    return aKey === bKey;
+  };
 
   return (
     <aside className="sidebar">

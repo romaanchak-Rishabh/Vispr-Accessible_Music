@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLibrary } from '../store/library';
 import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
@@ -393,7 +393,7 @@ export function MadeForYouSection(): JSX.Element | null {
   const playCounts = usePlayer((s) => s.playCounts);
   const recentlyPlayed = usePlayer((s) => s.recentlyPlayed);
   const playlists = useLibrary((s) => s.playlists);
-  const favourites = useLibrary((s) => s.tracks.filter((t) => !!t.favouritedAt));
+  const favouriteIds = useMemo(() => new Set(tracks.filter((t) => !!t.favouritedAt).map((t) => t.id)), [tracks]);
 
   const [recs, setRecs] = useState<Recommendation[]>([]);
 
@@ -401,14 +401,14 @@ export function MadeForYouSection(): JSX.Element | null {
     const recentTracks = recentlyPlayed.map((e) => e.track);
     try {
       const results = await getSmartRecommendations(
-        tracks, playCounts, recentTracks, playlists, new Set(favourites.map(t => t.id)), 10
+        tracks, playCounts, recentTracks, playlists, favouriteIds, 10
       );
       setRecs(results);
     } catch {
-      const results = getRecommendations(tracks, playCounts, recentTracks, playlists, new Set(favourites.map(t => t.id)), 10, Date.now());
+      const results = getRecommendations(tracks, playCounts, recentTracks, playlists, favouriteIds, 10, Date.now());
       setRecs(results);
     }
-  }, [tracks, playCounts, recentlyPlayed, playlists, favourites]);
+  }, [tracks, playCounts, recentlyPlayed, playlists, favouriteIds]);
 
   useEffect(() => {
     if (tracks.length > 0 && recs.length === 0) {
@@ -682,7 +682,7 @@ export function MoodGenreChips(): JSX.Element | null {
 {moods.map((mood) => {
             const moodTracks = tracks.filter((t) => {
               const genre = (t.genre1 ?? t.genre2 ?? '').toLowerCase();
-              return genre.includes(mood.name.toLowerCase()) || genre === '';
+              return genre.includes(mood.name.toLowerCase());
             }).slice(0, 50);
 
             const finalTracks = moodTracks.length > 0 ? moodTracks : tracks.slice(0, 50);
@@ -724,6 +724,7 @@ export function EnhancedJumpBackInSection(): JSX.Element | null {
   const albums = useLibrary((s) => s.albums);
   const playlists = useLibrary((s) => s.playlists);
   const artists = useLibrary((s) => s.artists);
+  const byId = useLibrary((s) => s.byId);
 
   if (albums.length === 0 && playlists.length === 0 && artists.length === 0) return null;
 
@@ -740,7 +741,7 @@ export function EnhancedJumpBackInSection(): JSX.Element | null {
           <EnhancedAlbumCard key={a.key} album={a} size={cardWidth} type="album" />
         ))}
         {playlists.slice(0, 6).map((p) => (
-          <EnhancedAlbumCard key={p.id} album={{ ...p, key: p.id, title: p.name, artist: '', artwork: p.trackIds[0] ? undefined : undefined }} size={cardWidth} type="playlist" trackIds={p.trackIds} />
+          <EnhancedAlbumCard key={p.id} album={{ ...p, key: p.id, title: p.name, artist: '', artwork: p.trackIds[0] ? byId[p.trackIds[0]]?.artwork : undefined }} size={cardWidth} type="playlist" trackIds={p.trackIds} />
         ))}
         {artists.slice(0, 6).map((a) => (
           <EnhancedAlbumCard key={a.name} album={{ key: a.name, title: a.name, artist: '', artwork: a.artwork }} size={cardWidth} type="artist" />
@@ -805,7 +806,8 @@ function EnhancedAlbumCard({ album, size = 180, type, trackIds }: EnhancedAlbumC
 
 // Recently Added Enhanced
 export function EnhancedRecentlyAddedSection(): JSX.Element | null {
-  const recentlyAdded = useLibrary((s) => s.tracks.slice().sort((a, b) => b.addedAt - a.addedAt).slice(0, 20));
+  const tracks = useLibrary((s) => s.tracks);
+  const recentlyAdded = useMemo(() => [...tracks].sort((a, b) => b.addedAt - a.addedAt).slice(0, 20), [tracks]);
 
   if (recentlyAdded.length === 0) return null;
 

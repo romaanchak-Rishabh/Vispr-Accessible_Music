@@ -87,18 +87,30 @@ export const usePlayer = create<PlayerState>()(
       },
 
       playTrackNext: (track) => {
-        const { queue, index } = get();
+        const { queue, index, originalQueue, shuffle } = get();
         const filtered = queue.filter((t, i) => !(t.id === track.id && i !== index));
         const insertAt = index + 1;
         filtered.splice(insertAt, 0, track);
-        set({ queue: filtered });
+        const update: Partial<PlayerState> = { queue: filtered };
+        if (shuffle) {
+          const origFiltered = originalQueue.filter((t) => t.id !== track.id);
+          origFiltered.push(track);
+          update.originalQueue = origFiltered;
+        }
+        set(update);
       },
 
       playTrackLater: (track) => {
-        const { queue, index } = get();
+        const { queue, index, originalQueue, shuffle } = get();
         const filtered = queue.filter((t, i) => !(t.id === track.id && i !== index));
         filtered.push(track);
-        set({ queue: filtered });
+        const update: Partial<PlayerState> = { queue: filtered };
+        if (shuffle) {
+          const origFiltered = originalQueue.filter((t) => t.id !== track.id);
+          origFiltered.push(track);
+          update.originalQueue = origFiltered;
+        }
+        set(update);
       },
 
       togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying && s.queue.length > 0 })),
@@ -136,13 +148,18 @@ export const usePlayer = create<PlayerState>()(
       previous: () => {
         const { index, queue, currentTime } = get();
         if (queue.length === 0) return;
-        if (currentTime > 3 || index === 0) {
-          if (index === 0 && currentTime <= 3) {
-            useUI.getState().showToast(queue.length === 1 ? 'Only song in the queue' : 'Start of queue — nothing before this');
-          }
+        // If more than 3s into the track, restart it
+        if (currentTime > 3) {
           set({ currentTime: 0, seekTo: { time: 0, nonce: Date.now() }, isPlaying: true });
           return;
         }
+        // At the start of the first track — show toast and restart
+        if (index === 0) {
+          useUI.getState().showToast(queue.length === 1 ? 'Only song in the queue' : 'Start of queue');
+          set({ currentTime: 0, seekTo: { time: 0, nonce: Date.now() }, isPlaying: true });
+          return;
+        }
+        // Go to previous track
         const prevIndex = index - 1;
         set({ index: prevIndex, currentTime: 0, duration: 0, isPlaying: true, seekTo: { time: 0, nonce: Date.now() } });
         recordPlay(set, get, queue[prevIndex]);
@@ -194,14 +211,33 @@ export const usePlayer = create<PlayerState>()(
 
       removeFromQueue: (queueIndex) => {
         const { queue, index } = get();
-        if (queueIndex <= index || queueIndex >= queue.length) return;
+        if (queueIndex < 0 || queueIndex >= queue.length) return;
+        // Cannot remove tracks at or before the current playing index
+        if (queueIndex < index) {
+          const newQueue = queue.filter((_, i) => i !== queueIndex);
+          set({ queue: newQueue, index: index - 1 });
+          return;
+        }
+        if (queueIndex === index) {
+          // Removing the currently playing track
+          if (queue.length <= 1) {
+            set({ queue: [], index: 0, isPlaying: false, currentTime: 0, duration: 0 });
+          } else {
+            const newQueue = queue.filter((_, i) => i !== queueIndex);
+            const newIndex = index >= newQueue.length ? 0 : index;
+            set({ queue: newQueue, index: newIndex, currentTime: 0, duration: 0, seekTo: { time: 0, nonce: Date.now() } });
+          }
+          return;
+        }
         const newQueue = queue.filter((_, i) => i !== queueIndex);
         set({ queue: newQueue });
       },
 
       moveInQueue: (from, to) => {
         const { queue, index } = get();
-        if (from <= index || to <= index) return;
+        if (from < 0 || to < 0 || from >= queue.length || to >= queue.length || from === to) return;
+        // Only allow moving tracks that are after the current one
+        if (from < index || to < index) return;
         const newQueue = [...queue];
         const [moved] = newQueue.splice(from, 1);
         newQueue.splice(to, 0, moved);
@@ -238,10 +274,8 @@ function stripArtwork(t: Track): Track {
   return { ...t, artwork: undefined };
 }
 
-function recordPlay(set: SetFn, _get: () => PlayerState, track: Track): void {
-  const state = usePlayer.getState();
-  // Strip artwork data-URLs from history snapshots to keep localStorage small;
-  // UI re-resolves live artwork from the library by track id.
+function recordPlay(set: SetFn, get: () => PlayerState, track: Track): void {
+  const state = get();
   const snapshot: Track = { ...track, artwork: undefined };
   const entry: HistoryEntry = { track: snapshot, playedAt: Date.now() };
   const recent = [entry, ...state.recentlyPlayed.filter((e) => e.track.id !== track.id)].slice(0, 100);

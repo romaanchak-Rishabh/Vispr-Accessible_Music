@@ -8,7 +8,18 @@ import type { YtItem } from '../lib/ytdlp';
 
 const fileCache = new Map<string, File>();
 const handleCache = new Map<string, FileSystemFileHandle>();
+const FILE_CACHE_MAX = 60;
 let downloadDirHandle: FileSystemDirectoryHandle | null = null;
+
+function cacheFile(id: string, file: File): void {
+  if (fileCache.has(id)) { fileCache.delete(id); }
+  else if (fileCache.size >= FILE_CACHE_MAX) {
+    // Evict oldest entry
+    const oldest = fileCache.keys().next().value;
+    if (oldest) fileCache.delete(oldest);
+  }
+  fileCache.set(id, file);
+}
 
 function browserDownload(filename: string, blob: Blob): void {
   const a = document.createElement('a');
@@ -328,7 +339,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             artwork
           };
           newTracks.push(track);
-          fileCache.set(track.id, file);
+          cacheFile(track.id, file);
           await db.saveFileBlob(track.id, file);
         } catch {
           /* skip unreadable */
@@ -356,7 +367,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       addedAt: Date.now(),
       artwork: meta.artwork
     };
-    fileCache.set(track.id, file);
+    cacheFile(track.id, file);
     await db.saveFileBlob(track.id, file);
     await saveCopyToDownloadFolder(file.name, file);
     await finalizeImport(set, get, [track]);

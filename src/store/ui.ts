@@ -67,7 +67,12 @@ export const useUI = create<UIState>((set, get) => ({
     const stack = get().pageStack;
     if (stack.length > 0) {
       const top = stack[stack.length - 1];
-      if (JSON.stringify(top) === JSON.stringify(page)) return;
+      // Compare by type + key identity fields only (skip tracks, icon, etc.)
+      if (top.type === page.type) {
+        const aKey = 'key' in top ? top.key : 'id' in top ? top.id : 'name' in top ? top.name : null;
+        const bKey = 'key' in page ? page.key : 'id' in page ? page.id : 'name' in page ? page.name : null;
+        if (aKey === bKey) return;
+      }
     }
     set({ pageStack: [...stack, page] });
     window.scrollTo(0, 0);
@@ -85,10 +90,11 @@ export const useUI = create<UIState>((set, get) => ({
   dismissInstall: () => set({ installBannerDismissed: true }),
 
   showToast: (msg) => {
-    set({ toast: { msg, nonce: Date.now() } });
+    const nonce = Date.now();
+    set({ toast: { msg, nonce } });
     window.setTimeout(() => {
       const t = get().toast;
-      if (t && t.msg === msg) set({ toast: null });
+      if (t && t.nonce === nonce) set({ toast: null });
     }, 2200);
   },
 

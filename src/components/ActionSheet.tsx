@@ -146,16 +146,21 @@ export function ActionSheet(): JSX.Element | null {
             {
               label: 'Delete from Library',
               fn: () => {
-                if (!window.confirm(`Delete “${track.title}” and its downloaded audio?\nThis cannot be undone.`)) return;
+                if (!window.confirm(`Delete "${track.title}" and its downloaded audio?\nThis cannot be undone.`)) return;
                 const p = usePlayer.getState();
                 const wasCurrent = p.queue[p.index]?.id === track.id;
                 if (wasCurrent) p.pause();
                 usePlayer.setState((s) => {
-                  const before = s.queue.filter((q, i) => q.id === track.id && i < s.index).length;
+                  const idx = s.queue.findIndex((q) => q.id === track.id);
+                  const newQueue = s.queue.filter((q) => q.id !== track.id);
+                  const newOrig = s.originalQueue.filter((q) => q.id !== track.id);
+                  let newIndex = s.index;
+                  if (idx >= 0 && idx < s.index) newIndex = Math.max(0, s.index - 1);
+                  else if (idx >= 0 && idx === s.index) newIndex = Math.min(newIndex, newQueue.length - 1);
                   return {
-                    queue: s.queue.filter((q) => q.id !== track.id),
-                    originalQueue: s.originalQueue.filter((q) => q.id !== track.id),
-                    index: Math.max(0, s.index - before),
+                    queue: newQueue,
+                    originalQueue: newOrig,
+                    index: Math.max(0, newIndex),
                     isPlaying: false
                   };
                 });

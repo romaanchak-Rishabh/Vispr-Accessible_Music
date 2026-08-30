@@ -21,6 +21,8 @@ export function PageRouter(): JSX.Element {
   const pageStack = useUI((s) => s.pageStack);
   const page = pageStack[pageStack.length - 1];
 
+  if (!page) return <div style={{ padding: 16 }}>Loading...</div>;
+
   switch (page.type) {
     case 'listen':
       return <ListenNowLazy />;
@@ -377,12 +379,13 @@ function AlbumGridCard({ album }: { album: Album }): JSX.Element {
 function BrowseView(): JSX.Element {
   const status = useLibrary((s) => s.status);
   const albums = useLibrary((s) => s.albums);
-  const genres = useLibrary((s) => s.tracks.reduce<Map<string, number>>((m, t) => {
+  const tracks = useLibrary((s) => s.tracks);
+  const genres = useMemo(() => tracks.reduce<Map<string, number>>((m, t) => {
     const g = (t.genre1 ?? t.genre2 ?? t.genre ?? '').trim();
     if (!g) return m;
     m.set(g, (m.get(g) ?? 0) + 1);
     return m;
-  }, new Map()));
+  }, new Map()), [tracks]);
 
   if (status === 'loading') return <div style={{ padding: 40 }}>Loading…</div>;
   if (status !== 'ready') {
@@ -430,6 +433,7 @@ function SearchView(): JSX.Element {
       (t) =>
         t.title.toLowerCase().includes(q) ||
         t.artist.toLowerCase().includes(q) ||
+        (t.artist2 ?? '').toLowerCase().includes(q) ||
         t.album.toLowerCase().includes(q) ||
         (t.genre1 ?? t.genre2 ?? '').toLowerCase().includes(q)
     );
@@ -799,7 +803,7 @@ function ForYouPage(): JSX.Element {
   const playCounts = usePlayer((s) => s.playCounts);
   const recentlyPlayed = usePlayer((s) => s.recentlyPlayed);
   const playlists = useLibrary((s) => s.playlists);
-  const favourites = useLibrary((s) => s.tracks.filter((t) => !!t.favouritedAt));
+  const favouriteIds = useMemo(() => new Set(tracks.filter((t) => !!t.favouritedAt).map((t) => t.id)), [tracks]);
   const playTracks = usePlayer((s) => s.playTracks);
 
   const [, setSeed] = useState(() => Date.now());
@@ -815,35 +819,30 @@ function ForYouPage(): JSX.Element {
     setEmbeddingProgress(null);
     setShowSweep(true);
     try {
-      const favIds = new Set(favourites.map((t) => t.id));
       const recentTracks = recentlyPlayed.map((e) => e.track);
       const results = await getSmartRecommendations(
-        tracks, playCounts, recentTracks, playlists, favIds, 10, newSeed,
+        tracks, playCounts, recentTracks, playlists, favouriteIds, 10, newSeed,
         (done, total) => setEmbeddingProgress({ done, total }),
       );
-      // Shuffle results so order changes on each refresh
       const shuffled = [...results].sort(() => Math.random() - 0.5);
       setRecs(shuffled);
     } catch {
-      // Fallback to sync recommendations
-      const favIds = new Set(favourites.map((t) => t.id));
       const recentTracks = recentlyPlayed.map((e) => e.track);
-      const results = getRecommendations(tracks, playCounts, recentTracks, playlists, favIds, 10, Date.now());
+      const results = getRecommendations(tracks, playCounts, recentTracks, playlists, favouriteIds, 10, Date.now());
       const shuffled = [...results].sort(() => Math.random() - 0.5);
       setRecs(shuffled);
     } finally {
       setLoading(false);
       setEmbeddingProgress(null);
-      // Keep aurora sweep visible for 1.5s after loading finishes
       setTimeout(() => setShowSweep(false), 1500);
     }
-  }, [tracks, playCounts, recentlyPlayed, playlists, favourites]);
+  }, [tracks, playCounts, recentlyPlayed, playlists, favouriteIds]);
 
   useEffect(() => {
     if (status === 'ready' && tracks.length > 0 && recs.length === 0) {
       refresh();
     }
-  }, [status, tracks.length]);
+  }, [status, tracks.length, refresh]);
 
   if (status === 'loading') {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--label-secondary)' }}>Loading…</div>;

@@ -45,6 +45,8 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
   const [phase, setPhase] = useState<'parsing' | 'review' | 'importing' | 'done' | 'error'>('parsing');
   const [errorMsg, setErrorMsg] = useState('');
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0, label: '' });
   const [applyAllChoice, setApplyAllChoice] = useState<'mine' | 'incoming' | null>(null);
   const [imported, setImported] = useState(0);
@@ -110,7 +112,6 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
   const startImport = async (): Promise<void> => {
     setPhase('importing');
 
-    // Health-check backend before starting
     let backendAlive = false;
     if (ytdlpServer) {
       try {
@@ -127,6 +128,8 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
     const trackIdsForPlaylist: string[] = [];
 
     for (const item of conflicts) {
+      if (!mountedRef.current) return;
+
       if (item.status === 'exact') {
         setSkipped((s) => s + 1);
         trackIdsForPlaylist.push(item.existing!.id);
@@ -209,13 +212,15 @@ export function ReceiveSheet({ files, onClose }: ReceiveSheetProps): JSX.Element
         try { await db.saveFileBlob(trackId, blobFile); } catch { /* skip */ }
         await useLibrary.getState().addTracks([track]);
         trackIdsForPlaylist.push(trackId);
-        setImported((i) => i + 1);
+        if (mountedRef.current) setImported((i) => i + 1);
       } catch {
-        setFailed((f) => f + 1);
+        if (mountedRef.current) setFailed((f) => f + 1);
       }
 
       done++;
     }
+
+    if (!mountedRef.current) return;
 
     if (payload && trackIdsForPlaylist.length > 0 && payload.type === 'playlist' && payload.playlistName) {
       const currentPlaylists = useLibrary.getState().playlists;

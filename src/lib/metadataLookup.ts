@@ -66,7 +66,7 @@ export function yearToEra(year: number | undefined): string | undefined {
   if (year >= 2000) return '2000s';
   if (year >= 1990) return '1990s';
   if (year >= 1980) return '1980s';
-  if (year >= 1900) return '1970s';
+  if (year >= 1970) return '1970s';
   return undefined;
 }
 
