@@ -26,10 +26,28 @@ export function registerMediaSession(track: Track): void {
 
 export function useAudioEngine(): void {
   useEffect(() => {
+    // iOS workaround: tell the OS this is a playback session so the lock-screen
+    // controls stay active when the page is backgrounded.
+    if ('audioSession' in navigator) {
+      try { (navigator as any).audioSession.type = 'playback'; } catch { /* ignore */ }
+    }
+
+    // iOS workaround: a silent looping audio element keeps the audio context
+    // alive when the page is backgrounded / screen locked. Without this, iOS
+    // suspends the main audio elements and the lock-screen play button stops
+    // working after a few seconds of inactivity.
+    const silentEl = new Audio();
+    silentEl.loop = true;
+    silentEl.volume = 0;
+    silentEl.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+
     const els: [HTMLAudioElement, HTMLAudioElement] = [new Audio(), new Audio()];
     els.forEach((a) => {
       a.preload = 'auto';
     });
+
+    // Start silent element immediately to keep iOS audio context alive
+    silentEl.play().catch(() => { /* ignore */ });
     const urls: (string | null)[] = [null, null];
     const loadedFor: (string | null)[] = [null, null];
     let cur = 0;
@@ -332,7 +350,10 @@ export function useAudioEngine(): void {
     });
 
     // Media session action handlers (lock screen / notification controls)
-    if ('mediaSession' in navigator) {
+    // On iOS, handlers must be re-registered when audio starts playing —
+    // iOS clears them when the page is backgrounded or audio is suspended.
+    const registerMediaHandlers = (): void => {
+      if (!('mediaSession' in navigator)) return;
       const ms = navigator.mediaSession;
       const setHandler = (action: MediaSessionAction, fn: MediaSessionActionHandler): void => {
         try {
@@ -341,21 +362,35 @@ export function useAudioEngine(): void {
           /* unsupported action */
         }
       };
-      setHandler('play', () => usePlayer.getState().resume());
+      setHandler('play', () => {
+        silentEl.play().catch(() => { /* ignore */ });
+        usePlayer.getState().resume();
+      });
       setHandler('pause', () => usePlayer.getState().pause());
+      setHandler('stop', () => usePlayer.getState().pause());
       setHandler('nexttrack', () => usePlayer.getState().next(false));
       setHandler('previoustrack', () => usePlayer.getState().previous());
-      // NOTE: no seekforward/seekbackward handlers. On iOS registering them
-      // replaces the Previous/Next buttons on the lock screen / Dynamic Island
-      // with the -10/+10 seek buttons (iOS shows one set, not both).
+      // NOTE: no seekforward/seekbackward — on iOS they REPLACE the
+      // Previous/Next buttons with -10/+10 seek buttons.
       setHandler('seekto', (details) => {
         if (details.seekTime != null) usePlayer.getState().seek(details.seekTime);
       });
-    }
+    };
+
+    // Register once at init
+    registerMediaHandlers();
+
+    // Re-register on every `playing` event so iOS always has the correct
+    // handlers active when the lock screen / Dynamic Island controls appear.
+    els.forEach((a) => {
+      a.addEventListener('playing', registerMediaHandlers);
+    });
 
     return () => {
       unsub();
       abortFade();
+      silentEl.pause();
+      silentEl.removeAttribute('src');
       els.forEach((a, i) => {
         a.removeEventListener('loadedmetadata', onLoaded);
         a.removeEventListener('loadeddata', onLoaded);
@@ -363,6 +398,7 @@ export function useAudioEngine(): void {
         a.removeEventListener('ended', onEnded);
         a.removeEventListener('timeupdate', onTimeUpdate);
         a.removeEventListener('error', onError);
+        a.removeEventListener('playing', registerMediaHandlers);
         a.pause();
         a.removeAttribute('src');
         revokeSlot(i);
