@@ -2,7 +2,8 @@ import { useSettings } from '../store/settings';
 import { useUI } from '../store/ui';
 
 const RAW_URL = 'https://raw.githubusercontent.com/romaanchak-Rishabh/Vispr-Accessible_Music/main/tunnel.txt';
-const POLL_MS = 60_000;
+const POLL_MS = 30_000;
+const HEALTH_TIMEOUT = 8_000;
 
 function hostOf(u: string): string | null {
   try {
@@ -23,21 +24,43 @@ async function fetchLatestTunnel(): Promise<string> {
   return u.replace(/\/+$/, '');
 }
 
+async function isTunnelAlive(url: string): Promise<boolean> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), HEALTH_TIMEOUT);
+    const r = await fetch(`${url}/api/ping`, { signal: ctrl.signal, cache: 'no-store' });
+    clearTimeout(t);
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Pull the current tunnel URL from git and apply it to Settings.
- * Only ever overwrites the saved server when it is empty or a trycloudflare
- * host — a custom server the user typed is left untouched.
+ * Also health-checks the current tunnel — if dead, immediately
+ * fetches the latest from GitHub and switches.
  */
 export async function syncTunnelUrl(): Promise<void> {
   try {
-    const latest = await fetchLatestTunnel();
-    if (!latest) return;
     const { ytdlpServer, setYtdlpServer } = useSettings.getState();
     const cur = (ytdlpServer ?? '').trim().replace(/\/+$/, '');
-    if (cur === latest) return;
     const curHost = hostOf(cur);
     const isManaged = cur === '' || (!!curHost && curHost.endsWith('.trycloudflare.com'));
+
+    // If we have a managed URL, health-check it first
+    if (isManaged && cur) {
+      const alive = await isTunnelAlive(cur);
+      if (alive) return; // current tunnel is fine, no update needed
+      // Tunnel is dead — fall through to fetch latest from GitHub
+    }
+
+    // Fetch latest from GitHub
+    const latest = await fetchLatestTunnel();
+    if (!latest) return;
+    if (cur === latest) return;
     if (!isManaged) return;
+
     setYtdlpServer(latest);
     useUI.getState().showToast('Backend tunnel updated automatically');
   } catch {
