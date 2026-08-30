@@ -424,8 +424,8 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             } catch {
               /* thumbnail optional */
             }
-            // Don't fall back to remote URL - it won't work as CSS background-image due to CORS
-            // Leave artwork undefined to show placeholder instead
+            // Fall back to remote URL so <img> can still display it
+            if (!artwork) artwork = item.thumbnail;
           }
           const existing = get().byId[`y-${item.id}`];
           const ov = overrides?.[item.id];
