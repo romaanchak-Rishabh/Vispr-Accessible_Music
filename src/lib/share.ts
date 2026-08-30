@@ -1,5 +1,4 @@
 import type { Track } from '../types';
-import * as db from './db';
 
 export type ShareType = 'track' | 'playlist' | 'album' | 'artist' | 'mix';
 
@@ -93,66 +92,67 @@ function getShareText(p: SharePayload): string {
   }
 }
 
-function getFileName(p: SharePayload): string {
-  const name = getShareTitle(p).replace(/[<>:"/\\|?*]/g, '_');
-  return `${name}.json`;
+function encodeSharePayload(payload: SharePayload): string {
+  const json = JSON.stringify(payload);
+  return btoa(unescape(encodeURIComponent(json)));
 }
 
-async function sharePayload(payload: SharePayload, tracks: Track[]): Promise<void> {
-  for (const track of tracks) {
-    const blob = await db.loadFileBlob(track.id);
-    if (blob) {
-      const b64 = await blobToBase64(blob);
-      const st = payload.tracks.find((t) => t.id === track.id);
-      if (st) st.audioData = b64;
-    }
-  }
+export function decodeSharePayload(encoded: string): SharePayload {
+  const json = decodeURIComponent(escape(atob(encoded.trim())));
+  return parseSharePayload(json);
+}
 
-  const jsonBlob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const jsonFile = new File([jsonBlob], getFileName(payload), { type: 'application/json' });
+function isBase64Share(text: string): boolean {
+  try {
+    const decoded = decodeURIComponent(escape(atob(text.trim())));
+    const data = JSON.parse(decoded);
+    return data.v === 1 && Array.isArray(data.tracks) && data.tracks.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function shareAsText(payload: SharePayload): Promise<void> {
+  const encoded = encodeSharePayload(payload);
+  const shareText = `🎵 Vispr Share\n\n${getShareText(payload)}\n\n${encoded}`;
 
   try {
-    if (navigator.share && navigator.canShare?.({ files: [jsonFile] })) {
-      await navigator.share({ files: [jsonFile], title: getShareTitle(payload), text: getShareText(payload) });
+    if (navigator.share) {
+      await navigator.share({ title: getShareTitle(payload), text: shareText });
       return;
     }
-  } catch { /* cancelled or unsupported — fall through to download */ }
+  } catch { /* cancelled or unsupported */ }
 
-  const url = URL.createObjectURL(jsonBlob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = getFileName(payload);
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+  try {
+    await navigator.clipboard.writeText(shareText);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = shareText;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
 }
 
 export async function shareTracks(tracks: Track[]): Promise<void> {
-  await sharePayload(createSharePayload(tracks, 'track'), tracks);
+  await shareAsText(createSharePayload(tracks, 'track'));
 }
 
 export async function sharePlaylist(name: string, tracks: Track[]): Promise<void> {
-  await sharePayload(createSharePayload(tracks, 'playlist', { playlistName: name }), tracks);
+  await shareAsText(createSharePayload(tracks, 'playlist', { playlistName: name }));
 }
 
 export async function shareAlbum(title: string, tracks: Track[]): Promise<void> {
-  await sharePayload(createSharePayload(tracks, 'album', { albumTitle: title }), tracks);
+  await shareAsText(createSharePayload(tracks, 'album', { albumTitle: title }));
 }
 
 export async function shareArtist(name: string, tracks: Track[]): Promise<void> {
-  await sharePayload(createSharePayload(tracks, 'artist', { artistName: name }), tracks);
+  await shareAsText(createSharePayload(tracks, 'artist', { artistName: name }));
 }
 
 export async function shareMix(name: string, tracks: Track[]): Promise<void> {
-  await sharePayload(createSharePayload(tracks, 'mix', { name }), tracks);
+  await shareAsText(createSharePayload(tracks, 'mix', { name }));
 }
 
 export function parseSharePayload(text: string): SharePayload {
@@ -166,6 +166,27 @@ export function parseSharePayload(text: string): SharePayload {
     if (!t.id || !t.title || !t.artist || !t.album) throw new Error('Malformed track in share file');
   }
   return data as SharePayload;
+}
+
+export function tryParseShareText(text: string): SharePayload | null {
+  const trimmed = text.trim();
+
+  // Try as base64-encoded share
+  if (isBase64Share(trimmed)) {
+    try {
+      return decodeSharePayload(trimmed);
+    } catch { /* not a valid share */ }
+  }
+
+  // Try as raw JSON
+  try {
+    const data = JSON.parse(trimmed);
+    if (data.v === 1 && Array.isArray(data.tracks) && data.tracks.length > 0) {
+      return data as SharePayload;
+    }
+  } catch { /* not JSON */ }
+
+  return null;
 }
 
 export interface ConflictItem {

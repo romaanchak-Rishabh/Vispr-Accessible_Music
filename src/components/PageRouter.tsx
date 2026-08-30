@@ -13,6 +13,8 @@ import { ChevronRightIcon, PlusCircleIcon, EllipsisIcon, ShuffleIcon, PlayIcon, 
 import { getRecommendations, getSmartRecommendations, type Recommendation } from '../lib/recommender';
 import { getTrackProfile } from '../lib/classifier';
 import { formatGenre } from '../lib/tags';
+import { tryParseShareText } from '../lib/share';
+import { ReceiveTextSheet } from './ReceiveTextSheet';
 import { shareAlbum, shareArtist, sharePlaylist, shareMix } from '../lib/share';
 
 export function PageRouter(): JSX.Element {
@@ -65,6 +67,8 @@ function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums'
   const artists = useLibrary((s) => s.artists);
   const navigate = useUI((s) => s.navigate);
   const playTracks = usePlayer((s) => s.playTracks);
+  const [pastedPayload, setPastedPayload] = useState<import('../lib/share').SharePayload | null>(null);
+  const [pasteError, setPasteError] = useState<string | null>(null);
 
   if (status === 'loading') {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--label-secondary)' }}>Loading…</div>;
@@ -103,6 +107,24 @@ function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums'
           <div className="detail-actions">
             <button className="pill-btn primary" onClick={() => playTracks(tracks, Math.floor(Math.random() * tracks.length), 'Shuffle All')}>
               <ShuffleIcon size={16} /> Shuffle
+            </button>
+            <button
+              className="pill-btn"
+              onClick={async () => {
+                try {
+                  const text = await navigator.clipboard.readText();
+                  const payload = tryParseShareText(text);
+                  if (payload) {
+                    setPastedPayload(payload);
+                  } else {
+                    setPasteError('No Vispr share found in clipboard.');
+                  }
+                } catch {
+                  setPasteError('Could not read clipboard. Tap again to retry.');
+                }
+              }}
+            >
+              Paste Share
             </button>
             <button
               className="pill-btn"
@@ -156,6 +178,14 @@ function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums'
       )}
 
       {active === 'playlists' && <PlaylistsManager />}
+
+      {pastedPayload && <ReceiveTextSheet payload={pastedPayload} onClose={() => setPastedPayload(null)} />}
+
+      {pasteError && (
+        <div style={{ position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-secondary)', color: 'var(--label)', padding: '10px 20px', borderRadius: 12, fontSize: 14, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', zIndex: 9999, maxWidth: '90%', textAlign: 'center' }} onClick={() => setPasteError(null)}>
+          {pasteError}
+        </div>
+      )}
     </div>
   );
 }
