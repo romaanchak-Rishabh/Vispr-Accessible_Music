@@ -80,18 +80,6 @@ function getShareTitle(p: SharePayload): string {
   }
 }
 
-function getShareText(p: SharePayload): string {
-  const n = p.tracks.length;
-  switch (p.type) {
-    case 'playlist': return `${p.playlistName ?? 'Playlist'} — ${n} songs`;
-    case 'album': return `${p.albumTitle ?? 'Album'} — ${n} songs`;
-    case 'artist': return `${p.artistName ?? 'Artist'} — ${n} songs`;
-    case 'mix': return `${p.name ?? 'Mix'} — ${n} songs`;
-    case 'track': return n === 1 ? `${p.tracks[0].title} — ${p.tracks[0].artist}` : `${n} songs from Vispr`;
-    default: return 'Vispr Share';
-  }
-}
-
 function encodeSharePayload(payload: SharePayload): string {
   const json = JSON.stringify(payload);
   return btoa(unescape(encodeURIComponent(json)));
@@ -114,20 +102,19 @@ function isBase64Share(text: string): boolean {
 
 async function shareAsText(payload: SharePayload): Promise<void> {
   const encoded = encodeSharePayload(payload);
-  const shareText = `🎵 Vispr Share\n\n${getShareText(payload)}\n\n${encoded}`;
 
   try {
     if (navigator.share) {
-      await navigator.share({ title: getShareTitle(payload), text: shareText });
+      await navigator.share({ title: getShareTitle(payload), text: encoded });
       return;
     }
   } catch { /* cancelled or unsupported */ }
 
   try {
-    await navigator.clipboard.writeText(shareText);
+    await navigator.clipboard.writeText(encoded);
   } catch {
     const ta = document.createElement('textarea');
-    ta.value = shareText;
+    ta.value = encoded;
     document.body.appendChild(ta);
     ta.select();
     document.execCommand('copy');
@@ -171,20 +158,28 @@ export function parseSharePayload(text: string): SharePayload {
 export function tryParseShareText(text: string): SharePayload | null {
   const trimmed = text.trim();
 
-  // Try as base64-encoded share
-  if (isBase64Share(trimmed)) {
-    try {
-      return decodeSharePayload(trimmed);
-    } catch { /* not a valid share */ }
-  }
-
-  // Try as raw JSON
+  // Try as raw JSON first
   try {
     const data = JSON.parse(trimmed);
     if (data.v === 1 && Array.isArray(data.tracks) && data.tracks.length > 0) {
       return data as SharePayload;
     }
   } catch { /* not JSON */ }
+
+  // Try as base64-encoded share (full text)
+  if (isBase64Share(trimmed)) {
+    try {
+      return decodeSharePayload(trimmed);
+    } catch { /* not valid */ }
+  }
+
+  // Try to find base64 within the text (user may have copied extra text)
+  const b64Match = trimmed.match(/[A-Za-z0-9+/=]{50,}/);
+  if (b64Match && isBase64Share(b64Match[0])) {
+    try {
+      return decodeSharePayload(b64Match[0]);
+    } catch { /* not valid */ }
+  }
 
   return null;
 }
