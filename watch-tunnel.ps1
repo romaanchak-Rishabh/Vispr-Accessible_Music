@@ -182,12 +182,27 @@ do {
   $ran = Get-Process cloudflared -ErrorAction SilentlyContinue | Select-Object -First 1
 
   if ($ran) {
+    # Always query cloudflared metrics FIRST — the live URL may have changed
     $live = try { (Invoke-RestMethod -Uri "http://127.0.0.1:20241/quicktunnel" -TimeoutSec 3).hostname } catch { '' }
-    if ($live -and "https://$live" -eq $url) {
+
+    if ($live -and "https://$live" -ne $url) {
+      # Cloudflared has a different URL than what's published — switch immediately
+      $candidate = "https://$live"
+      $candidateSince = Get-Date
+      Log "Cloudflared live on $candidate (published $url is stale) - verifying."
+    } elseif ($live -and "https://$live" -eq $url) {
+      # Same URL — just health-check it
       $st = Test-UrlState $url
       if ($st -ne 'ok') {
         if ($st -eq 'dns') {
-          Log "Published URL $url not resolving right now - DNS lag, keeping cloudflared and re-checking."
+          Log "Published URL $url DNS lag - checking if cloudflared rotated."
+          # Re-query metrics in case it changed between checks
+          $live2 = try { (Invoke-RestMethod -Uri "http://127.0.0.1:20241/quicktunnel" -TimeoutSec 3).hostname } catch { '' }
+          if ($live2 -and "https://$live2" -ne $url) {
+            $candidate = "https://$live2"
+            $candidateSince = Get-Date
+            Log "Cloudflared rotated to $candidate - verifying."
+          }
         } else {
           Log "Tunnel URL down (edge/HTTP) - restarting cloudflared for a fresh hostname."
           Stop-Cloudflared
@@ -196,12 +211,8 @@ do {
       } else {
         Log "OK - backend + tunnel healthy ($url)"
       }
-    } elseif ($live -and "https://$live" -ne $url) {
-      $candidate = "https://$live"
-      $candidateSince = Get-Date
-      Log "Running cloudflared is on $candidate (published $url is stale) - verifying the live one, leaving process untouched."
     } else {
-      # process up but metrics unreachable, and published URL unknown - just check it
+      # process up but metrics unreachable — check if published URL is alive
       $st = Test-UrlState $url
       if ($st -ne 'ok' -and $st -ne 'dns') {
         Log "Tunnel URL down (edge/HTTP) - restarting cloudflared for a fresh hostname."
