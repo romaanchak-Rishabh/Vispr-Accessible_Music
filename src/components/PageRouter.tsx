@@ -432,7 +432,7 @@ function SearchView(): JSX.Element {
   const [importingId, setImportingId] = useState<string | null>(null);
   const ytdlpServer = useSettings((s) => s.ytdlpServer);
   const ytdlpToken = useSettings((s) => s.ytdlpToken);
-  const importYouTube = useLibrary((s) => s.importFromUrl);
+  const importYouTube = useLibrary((s) => s.importYouTube);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const results = useMemo(() => {
