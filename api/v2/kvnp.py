@@ -63,11 +63,13 @@ class KvnpProvider:
 
     def _poll_job(self, job_id: str, timeout: int = 120) -> str:
         deadline = time.time() + timeout
+        first_poll = True
         while time.time() < deadline:
             try:
                 status = _rapidapi_get(HOST, f"/status/{job_id}", timeout=15)
             except Exception:
-                time.sleep(2)
+                time.sleep(5 if not first_poll else 2)
+                first_poll = False
                 continue
 
             state = (status.get("status") or "").upper()
@@ -84,7 +86,7 @@ class KvnpProvider:
             if state in ("ERROR", "FAILED", "CONVERSION_ERROR"):
                 raise ProviderError(self.name, f"job failed: {status}")
 
-            time.sleep(2)
+            time.sleep(5)
         raise ProviderError(self.name, f"job {job_id} timed out after {timeout}s")
 
     def search(self, query: str, limit: int = 5):
