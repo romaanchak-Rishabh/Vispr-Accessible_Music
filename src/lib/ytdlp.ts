@@ -167,3 +167,37 @@ export async function downloadAudioViaYtDlp(
   if (!/^[a-z0-9._ -]+$/i.test(filename)) filename = 'song.' + ext;
   return { blob, ext, filename };
 }
+
+// ---------------------------------------------------------------------------
+// YouTube search (via server-side v2 endpoint)
+// ---------------------------------------------------------------------------
+
+export interface YtSearchResult {
+  id: string;
+  title: string;
+  url: string;
+  uploader: string;
+  duration: number;
+  thumbnail: string;
+}
+
+export async function searchYouTube(
+  server: string,
+  token: string,
+  query: string,
+  limit: number = 10
+): Promise<YtSearchResult[]> {
+  const base = effectiveServerBase(server);
+  try {
+    const resp = await fetchWithTimeout(`${base}/api/search_v2`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ query, limit })
+    }, 15_000);
+    if (!resp.ok) return [];
+    const data = (await resp.json()) as { results?: YtSearchResult[] };
+    return data.results ?? [];
+  } catch {
+    return [];
+  }
+}

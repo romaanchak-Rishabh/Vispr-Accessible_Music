@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import type { JSX } from 'react';
 import { useLibrary, getFavourites, getMostListened, isAutoPlaylist, AUTO_FAVOURITES_ID, AUTO_MOST_LISTENED_ID } from '../store/library';
 import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
+import { useSettings } from '../store/settings';
 import type { Album, Artist, Track } from '../types';
 import { formatArtist } from '../types';
 import { TrackRow } from './TrackRow';
@@ -16,6 +17,7 @@ import { formatGenre } from '../lib/tags';
 import { ReceiveTextSheet } from './ReceiveTextSheet';
 import { PasteShareSheet } from './PasteShareSheet';
 import { shareAlbum, shareArtist, sharePlaylist, shareMix } from '../lib/share';
+import { searchYouTube, type YtSearchResult } from '../lib/ytdlp';
 
 export function PageRouter(): JSX.Element {
   const pageStack = useUI((s) => s.pageStack);
@@ -425,6 +427,13 @@ function SearchView(): JSX.Element {
   const status = useLibrary((s) => s.status);
   const tracks = useLibrary((s) => s.tracks);
   const [query, setQuery] = useState('');
+  const [ytResults, setYtResults] = useState<YtSearchResult[]>([]);
+  const [ytLoading, setYtLoading] = useState(false);
+  const [importingId, setImportingId] = useState<string | null>(null);
+  const ytdlpServer = useSettings((s) => s.ytdlpServer);
+  const ytdlpToken = useSettings((s) => s.ytdlpToken);
+  const importYouTube = useLibrary((s) => s.importFromUrl);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -438,6 +447,47 @@ function SearchView(): JSX.Element {
         (t.genre1 ?? t.genre2 ?? '').toLowerCase().includes(q)
     );
   }, [query, tracks]);
+
+  // Debounced YouTube search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = query.trim();
+    if (!q || q.length < 2) {
+      setYtResults([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setYtLoading(true);
+      try {
+        const res = await searchYouTube(ytdlpServer, ytdlpToken, q, 8);
+        setYtResults(res);
+      } catch {
+        setYtResults([]);
+      } finally {
+        setYtLoading(false);
+      }
+    }, 600);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query, ytdlpServer, ytdlpToken]);
+
+  const handleImportYt = async (item: YtSearchResult): Promise<void> => {
+    setImportingId(item.id);
+    try {
+      const videoUrl = item.url || `https://www.youtube.com/watch?v=${item.id}`;
+      await importYouTube(videoUrl);
+    } catch {
+      // silent
+    } finally {
+      setImportingId(null);
+    }
+  };
+
+  const formatDuration = (secs: number): string => {
+    if (!secs) return '';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   if (status === 'loading') return <div style={{ padding: 40 }}>Loading…</div>;
   if (status !== 'ready') {
@@ -472,14 +522,76 @@ function SearchView(): JSX.Element {
           <h2 className="section-header">Your Top Plays</h2>
           <TopPlaysInline />
         </div>
-      ) : results.length === 0 ? (
-        <p style={{ textAlign: 'center', color: 'var(--label-secondary)', padding: 30 }}>No results for “{query}”</p>
       ) : (
-        <div className="group">
-          {results.slice(0, 60).map((t) => (
-            <TrackRow key={t.id} track={t} />
-          ))}
-        </div>
+        <>
+          {results.length > 0 && (
+            <>
+              <h2 className="section-header">Your Library</h2>
+              <div className="group">
+                {results.slice(0, 60).map((t) => (
+                  <TrackRow key={t.id} track={t} />
+                ))}
+              </div>
+            </>
+          )}
+
+          <h2 className="section-header" style={{ marginTop: 16 }}>
+            YouTube{ytLoading ? ' — Searching…' : ytResults.length > 0 ? ` — ${ytResults.length} results` : ''}
+          </h2>
+          {ytLoading && ytResults.length === 0 ? (
+            <p style={{ textAlign: 'center', color: 'var(--label-secondary)', padding: 20 }}>Searching YouTube…</p>
+          ) : ytResults.length === 0 && !ytLoading ? (
+            <p style={{ textAlign: 'center', color: 'var(--label-secondary)', padding: 20 }}>
+              {results.length === 0 ? `No results for "${query}"` : 'No YouTube results found'}
+            </p>
+          ) : (
+            <div className="group">
+              {ytResults.map((r) => (
+                <button
+                  key={r.id}
+                  className="row"
+                  style={{ textAlign: 'left' }}
+                  onClick={() => void handleImportYt(r)}
+                  disabled={importingId === r.id}
+                >
+                  <div style={{ position: 'relative', width: 48, height: 48, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: 'var(--fill-secondary)' }}>
+                    {r.thumbnail ? (
+                      <img src={r.thumbnail} alt="" style={{ width: 48, height: 48, objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--label-tertiary)' }}>
+                        <PlayIcon size={20} />
+                      </div>
+                    )}
+                    {r.duration > 0 && (
+                      <span style={{
+                        position: 'absolute', bottom: 2, right: 2,
+                        background: 'rgba(0,0,0,0.75)', color: '#fff',
+                        fontSize: 10, padding: '1px 4px', borderRadius: 3,
+                      }}>
+                        {formatDuration(r.duration)}
+                      </span>
+                    )}
+                  </div>
+                  <span className="row-texts" style={{ minWidth: 0 }}>
+                    <span className="row-title" style={{ display: 'block' }}>{r.title}</span>
+                    <span className="row-subtitle" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.uploader || 'YouTube'}
+                    </span>
+                  </span>
+                  <span style={{ flexShrink: 0, marginLeft: 8 }}>
+                    {importingId === r.id ? (
+                      <span style={{ fontSize: 12, color: 'var(--accent)' }}>Adding…</span>
+                    ) : (
+                      <span className="icon-btn" style={{ color: 'var(--accent)' }}>
+                        <PlusCircleIcon size={22} />
+                      </span>
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

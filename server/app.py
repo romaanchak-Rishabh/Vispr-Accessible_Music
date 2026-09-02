@@ -387,7 +387,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):  # noqa: N802
         path = self.path.split("?")[0]
-        valid = ("/api/resolve", "/api/resolve_v2", "/api/info", "/api/download", "/api/download_v2")
+        valid = ("/api/resolve", "/api/resolve_v2", "/api/info", "/api/download", "/api/download_v2", "/api/search_v2")
         if path not in valid:
             self._json(404, {"error": "not found"})
             return
@@ -399,6 +399,11 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length) or b"{}")
         except Exception:  # noqa: BLE001
             self._json(400, {"error": "invalid json"})
+            return
+
+        # v2 search — search YouTube via API providers
+        if path == "/api/search_v2":
+            self._handle_search_v2(payload)
             return
 
         # v2 resolve — try API providers, fallback to yt-dlp
@@ -439,6 +444,36 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(data)
         except (BrokenPipeError, ConnectionResetError):
             pass
+
+    def _handle_search_v2(self, payload):
+        """Search YouTube via v2 API providers."""
+        query = (payload.get("query") or "").strip()
+        limit = payload.get("limit", 10)
+        if not query:
+            self._json(400, {"error": "missing query"})
+            return
+        try:
+            import sys as _sys
+            _v2_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "api", "v2")
+            if _v2_dir not in _sys.path:
+                _sys.path.insert(0, _v2_dir)
+            from search import search_youtube
+            results = search_youtube(query, limit=limit)
+            items = [
+                {
+                    "id": r.id,
+                    "title": r.title,
+                    "url": r.url,
+                    "uploader": r.uploader,
+                    "duration": r.duration,
+                    "thumbnail": r.thumbnail,
+                }
+                for r in results
+            ]
+            self._json(200, {"results": items})
+        except Exception as exc:
+            print(f"[v2] search failed: {exc}")
+            self._json(502, {"error": str(exc)})
 
     def _handle_resolve_v2(self, payload):
         """Try v2 API providers, fall back to yt-dlp."""
