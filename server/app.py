@@ -5,13 +5,22 @@ Endpoints (POST, JSON):
   /api/resolve   { "url": "<youtube video or playlist url>" }
                  -> { "items": [ { "id", "title", "webpage_url", "uploader", "duration", "thumbnail", "playlist_title" } ] }
 
+  /api/resolve_v2 { "url": "<youtube video or playlist url>" }
+                 -> same as /api/resolve, but tries API providers first
+
   /api/info      { "url": "<single youtube video url>" }
                  -> { "description", "tags", "year", "artist", "title" }
 
   /api/download  { "url": "<single youtube video url>" }
                  -> audio file bytes (m4a/webm)
 
+  /api/download_v2 { "url": "<single youtube video url>", "format": "mp3" }
+                 -> audio file bytes, tries API providers first
+
 Auth: set YTDLP_SECRET env var to require header "x-auth-token: <secret>".
+
+V2 API providers (set env vars):
+  RAPIDAPI_KEY   RapidAPI key for KvnqPoza, YTStream, Search API
 
 Run locally:
   pip install yt-dlp
@@ -377,7 +386,9 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):  # noqa: N802
-        if self.path.split("?")[0] not in ("/api/resolve", "/api/info", "/api/download"):
+        path = self.path.split("?")[0]
+        valid = ("/api/resolve", "/api/resolve_v2", "/api/info", "/api/download", "/api/download_v2")
+        if path not in valid:
             self._json(404, {"error": "not found"})
             return
         if not check_auth(self.headers):
@@ -390,16 +401,107 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {"error": "invalid json"})
             return
 
-        if self.path.startswith("/api/resolve"):
+        # v2 resolve — try API providers, fallback to yt-dlp
+        if path == "/api/resolve_v2":
+            status, obj = self._handle_resolve_v2(payload)
+            self._json(status, obj)
+            return
+
+        if path.startswith("/api/resolve"):
             status, obj = handle_resolve(payload)
             self._json(status, obj)
             return
 
-        if self.path.startswith("/api/info"):
+        if path.startswith("/api/info"):
             status, obj = handle_info(payload)
             self._json(status, obj)
             return
 
+        # v2 download — try API providers, fallback to yt-dlp
+        if path == "/api/download_v2":
+            self._handle_download_v2(payload)
+            return
+
+        result, err = handle_download(payload)
+        if err:
+            status, obj = err
+            self._json(status, obj)
+            return
+        _, data, ext, filename = result
+        mime = "audio/mp4" if ext in ("m4a", "mp4") else "audio/webm" if ext in ("webm", "opus") else "audio/mpeg"
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Disposition", f'attachment; filename*=UTF-8\'\'{filename.encode("ascii", "ignore").decode() or "song." + ext}')
+            self._cors()
+            self.end_headers()
+            self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def _handle_resolve_v2(self, payload):
+        """Try v2 API providers, fall back to yt-dlp."""
+        url = normalize_url(payload.get("url", "").strip())
+        if not url:
+            return 400, {"error": "missing url"}
+        # Try v2
+        try:
+            import sys as _sys
+            _v2_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "api", "v2")
+            if _v2_dir not in _sys.path:
+                _sys.path.insert(0, _v2_dir)
+            from search import resolve_url
+            results = resolve_url(url)
+            if results:
+                items = [
+                    {
+                        "id": r.id,
+                        "title": r.title,
+                        "webpage_url": r.url,
+                        "uploader": r.uploader,
+                        "duration": r.duration,
+                        "thumbnail": r.thumbnail,
+                        "playlist_title": None,
+                    }
+                    for r in results[:MAX_PLAYLIST]
+                ]
+                return 200, {"items": items}
+        except Exception as exc:
+            print(f"[v2] resolve provider failed: {exc}, falling back to yt-dlp")
+        # Fallback
+        return handle_resolve(payload)
+
+    def _handle_download_v2(self, payload):
+        """Try v2 API providers, fall back to yt-dlp."""
+        url = normalize_url(payload.get("url", "").strip())
+        fmt = payload.get("format", "mp3").strip()
+        if not url:
+            self._json(400, {"error": "missing url"})
+            return
+        # Try v2
+        try:
+            import sys as _sys
+            _v2_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "api", "v2")
+            if _v2_dir not in _sys.path:
+                _sys.path.insert(0, _v2_dir)
+            from download import download_audio
+            data, ext, filename = download_audio(url, fmt=fmt)
+            mime = "audio/mp4" if ext in ("m4a", "mp4") else "audio/webm" if ext in ("webm", "opus") else "audio/mpeg"
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", mime)
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Content-Disposition", f'attachment; filename*=UTF-8\'\'{filename.encode("ascii", "ignore").decode() or "song." + ext}')
+                self._cors()
+                self.end_headers()
+                self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            return
+        except Exception as exc:
+            print(f"[v2] download provider failed: {exc}, falling back to yt-dlp")
+        # Fallback to v1
         result, err = handle_download(payload)
         if err:
             status, obj = err

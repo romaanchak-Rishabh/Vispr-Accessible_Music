@@ -28,15 +28,69 @@ async function fetchWithTimeout(input: RequestInfo, init: RequestInit, timeoutMs
 
 export function effectiveServerBase(server: string): string {
   let s = server.trim().replace(/\/+$/, '');
-  // Ensure https:// for Cloudflare tunnels and similar
   if (s && !s.startsWith('http://') && !s.startsWith('https://')) {
     s = 'https://' + s;
   }
   return s;
 }
 
+// ---------------------------------------------------------------------------
+// v2 endpoints — try these first, fall back to v1
+// ---------------------------------------------------------------------------
+
+async function tryV2Resolve(base: string, token: string, url: string): Promise<YtItem[] | null> {
+  try {
+    const resp = await fetchWithTimeout(`${base}/api/resolve_v2`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ url })
+    }, 30_000);
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { items?: YtItem[] };
+    return data.items ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function tryV2Download(
+  base: string,
+  token: string,
+  videoUrl: string,
+  format: string = 'mp3'
+): Promise<{ blob: Blob; ext: string; filename: string } | null> {
+  try {
+    const resp = await fetchWithTimeout(`${base}/api/download_v2`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ url: videoUrl, format })
+    }, 180_000);
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
+    if (blob.size < 1000) return null; // garbage response
+    const disposition = resp.headers.get('Content-Disposition') ?? '';
+    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    let filename = utf8Match ? decodeURIComponent(utf8Match[1]) : disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? 'song.mp3';
+    const ext = filename.includes('.') ? filename.split('.').pop()!.toLowerCase() : 'mp3';
+    if (!/^[a-z0-9._ -]+$/i.test(filename)) filename = 'song.' + ext;
+    return { blob, ext, filename };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public API — v2 first, v1 fallback
+// ---------------------------------------------------------------------------
+
 export async function resolveViaYtDlp(server: string, token: string, url: string): Promise<YtItem[]> {
   const base = effectiveServerBase(server);
+
+  // Try v2 first
+  const v2 = await tryV2Resolve(base, token, url);
+  if (v2 !== null) return v2;
+
+  // Fallback to v1
   const resp = await fetchWithTimeout(`${base}/api/resolve`, {
     method: 'POST',
     headers: authHeaders(token),
@@ -85,6 +139,12 @@ export async function downloadAudioViaYtDlp(
   videoUrl: string
 ): Promise<{ blob: Blob; ext: string; filename: string }> {
   const base = effectiveServerBase(server);
+
+  // Try v2 first
+  const v2 = await tryV2Download(base, token, videoUrl, 'mp3');
+  if (v2 !== null) return v2;
+
+  // Fallback to v1
   const resp = await fetchWithTimeout(`${base}/api/download`, {
     method: 'POST',
     headers: authHeaders(token),
