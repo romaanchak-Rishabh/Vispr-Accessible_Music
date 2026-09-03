@@ -18,6 +18,8 @@ import { ReceiveTextSheet } from './ReceiveTextSheet';
 import { PasteShareSheet } from './PasteShareSheet';
 import { shareAlbum, shareArtist, sharePlaylist, shareMix } from '../lib/share';
 import { searchYouTube, type YtSearchResult } from '../lib/ytdlp';
+import type { YtItem } from '../lib/ytdlp';
+import { ImportConfirmSheet, type ImportOverrides } from './ImportConfirmSheet';
 
 async function isServerReachable(server: string): Promise<boolean> {
   if (!server) return false;
@@ -443,6 +445,7 @@ function SearchView(): JSX.Element {
   const [ytResults, setYtResults] = useState<YtSearchResult[]>([]);
   const [ytLoading, setYtLoading] = useState(false);
   const [importingId, setImportingId] = useState<string | null>(null);
+  const [pendingYtItem, setPendingYtItem] = useState<YtItem | null>(null);
   const ytdlpServer = useSettings((s) => s.ytdlpServer);
   const ytdlpToken = useSettings((s) => s.ytdlpToken);
   const importYouTube = useLibrary((s) => s.importYouTube);
@@ -503,23 +506,35 @@ function SearchView(): JSX.Element {
   }, [ytdlpServer, downloadQueue, queueProcessing, processQueue]);
 
   const handleImportYt = async (item: YtSearchResult): Promise<void> => {
+    // Convert to YtItem and show metadata form
+    setPendingYtItem({
+      id: item.id,
+      title: item.title,
+      webpage_url: item.url || `https://www.youtube.com/watch?v=${item.id}`,
+      uploader: item.uploader,
+      duration: item.duration,
+      thumbnail: item.thumbnail,
+    });
+  };
+
+  const handleConfirmYtImport = async (overrides: Record<string, ImportOverrides>): Promise<void> => {
+    if (!pendingYtItem) return;
+    const item = pendingYtItem;
+    setPendingYtItem(null);
     setImportingId(item.id);
     try {
-      const videoUrl = item.url || `https://www.youtube.com/watch?v=${item.id}`;
-      // Check if local server is reachable
+      const videoUrl = item.webpage_url || `https://www.youtube.com/watch?v=${item.id}`;
       const serverUp = await isServerReachable(ytdlpServer);
       if (serverUp) {
-        // Download immediately via yt-dlp
-        await importYouTube(videoUrl);
+        await importYouTube(videoUrl, undefined, overrides);
       } else {
-        // Queue for later — will download when server comes online
         await queueYouTubeImport({
           id: item.id,
           url: videoUrl,
-          title: item.title,
-          artist: item.uploader,
-          thumbnail: item.thumbnail,
-          duration: item.duration,
+          title: overrides[item.id]?.title || item.title || '',
+          artist: overrides[item.id]?.artist || item.uploader || '',
+          thumbnail: item.thumbnail || '',
+          duration: item.duration || 0,
         });
       }
     } catch {
@@ -644,6 +659,14 @@ function SearchView(): JSX.Element {
             </div>
           )}
         </>
+      )}
+
+      {pendingYtItem && (
+        <ImportConfirmSheet
+          items={[pendingYtItem]}
+          onConfirm={(overrides) => void handleConfirmYtImport(overrides)}
+          onCancel={() => setPendingYtItem(null)}
+        />
       )}
     </div>
   );
