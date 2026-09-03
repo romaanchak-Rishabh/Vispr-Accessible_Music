@@ -27,17 +27,36 @@ class SearchApiProvider:
         except Exception as exc:
             raise ProviderError(self.name, f"search failed: {exc}") from exc
 
-        videos = data.get("videos") or data.get("items") or []
+        # Response format: { "contents": [ { "video": { "videoId", "title", ... } } ] }
+        raw = data.get("contents") or data.get("videos") or data.get("items") or []
         results = []
-        for v in videos[:limit]:
-            vid = v.get("id") or v.get("videoId") or ""
+        for item in raw[:limit]:
+            v = item.get("video") or item  # handle both nested and flat
+            vid = v.get("videoId") or v.get("id") or ""
+            # Parse duration from "3:28" format
+            dur = 0
+            lt = v.get("lengthText") or ""
+            if lt and ":" in str(lt):
+                parts = str(lt).split(":")
+                try:
+                    if len(parts) == 2:
+                        dur = int(parts[0]) * 60 + int(parts[1])
+                    elif len(parts) == 3:
+                        dur = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                except ValueError:
+                    pass
+            elif isinstance(v.get("duration"), (int, float)):
+                dur = v["duration"]
+            # Pick best thumbnail
+            thumbs = v.get("thumbnails") or []
+            thumb = thumbs[-1].get("url") if thumbs else (v.get("thumbnail") or "")
             results.append(SearchResult(
                 id=vid,
                 title=v.get("title", ""),
-                url=v.get("webpage_url") or v.get("url") or f"https://www.youtube.com/watch?v={vid}",
-                uploader=v.get("uploader") or v.get("channel") or v.get("author", ""),
-                duration=v.get("duration") or 0,
-                thumbnail=v.get("thumbnail") or v.get("thumb") or "",
+                url=f"https://www.youtube.com/watch?v={vid}",
+                uploader=v.get("channelName") or v.get("uploader") or v.get("channel") or "",
+                duration=dur,
+                thumbnail=thumb,
             ))
         return results
 
@@ -50,13 +69,24 @@ class SearchApiProvider:
             vid = m.group(1)
             try:
                 data = _rapidapi_get(HOST, "/video", params={"id": vid}, timeout=15)
+                # Response wraps data in videoDetails
+                vd = data.get("videoDetails") or data
+                thumbs = vd.get("thumbnail", {}).get("thumbnails") or []
+                thumb = thumbs[-1].get("url", "") if thumbs else ""
+                dur = 0
+                ls = vd.get("lengthSeconds")
+                if ls:
+                    try:
+                        dur = int(ls)
+                    except ValueError:
+                        pass
                 return [SearchResult(
                     id=vid,
-                    title=data.get("title", ""),
+                    title=vd.get("title", ""),
                     url=url,
-                    uploader=data.get("uploader") or data.get("channel", ""),
-                    duration=data.get("duration") or 0,
-                    thumbnail=data.get("thumbnail") or "",
+                    uploader=vd.get("author") or vd.get("channelName", ""),
+                    duration=dur,
+                    thumbnail=thumb,
                 )]
             except Exception:
                 pass

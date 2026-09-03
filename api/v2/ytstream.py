@@ -36,26 +36,33 @@ class YTStreamProvider:
             raise ProviderError(self.name, data["error"])
 
         title = data.get("title", "")
-        formats = data.get("formats") or []
+        # Audio streams live in adaptiveFormats, not formats
+        adaptive = data.get("adaptiveFormats") or []
+        combined = data.get("formats") or []
+        all_streams = adaptive + combined
 
         # Pick the right format
         if fmt == "mp3":
-            # Look for audio-only streams
-            audio_streams = [f for f in formats if f.get("mimeType", "").startswith("audio/")]
+            # Look for audio-only streams in adaptiveFormats
+            audio_streams = [f for f in adaptive if f.get("mimeType", "").startswith("audio/")]
             if audio_streams:
                 best = max(audio_streams, key=lambda f: f.get("bitrate", 0))
                 stream_url = best.get("url", "")
             else:
-                raise ProviderError(self.name, "no audio streams found")
+                # Fallback: use combined stream (has audio + video)
+                if combined:
+                    best = combined[0]
+                    stream_url = best.get("url", "")
+                else:
+                    raise ProviderError(self.name, "no audio streams found")
         else:
             # Video — pick highest quality mp4
-            mp4_streams = [f for f in formats if "video/mp4" in f.get("mimeType", "")]
+            mp4_streams = [f for f in all_streams if "video/mp4" in f.get("mimeType", "")]
             if mp4_streams:
                 best = max(mp4_streams, key=lambda f: f.get("height", 0))
                 stream_url = best.get("url", "")
             else:
-                # Fallback to any video
-                video_streams = [f for f in formats if f.get("mimeType", "").startswith("video/")]
+                video_streams = [f for f in all_streams if f.get("mimeType", "").startswith("video/")]
                 if video_streams:
                     best = max(video_streams, key=lambda f: f.get("height", 0))
                     stream_url = best.get("url", "")
@@ -71,7 +78,7 @@ class YTStreamProvider:
             ext=ext,
             filename=f"{title[:80] or 'song'}.{ext}",
             title=title,
-            needs_fetch=True,  # CDN URL — caller must fetch
+            needs_fetch=True,
         )
 
     def _extract_id(self, url: str) -> str | None:

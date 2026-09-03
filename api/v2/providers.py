@@ -72,8 +72,12 @@ def _rapidapi_post(host: str, path: str, body: dict, timeout: int = 30) -> dict:
 
 
 def fetch_url_bytes(url: str, timeout: int = 120) -> bytes:
-    """Download raw bytes from a URL."""
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    """Download raw bytes from a URL. Sets proper headers for CDN compatibility."""
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Referer": "https://www.youtube.com/",
+        "Origin": "https://www.youtube.com",
+    })
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read()
 
