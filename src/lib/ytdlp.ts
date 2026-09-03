@@ -1,3 +1,24 @@
+// ── In-memory search cache (avoids repeated API calls) ────────
+
+interface SearchCacheEntry { query: string; results: YtSearchResult[]; ts: number }
+const SEARCH_CACHE_TTL = 1000 * 60 * 30; // 30 min
+const searchCache: SearchCacheEntry[] = [];
+
+function getCachedSearchSync(query: string): YtSearchResult[] | null {
+  const q = query.toLowerCase().trim();
+  const entry = searchCache.find((c) => c.query === q);
+  if (entry && Date.now() - entry.ts < SEARCH_CACHE_TTL) return entry.results;
+  return null;
+}
+
+export function cacheSearchResults(query: string, results: YtSearchResult[]): void {
+  const q = query.toLowerCase().trim();
+  const idx = searchCache.findIndex((c) => c.query === q);
+  const entry: SearchCacheEntry = { query: q, results, ts: Date.now() };
+  if (idx >= 0) searchCache[idx] = entry;
+  else searchCache.push(entry);
+}
+
 export interface YtItem {
   id: string;
   title?: string;
@@ -49,33 +70,6 @@ async function tryV2Resolve(base: string, token: string, url: string): Promise<Y
     if (!resp.ok) return null;
     const data = (await resp.json()) as { items?: YtItem[] };
     return data.items ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function tryV2Download(
-  base: string,
-  token: string,
-  videoUrl: string,
-  format: string = 'mp3'
-): Promise<{ blob: Blob; ext: string; filename: string } | null> {
-  try {
-    const endpoint = base ? `${base}/api/download_v2` : '/api/download_v2';
-    const resp = await fetchWithTimeout(endpoint, {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ url: videoUrl, format })
-    }, 180_000);
-    if (!resp.ok) return null;
-    const blob = await resp.blob();
-    if (blob.size < 1000) return null;
-    const disposition = resp.headers.get('Content-Disposition') ?? '';
-    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-    let filename = utf8Match ? decodeURIComponent(utf8Match[1]) : disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? 'song.mp3';
-    const ext = filename.includes('.') ? filename.split('.').pop()!.toLowerCase() : 'mp3';
-    if (!/^[a-z0-9._ -]+$/i.test(filename)) filename = 'song.' + ext;
-    return { blob, ext, filename };
   } catch {
     return null;
   }
@@ -144,11 +138,7 @@ export async function downloadAudioViaYtDlp(
 ): Promise<{ blob: Blob; ext: string; filename: string }> {
   const base = effectiveServerBase(server);
 
-  // Try v2 first
-  const v2 = await tryV2Download(base, token, videoUrl, 'mp3');
-  if (v2 !== null) return v2;
-
-  // Fallback to v1
+  // Download via yt-dlp only (v1 endpoint) — saves API tokens
   const endpoint = base ? `${base}/api/download` : '/api/download';
   const resp = await fetchWithTimeout(endpoint, {
     method: 'POST',
@@ -192,8 +182,11 @@ export async function searchYouTube(
   query: string,
   limit: number = 10
 ): Promise<YtSearchResult[]> {
+  // Check in-memory cache first (avoids API call)
+  const cached = getCachedSearchSync(query);
+  if (cached) return cached.slice(0, limit);
+
   const base = effectiveServerBase(server);
-  // Use relative URL when no server configured (works on Vercel)
   const url = base ? `${base}/api/search_v2` : '/api/search_v2';
   try {
     const resp = await fetchWithTimeout(url, {
@@ -203,7 +196,9 @@ export async function searchYouTube(
     }, 15_000);
     if (!resp.ok) return [];
     const data = (await resp.json()) as { results?: YtSearchResult[] };
-    return data.results ?? [];
+    const results = data.results ?? [];
+    if (results.length > 0) cacheSearchResults(query, results);
+    return results;
   } catch {
     return [];
   }

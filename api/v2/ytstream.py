@@ -43,10 +43,13 @@ class YTStreamProvider:
 
         # Pick the right format
         if fmt == "mp3":
-            # Look for audio-only streams in adaptiveFormats
-            audio_streams = [f for f in adaptive if f.get("mimeType", "").startswith("audio/")]
-            if audio_streams:
-                best = max(audio_streams, key=lambda f: f.get("bitrate", 0))
+            # Prefer m4a (better quality) over opus, pick highest bitrate
+            m4a_streams = [f for f in adaptive if f.get("mimeType", "").startswith("audio/mp4")]
+            opus_streams = [f for f in adaptive if f.get("mimeType", "").startswith("audio/webm")]
+            all_audio = m4a_streams + opus_streams
+            if all_audio:
+                # Prefer m4a if available (better quality per bit)
+                best = max(m4a_streams or all_audio, key=lambda f: f.get("bitrate", 0))
                 stream_url = best.get("url", "")
             else:
                 # Fallback: use combined stream (has audio + video)

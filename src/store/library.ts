@@ -5,6 +5,13 @@ import { pickDirectory, ensurePermission, scanMusicDirectory, supportsDirectoryP
 import { useSettings } from './settings';
 import { eraToYear } from '../lib/tags';
 import type { YtItem } from '../lib/ytdlp';
+import {
+  type QueuedImport,
+  loadQueue,
+  addToQueue,
+  removeFromQueue,
+  updateQueueItem,
+} from '../lib/downloadQueue';
 
 const fileCache = new Map<string, File>();
 const handleCache = new Map<string, FileSystemFileHandle>();
@@ -116,6 +123,8 @@ interface LibraryState {
   downloadDirName: string | null;
   downloadDirNeedsAuth: boolean;
   topExcluded: Record<string, true>;
+  downloadQueue: QueuedImport[];
+  queueProcessing: boolean;
   chooseDownloadFolder: () => Promise<boolean>;
   clearDownloadFolder: () => Promise<void>;
   init: () => Promise<void>;
@@ -165,6 +174,9 @@ interface LibraryState {
   removeTrackFromLibrary: (trackId: string) => Promise<void>;
   resolveFile: (trackId: string) => Promise<File | null>;
   addTracks: (tracks: Track[]) => Promise<void>;
+  queueYouTubeImport: (item: Omit<QueuedImport, 'queuedAt' | 'status'>) => Promise<void>;
+  processDownloadQueue: () => Promise<void>;
+  removeFromDownloadQueue: (id: string) => Promise<void>;
 }
 
 export const useLibrary = create<LibraryState>((set, get) => ({
@@ -181,6 +193,8 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   downloadDirName: null,
   downloadDirNeedsAuth: false,
   topExcluded: {},
+  downloadQueue: [],
+  queueProcessing: false,
 
   chooseDownloadFolder: async () => {
     const dir = await pickDirectory('readwrite');
@@ -201,12 +215,13 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 
   init: async () => {
     try {
-      const [tracks, playlists, topExcluded] = await Promise.all([
+      const [tracks, playlists, topExcluded, downloadQueue] = await Promise.all([
         db.loadTracks(),
         db.loadPlaylists(),
-        db.loadTopExcluded()
+        db.loadTopExcluded(),
+        loadQueue(),
       ]);
-      set({ playlists, topExcluded });
+      set({ playlists, topExcluded, downloadQueue });
       const savedDir = await db.loadDownloadDir();
       if (savedDir) {
         downloadDirHandle = savedDir;
@@ -604,7 +619,77 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 
   addTracks: async (newTracks) => {
     await finalizeImport(set, get, newTracks);
-  }
+  },
+
+  queueYouTubeImport: async (item) => {
+    const queue = await addToQueue(item);
+    set({ downloadQueue: queue });
+  },
+
+  removeFromDownloadQueue: async (id) => {
+    const queue = await removeFromQueue(id);
+    set({ downloadQueue: queue });
+  },
+
+  processDownloadQueue: async () => {
+    const state = get();
+    if (state.queueProcessing) return;
+    const queue = state.downloadQueue.filter((q) => q.status === 'pending');
+    if (queue.length === 0) return;
+
+    set({ queueProcessing: true });
+    const { ytdlpServer, ytdlpToken } = useSettings.getState();
+    const { downloadAudioViaYtDlp } = await import('../lib/ytdlp');
+    const { blobToDataUrl } = await import('../lib/metadata');
+
+    for (const item of queue) {
+      try {
+        await updateQueueItem(item.id, { status: 'downloading' });
+        set({ downloadQueue: await loadQueue() });
+
+        const dl = await downloadAudioViaYtDlp(ytdlpServer, ytdlpToken, item.url);
+
+        let artwork: string | undefined;
+        if (item.thumbnail) {
+          try {
+            const ctrl = new AbortController();
+            const t = setTimeout(() => ctrl.abort(), 8000);
+            const thumbResp = await fetch(item.thumbnail, { mode: 'cors', signal: ctrl.signal });
+            clearTimeout(t);
+            if (thumbResp.ok) artwork = (await blobToDataUrl(await thumbResp.blob())) ?? undefined;
+          } catch { /* thumbnail optional */ }
+          if (!artwork) artwork = item.thumbnail;
+        }
+
+        const track: Track = {
+          id: `y-${item.id}`,
+          title: item.title,
+          artist: item.artist || 'Unknown Artist',
+          album: 'YouTube',
+          fileName: dl.filename,
+          path: dl.filename,
+          source: 'file',
+          size: dl.blob.size,
+          addedAt: Date.now(),
+          duration: item.duration,
+          artwork,
+        };
+
+        fileCache.set(track.id, new File([dl.blob], dl.filename, { type: dl.blob.type || 'audio/mp4' }));
+        try {
+          await db.saveFileBlob(track.id, fileCache.get(track.id)!);
+        } catch { /* quota exceeded — keep in memory */ }
+
+        await finalizeImport(set, get, [track]);
+        await updateQueueItem(item.id, { status: 'done' });
+      } catch (err) {
+        await updateQueueItem(item.id, { status: 'failed', error: String(err) });
+      }
+      set({ downloadQueue: await loadQueue() });
+    }
+
+    set({ queueProcessing: false });
+  },
 }));
 
 async function finalizeImport(

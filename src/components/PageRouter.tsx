@@ -19,6 +19,19 @@ import { PasteShareSheet } from './PasteShareSheet';
 import { shareAlbum, shareArtist, sharePlaylist, shareMix } from '../lib/share';
 import { searchYouTube, type YtSearchResult } from '../lib/ytdlp';
 
+async function isServerReachable(server: string): Promise<boolean> {
+  if (!server) return false;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 3000);
+    const r = await fetch(`${server.replace(/\/+$/, '')}/api/ping`, { signal: ctrl.signal, cache: 'no-store' });
+    clearTimeout(t);
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function PageRouter(): JSX.Element {
   const pageStack = useUI((s) => s.pageStack);
   const page = pageStack[pageStack.length - 1];
@@ -433,6 +446,7 @@ function SearchView(): JSX.Element {
   const ytdlpServer = useSettings((s) => s.ytdlpServer);
   const ytdlpToken = useSettings((s) => s.ytdlpToken);
   const importYouTube = useLibrary((s) => s.importYouTube);
+  const queueYouTubeImport = useLibrary((s) => s.queueYouTubeImport);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const results = useMemo(() => {
@@ -470,11 +484,44 @@ function SearchView(): JSX.Element {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query, ytdlpServer, ytdlpToken]);
 
+  // Auto-process download queue when server comes online
+  const processQueue = useLibrary((s) => s.processDownloadQueue);
+  const downloadQueue = useLibrary((s) => s.downloadQueue);
+  const queueProcessing = useLibrary((s) => s.queueProcessing);
+  const queueCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    // Check server every 10s and process queue if server is up
+    queueCheckRef.current = setInterval(async () => {
+      if (queueProcessing) return;
+      const pending = downloadQueue.filter((q) => q.status === 'pending');
+      if (pending.length === 0) return;
+      const up = await isServerReachable(ytdlpServer);
+      if (up) processQueue();
+    }, 10_000);
+    return () => { if (queueCheckRef.current) clearInterval(queueCheckRef.current); };
+  }, [ytdlpServer, downloadQueue, queueProcessing, processQueue]);
+
   const handleImportYt = async (item: YtSearchResult): Promise<void> => {
     setImportingId(item.id);
     try {
       const videoUrl = item.url || `https://www.youtube.com/watch?v=${item.id}`;
-      await importYouTube(videoUrl);
+      // Check if local server is reachable
+      const serverUp = await isServerReachable(ytdlpServer);
+      if (serverUp) {
+        // Download immediately via yt-dlp
+        await importYouTube(videoUrl);
+      } else {
+        // Queue for later — will download when server comes online
+        await queueYouTubeImport({
+          id: item.id,
+          url: videoUrl,
+          title: item.title,
+          artist: item.uploader,
+          thumbnail: item.thumbnail,
+          duration: item.duration,
+        });
+      }
     } catch {
       // silent
     } finally {
