@@ -21,3 +21,5 @@ linked.ok
 qr.txt
 qr.png
 watch-tunnel.log
+tunnel_out.txt
+tunnel_err.txt
