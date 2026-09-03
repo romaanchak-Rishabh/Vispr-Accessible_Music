@@ -19,7 +19,7 @@ HOST = "ytstream-download-youtube-videos.p.rapidapi.com"
 @register_download_provider
 class YTStreamProvider:
     name = "ytstream"
-    priority = 2  # fallback — returns CDN URLs, not hosted
+    priority = 1  # primary — CDN URLs work from server
 
     def download(self, url: str, fmt: str = "mp3") -> DownloadResult:
         """Get stream URLs from YTStream. Returns the best matching CDN link."""
