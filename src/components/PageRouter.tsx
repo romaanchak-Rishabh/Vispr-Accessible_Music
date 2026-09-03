@@ -593,9 +593,9 @@ function SearchView(): JSX.Element {
             </p>
           ) : (
             <div className="group">
-              {ytResults.map((r) => (
+              {ytResults.filter(r => r && r.id).map((r) => (
                 <button
-                  key={r.id}
+                  key={String(r.id)}
                   className="row"
                   style={{ textAlign: 'left' }}
                   onClick={() => void handleImportYt(r)}
@@ -603,7 +603,12 @@ function SearchView(): JSX.Element {
                 >
                   <div style={{ position: 'relative', width: 48, height: 48, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: 'var(--fill-secondary)' }}>
                     {r.thumbnail ? (
-                      <img src={r.thumbnail} alt="" style={{ width: 48, height: 48, objectFit: 'cover' }} />
+                      <img
+                        src={r.thumbnail}
+                        alt=""
+                        style={{ width: 48, height: 48, objectFit: 'cover' }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
                     ) : (
                       <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--label-tertiary)' }}>
                         <PlayIcon size={20} />
