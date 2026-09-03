@@ -40,7 +40,8 @@ export function effectiveServerBase(server: string): string {
 
 async function tryV2Resolve(base: string, token: string, url: string): Promise<YtItem[] | null> {
   try {
-    const resp = await fetchWithTimeout(`${base}/api/resolve_v2`, {
+    const endpoint = base ? `${base}/api/resolve_v2` : '/api/resolve_v2';
+    const resp = await fetchWithTimeout(endpoint, {
       method: 'POST',
       headers: authHeaders(token),
       body: JSON.stringify({ url })
@@ -60,14 +61,15 @@ async function tryV2Download(
   format: string = 'mp3'
 ): Promise<{ blob: Blob; ext: string; filename: string } | null> {
   try {
-    const resp = await fetchWithTimeout(`${base}/api/download_v2`, {
+    const endpoint = base ? `${base}/api/download_v2` : '/api/download_v2';
+    const resp = await fetchWithTimeout(endpoint, {
       method: 'POST',
       headers: authHeaders(token),
       body: JSON.stringify({ url: videoUrl, format })
     }, 180_000);
     if (!resp.ok) return null;
     const blob = await resp.blob();
-    if (blob.size < 1000) return null; // garbage response
+    if (blob.size < 1000) return null;
     const disposition = resp.headers.get('Content-Disposition') ?? '';
     const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
     let filename = utf8Match ? decodeURIComponent(utf8Match[1]) : disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? 'song.mp3';
@@ -91,7 +93,8 @@ export async function resolveViaYtDlp(server: string, token: string, url: string
   if (v2 !== null) return v2;
 
   // Fallback to v1
-  const resp = await fetchWithTimeout(`${base}/api/resolve`, {
+  const endpoint = base ? `${base}/api/resolve` : '/api/resolve';
+  const resp = await fetchWithTimeout(endpoint, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({ url })
@@ -121,7 +124,8 @@ export interface YtInfo {
 export async function fetchYtInfo(server: string, token: string, url: string): Promise<YtInfo | null> {
   const base = effectiveServerBase(server);
   try {
-    const resp = await fetchWithTimeout(`${base}/api/info`, {
+    const endpoint = base ? `${base}/api/info` : '/api/info';
+    const resp = await fetchWithTimeout(endpoint, {
       method: 'POST',
       headers: authHeaders(token),
       body: JSON.stringify({ url })
@@ -145,7 +149,8 @@ export async function downloadAudioViaYtDlp(
   if (v2 !== null) return v2;
 
   // Fallback to v1
-  const resp = await fetchWithTimeout(`${base}/api/download`, {
+  const endpoint = base ? `${base}/api/download` : '/api/download';
+  const resp = await fetchWithTimeout(endpoint, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({ url: videoUrl })
@@ -188,8 +193,10 @@ export async function searchYouTube(
   limit: number = 10
 ): Promise<YtSearchResult[]> {
   const base = effectiveServerBase(server);
+  // Use relative URL when no server configured (works on Vercel)
+  const url = base ? `${base}/api/search_v2` : '/api/search_v2';
   try {
-    const resp = await fetchWithTimeout(`${base}/api/search_v2`, {
+    const resp = await fetchWithTimeout(url, {
       method: 'POST',
       headers: authHeaders(token),
       body: JSON.stringify({ query, limit })
