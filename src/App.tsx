@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import type { JSX } from 'react';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { useMediaQuery } from './hooks/useMediaQuery';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { startTunnelSync } from './lib/tunnelSync';
 import { useLibrary } from './store/library';
 import { usePlayer } from './store/player';
@@ -20,6 +21,7 @@ import { Toast } from './components/Toast';
 import { PageRouter } from './components/PageRouter';
 import { ReceiveSheet } from './components/ReceiveSheet';
 import { DownloadStatusBar } from './components/DownloadStatusBar';
+import { BatchBar } from './components/BatchBar';
 import { ChevronLeftIcon } from './components/Icons';
 
 async function checkServerOnMount(showToast: (msg: string) => void): Promise<void> {
@@ -74,6 +76,7 @@ export default function App(): JSX.Element {
   const theme = useSettings((s) => s.theme);
   const accent = useSettings((s) => s.accent);
   void useAudioEngine();
+  void useKeyboardShortcuts();
 
   // apply persisted appearance on startup and on every change
   useEffect(() => {
@@ -159,6 +162,7 @@ export default function App(): JSX.Element {
         <QueueSheet />
         <ActionSheet />
         <DownloadStatusBar />
+        <BatchBar />
         <Toast />
         {shareTargetFiles && <ReceiveSheet files={shareTargetFiles} onClose={() => setShareTargetFiles(null)} />}
       </div>
@@ -191,6 +195,7 @@ export default function App(): JSX.Element {
       <QueueSheet />
       <ActionSheet />
       <DownloadStatusBar />
+      <BatchBar />
       <InstallBanner />
       <Toast />
       {shareTargetFiles && <ReceiveSheet files={shareTargetFiles} onClose={() => setShareTargetFiles(null)} />}
