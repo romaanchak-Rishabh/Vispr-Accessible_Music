@@ -717,10 +717,73 @@ function DetailHeader({
   );
 }
 
+const ROW_H = 56;
+
+function DragRow({ track, index, totalCount, showIndex, onMove, trailing }: {
+  track: Track;
+  index: number;
+  totalCount: number;
+  showIndex?: boolean;
+  onMove: (from: number, to: number) => void;
+  trailing?: React.ReactNode;
+}): JSX.Element {
+  const dragRef = useRef<{ startY: number } | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
+
+  return (
+    <div
+      className="rowwrap"
+      style={dragging ? { transform: `translateY(${dragOffset}px)`, background: 'var(--bg-elevated)', borderRadius: 8, zIndex: 2, position: 'relative' as const } : undefined}
+    >
+      <span
+        onPointerDown={(e) => {
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          dragRef.current = { startY: e.clientY };
+          setDragging(true);
+        }}
+        onPointerMove={(e) => {
+          if (!dragRef.current) return;
+          setDragOffset(e.clientY - dragRef.current.startY);
+        }}
+        onPointerUp={(e) => {
+          (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+          if (dragRef.current) {
+            const delta = Math.round((e.clientY - dragRef.current.startY) / ROW_H);
+            if (delta !== 0) {
+              const to = Math.max(0, Math.min(totalCount - 1, index + delta));
+              if (to !== index) onMove(index, to);
+            }
+          }
+          dragRef.current = null;
+          setDragging(false);
+          setDragOffset(0);
+        }}
+        style={{
+          touchAction: 'none',
+          cursor: 'grab',
+          fontSize: 18,
+          color: 'var(--label-tertiary)',
+          padding: '4px 2px 4px 6px',
+          userSelect: 'none',
+          display: 'flex',
+          alignItems: 'center'
+        }}
+      >
+        ≡
+      </span>
+      <TrackRow track={track} showIndex={showIndex ? index + 1 : undefined} showArtwork={!showIndex} />
+      {trailing}
+    </div>
+  );
+}
+
 function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null {
   const album = useLibrary((s) => s.albums.find((a) => a.key === albumKey));
   const byId = useLibrary((s) => s.byId);
   const renameAlbum = useLibrary((s) => s.renameAlbum);
+  const reorderAlbum = useLibrary((s) => s.reorderAlbum);
+  const sortAlbumByDate = useLibrary((s) => s.sortAlbumByDate);
   const playTracks = usePlayer((s) => s.playTracks);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const shuffle = usePlayer((s) => s.shuffle);
@@ -803,9 +866,21 @@ function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null
           Edit
         </button>
       </DetailHeader>
+      <div style={{ display: 'flex', gap: 8, padding: '0 16px 12px' }}>
+        <button className="pill-btn" style={{ fontSize: 12 }} onClick={() => sortAlbumByDate(album.title)}>
+          Sort by Date
+        </button>
+      </div>
       <div className="group">
         {tracks.map((t, i) => (
-          <TrackRow key={t.id} track={t} showIndex={i + 1} showArtwork={false} />
+          <DragRow
+            key={t.id}
+            track={t}
+            index={i}
+            totalCount={tracks.length}
+            showIndex
+            onMove={(from, to) => reorderAlbum(album.title, from, to)}
+          />
         ))}
       </div>
     </div>
@@ -889,6 +964,8 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
   const deletePlaylist = useLibrary((s) => s.deletePlaylist);
   const renamePlaylist = useLibrary((s) => s.renamePlaylist);
   const removeFromPlaylist = useLibrary((s) => s.removeFromPlaylist);
+  const reorderPlaylist = useLibrary((s) => s.reorderPlaylist);
+  const sortPlaylistByDate = useLibrary((s) => s.sortPlaylistByDate);
   const toggleFavourite = useLibrary((s) => s.toggleFavourite);
   const removeFromMostListened = useLibrary((s) => s.removeFromMostListened);
   const goBack = useUI((s) => s.goBack);
@@ -1031,21 +1108,34 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
           Empty playlist. Add songs using the ⋯ button on any track.
         </p>
       ) : (
-        <div className="group">
-          {plTracks.map((t) => (
-            <div key={t.id} className="rowwrap">
-              <TrackRow track={t} />
-              <button
-                className="icon-btn"
-                style={{ paddingRight: 14, color: 'var(--label-secondary)' }}
-                onClick={() => removeFromPlaylist(playlist.id, t.id)}
-                aria-label="Remove from playlist"
-              >
-                A-
-              </button>
-            </div>
-          ))}
-        </div>
+        <>
+          <div style={{ display: 'flex', gap: 8, padding: '0 16px 12px' }}>
+            <button className="pill-btn" style={{ fontSize: 12 }} onClick={() => sortPlaylistByDate(playlist.id)}>
+              Sort by Date
+            </button>
+          </div>
+          <div className="group">
+            {plTracks.map((t, i) => (
+              <DragRow
+                key={t.id}
+                track={t}
+                index={i}
+                totalCount={plTracks.length}
+                onMove={(from, to) => reorderPlaylist(playlist.id, from, to)}
+                trailing={
+                  <button
+                    className="icon-btn"
+                    style={{ paddingRight: 14, color: 'var(--label-secondary)' }}
+                    onClick={() => removeFromPlaylist(playlist.id, t.id)}
+                    aria-label="Remove from playlist"
+                  >
+                    A-
+                  </button>
+                }
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

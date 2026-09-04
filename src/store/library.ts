@@ -170,6 +170,10 @@ interface LibraryState {
   deletePlaylist: (id: string) => void;
   renamePlaylist: (id: string, name: string) => void;
   renameAlbum: (oldAlbum: string, newAlbum: string) => void;
+  reorderPlaylist: (playlistId: string, fromIndex: number, toIndex: number) => void;
+  sortPlaylistByDate: (playlistId: string) => void;
+  reorderAlbum: (albumName: string, fromIndex: number, toIndex: number) => void;
+  sortAlbumByDate: (albumName: string) => void;
   addToPlaylist: (playlistId: string, trackIds: string[]) => void;
   removeFromPlaylist: (playlistId: string, trackId: string) => void;
   removeTrackFromLibrary: (trackId: string) => Promise<void>;
@@ -569,6 +573,58 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     const tracks = get().tracks.map((t) =>
       t.album === oldAlbum ? { ...t, album: trimmed } : t
     );
+    const byId: Record<string, Track> = {};
+    for (const t of tracks) byId[t.id] = t;
+    const albums = buildAlbums(tracks);
+    const artists = buildArtists(tracks, albums);
+    void db.saveTracks(tracks);
+    set({ tracks, byId, albums, artists });
+  },
+  reorderPlaylist: (playlistId, fromIndex, toIndex) => {
+    const playlists = get().playlists.map((p) => {
+      if (p.id !== playlistId) return p;
+      const ids = [...p.trackIds];
+      const [moved] = ids.splice(fromIndex, 1);
+      ids.splice(toIndex, 0, moved);
+      return { ...p, trackIds: ids };
+    });
+    set({ playlists });
+    void db.savePlaylists(playlists);
+  },
+  sortPlaylistByDate: (playlistId) => {
+    const tracks = get().tracks;
+    const playlists = get().playlists.map((p) => {
+      if (p.id !== playlistId) return p;
+      const sorted = [...p.trackIds].sort((a, b) => {
+        const ta = tracks.find((t) => t.id === a);
+        const tb = tracks.find((t) => t.id === b);
+        return (ta?.addedAt ?? 0) - (tb?.addedAt ?? 0);
+      });
+      return { ...p, trackIds: sorted };
+    });
+    set({ playlists });
+    void db.savePlaylists(playlists);
+  },
+  reorderAlbum: (albumName, fromIndex, toIndex) => {
+    const tracks = get().tracks.map((t) => t);
+    const albumTracks = tracks.filter((t) => t.album === albumName);
+    if (albumTracks.length === 0) return;
+    const [moved] = albumTracks.splice(fromIndex, 1);
+    albumTracks.splice(toIndex, 0, moved);
+    albumTracks.forEach((t, i) => { t.trackNo = i + 1; });
+    const byId: Record<string, Track> = {};
+    for (const t of tracks) byId[t.id] = t;
+    const albums = buildAlbums(tracks);
+    const artists = buildArtists(tracks, albums);
+    void db.saveTracks(tracks);
+    set({ tracks, byId, albums, artists });
+  },
+  sortAlbumByDate: (albumName) => {
+    const tracks = get().tracks.map((t) => t);
+    const albumTracks = tracks.filter((t) => t.album === albumName);
+    if (albumTracks.length === 0) return;
+    albumTracks.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
+    albumTracks.forEach((t, i) => { t.trackNo = i + 1; });
     const byId: Record<string, Track> = {};
     for (const t of tracks) byId[t.id] = t;
     const albums = buildAlbums(tracks);
