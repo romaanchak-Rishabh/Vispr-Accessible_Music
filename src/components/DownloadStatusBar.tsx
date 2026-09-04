@@ -3,7 +3,6 @@ import { SpinnerIcon } from './Icons';
 
 export function DownloadStatusBar(): JSX.Element | null {
   const queue = useLibrary((s) => s.downloadQueue);
-  const processing = useLibrary((s) => s.queueProcessing);
 
   const active = queue.filter((q) => q.status === 'downloading' || q.status === 'pending');
   const failed = queue.filter((q) => q.status === 'failed');
@@ -15,22 +14,27 @@ export function DownloadStatusBar(): JSX.Element | null {
 
   return (
     <div
+      className="download-status-bar"
       style={{
         position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
+        bottom: 'calc(env(safe-area-inset-bottom) + 130px)',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 'calc(100% - 32px)',
+        maxWidth: 500,
         zIndex: 110,
         background: 'var(--sheet-bg)',
         backdropFilter: 'blur(24px) saturate(180%)',
-        borderTop: '0.5px solid var(--separator)',
-        padding: '10px 16px',
+        border: '0.5px solid var(--separator)',
+        borderRadius: 12,
+        padding: '10px 14px',
         display: 'flex',
         alignItems: 'center',
-        gap: 10
+        gap: 10,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
       }}
     >
-      {processing && <SpinnerIcon size={16} />}
+      {current && <SpinnerIcon size={16} />}
       <div style={{ flex: 1, minWidth: 0 }}>
         {current && (
           <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
