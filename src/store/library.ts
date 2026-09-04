@@ -855,3 +855,51 @@ export function getMostListened(tracks: Track[], playCounts: Record<string, numb
     .filter((t) => !topExcluded[t.id] && (playCounts[t.id] ?? 0) > 0)
     .sort((a, b) => (playCounts[b.id] ?? 0) - (playCounts[a.id] ?? 0));
 }
+
+export function getTopPlayed(tracks: Track[], playCounts: Record<string, number>, limit = 25): Track[] {
+  return tracks
+    .filter((t) => (playCounts[t.id] ?? 0) > 0)
+    .sort((a, b) => (playCounts[b.id] ?? 0) - (playCounts[a.id] ?? 0))
+    .slice(0, limit);
+}
+
+export function getRecentlyAdded(tracks: Track[], limit = 25): Track[] {
+  return [...tracks]
+    .sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0))
+    .slice(0, limit);
+}
+
+export function getNeverPlayed(tracks: Track[], playCounts: Record<string, number>): Track[] {
+  return tracks
+    .filter((t) => (playCounts[t.id] ?? 0) === 0)
+    .sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
+}
+
+export const SMART_PLAYLISTS = [
+  { id: 'smart-top-played', name: 'Top 25 Most Played', icon: '🔥' },
+  { id: 'smart-recently-added', name: 'Recently Added', icon: '🕐' },
+  { id: 'smart-never-played', name: 'Never Played', icon: '🔇' },
+] as const;
+
+export type SmartPlaylistId = typeof SMART_PLAYLISTS[number]['id'];
+
+export function isSmartPlaylist(id: string): boolean {
+  return SMART_PLAYLISTS.some((sp) => sp.id === id);
+}
+
+export function getSmartPlaylistTracks(id: string, tracks: Track[], playCounts: Record<string, number>, topExcluded: Record<string, true>): Track[] {
+  switch (id) {
+    case 'smart-top-played':
+      return getTopPlayed(tracks, playCounts, 25);
+    case 'smart-recently-added':
+      return getRecentlyAdded(tracks, 25);
+    case 'smart-never-played':
+      return getNeverPlayed(tracks, playCounts);
+    case AUTO_FAVOURITES_ID:
+      return getFavourites(tracks);
+    case AUTO_MOST_LISTENED_ID:
+      return getMostListened(tracks, playCounts, topExcluded);
+    default:
+      return [];
+  }
+}

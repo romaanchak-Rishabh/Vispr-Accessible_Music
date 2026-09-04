@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import type { JSX } from 'react';
-import { useLibrary, getFavourites, getMostListened, isAutoPlaylist, AUTO_FAVOURITES_ID, AUTO_MOST_LISTENED_ID } from '../store/library';
+import { useLibrary, getFavourites, getMostListened, isAutoPlaylist, AUTO_FAVOURITES_ID, AUTO_MOST_LISTENED_ID, SMART_PLAYLISTS, isSmartPlaylist, getSmartPlaylistTracks } from '../store/library';
 import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import { useSettings } from '../store/settings';
@@ -8,6 +8,7 @@ import type { Album, Artist, Track } from '../types';
 import { formatArtist } from '../types';
 import { TrackRow } from './TrackRow';
 import { Artwork } from './Artwork';
+import { PlaylistArtwork } from './PlaylistArtwork';
 import { EmptyLibrary, AlbumCard } from './Views';
 import { ImportBar } from './ImportBar';
 import { ChevronRightIcon, PlusCircleIcon, EllipsisIcon, ShuffleIcon, PlayIcon, SparklesIcon, ShareIcon } from './Icons';
@@ -298,6 +299,13 @@ function PlaylistsManager(): JSX.Element {
     [AUTO_MOST_LISTENED_ID, 'Most Listened', getMostListened(tracks, playCounts, topExcluded).length]
   ];
 
+  const smartCounts: [string, string, string, number][] = SMART_PLAYLISTS.map((sp) => [
+    sp.id,
+    sp.name,
+    sp.icon,
+    getSmartPlaylistTracks(sp.id, tracks, playCounts, topExcluded).length
+  ]);
+
   return (
     <div>
       <form
@@ -320,29 +328,45 @@ function PlaylistsManager(): JSX.Element {
           <PlusCircleIcon size={18} /> Create
         </button>
       </form>
-      {playlists.length === 0 ? (
-        <p style={{ textAlign: 'center', color: 'var(--label-secondary)', padding: 20 }}>
-          No playlists yet. Create one above, then add songs via the ⋯ button on any track.
-        </p>
-      ) : (
-        <div className="group">
-          {autoCounts.map(([id, label, count]) => (
-            <button key={id} className="row" onClick={() => navigate({ type: 'playlist', id })}>
-              <Artwork className="row-artwork" placeholderSize={20} />
-              <span className="row-texts">
-                <span className="row-title" style={{ display: 'block' }}>
-                  {label}
-                </span>
-                <span className="row-subtitle" style={{ display: 'block' }}>
-                  {count} {count === 1 ? 'song' : 'songs'} · auto
-                </span>
+
+      <div className="group">
+        {autoCounts.map(([id, label, count]) => (
+          <button key={id} className="row" onClick={() => navigate({ type: 'playlist', id })}>
+            <Artwork className="row-artwork" placeholderSize={20} />
+            <span className="row-texts">
+              <span className="row-title" style={{ display: 'block' }}>
+                {label}
               </span>
-              <ChevronRightIcon size={16} />
-            </button>
-          ))}
+              <span className="row-subtitle" style={{ display: 'block' }}>
+                {count} {count === 1 ? 'song' : 'songs'} · auto
+              </span>
+            </span>
+            <ChevronRightIcon size={16} />
+          </button>
+        ))}
+        {smartCounts.map(([id, label, icon, count]) => (
+          <button key={id} className="row" onClick={() => navigate({ type: 'playlist', id })}>
+            <span style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+              {icon}
+            </span>
+            <span className="row-texts">
+              <span className="row-title" style={{ display: 'block' }}>
+                {label}
+              </span>
+              <span className="row-subtitle" style={{ display: 'block' }}>
+                {count} {count === 1 ? 'song' : 'songs'}
+              </span>
+            </span>
+            <ChevronRightIcon size={16} />
+          </button>
+        ))}
+      </div>
+
+      {playlists.length > 0 && (
+        <div className="group">
           {playlists.map((p) => (
             <button key={p.id} className="row" onClick={() => navigate({ type: 'playlist', id: p.id })}>
-              <Artwork className="row-artwork" placeholderSize={20} />
+              <PlaylistArtwork trackIds={p.trackIds} size={40} />
               <span className="row-texts">
                 <span className="row-title" style={{ display: 'block' }}>
                   {p.name}
@@ -446,16 +470,38 @@ function SearchView(): JSX.Element {
   const [ytLoading, setYtLoading] = useState(false);
   const [importingId, setImportingId] = useState<string | null>(null);
   const [pendingYtItem, setPendingYtItem] = useState<YtItem | null>(null);
+  const [filterGenre, setFilterGenre] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+  const [sortBy, setSortBy] = useState<'relevance' | 'title' | 'artist' | 'date'>('relevance');
   const ytdlpServer = useSettings((s) => s.ytdlpServer);
   const ytdlpToken = useSettings((s) => s.ytdlpToken);
   const importYouTube = useLibrary((s) => s.importYouTube);
   const queueYouTubeImport = useLibrary((s) => s.queueYouTubeImport);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const genres = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tracks) {
+      const g = (t.genre1 ?? t.genre2 ?? '').trim();
+      if (g) set.add(g);
+    }
+    return [...set].sort();
+  }, [tracks]);
+
+  const years = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tracks) {
+      if (t.year) {
+        const decade = `${Math.floor(t.year / 10) * 10}s`;
+        set.add(decade);
+      }
+    }
+    return [...set].sort().reverse();
+  }, [tracks]);
+
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return tracks.filter(
+    let filtered = tracks.filter(
       (t) =>
         t.title.toLowerCase().includes(q) ||
         t.artist.toLowerCase().includes(q) ||
@@ -463,7 +509,26 @@ function SearchView(): JSX.Element {
         t.album.toLowerCase().includes(q) ||
         (t.genre1 ?? t.genre2 ?? '').toLowerCase().includes(q)
     );
-  }, [query, tracks]);
+
+    // Genre filter
+    if (filterGenre) {
+      const g = filterGenre.toLowerCase();
+      filtered = filtered.filter((t) => (t.genre1 ?? t.genre2 ?? '').toLowerCase().includes(g));
+    }
+
+    // Year filter
+    if (filterYear) {
+      const decadeStart = parseInt(filterYear);
+      filtered = filtered.filter((t) => t.year && t.year >= decadeStart && t.year < decadeStart + 10);
+    }
+
+    // Sort
+    if (sortBy === 'title') filtered.sort((a, b) => a.title.localeCompare(b.title));
+    else if (sortBy === 'artist') filtered.sort((a, b) => a.artist.localeCompare(b.artist));
+    else if (sortBy === 'date') filtered.sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0));
+
+    return filtered;
+  }, [query, tracks, filterGenre, filterYear, sortBy]);
 
   // Debounced YouTube search
   useEffect(() => {
@@ -578,6 +643,58 @@ function SearchView(): JSX.Element {
           autoCorrect="off"
           autoCapitalize="off"
         />
+      </div>
+
+      {/* Compact filters — single row, horizontally scrollable */}
+      <div style={{ display: 'flex', gap: 6, padding: '6px 16px', overflowX: 'auto', flexShrink: 0 }}>
+        {genres.slice(0, 8).map((g) => (
+          <button
+            key={g}
+            className="chip"
+            style={{ flexShrink: 0, fontSize: 11, padding: '3px 8px', ...(filterGenre === g ? { background: 'var(--accent)', color: '#fff' } : {}) }}
+            onClick={() => setFilterGenre(filterGenre === g ? '' : g)}
+          >
+            {g}
+          </button>
+        ))}
+        {years.slice(0, 4).map((y) => (
+          <button
+            key={y}
+            className="chip"
+            style={{ flexShrink: 0, fontSize: 11, padding: '3px 8px', ...(filterYear === y ? { background: 'var(--accent)', color: '#fff' } : {}) }}
+            onClick={() => setFilterYear(filterYear === y ? '' : y)}
+          >
+            {y}
+          </button>
+        ))}
+        <select
+          style={{
+            flexShrink: 0,
+            fontSize: 11,
+            padding: '3px 6px',
+            borderRadius: 12,
+            border: '1px solid var(--separator)',
+            background: 'var(--bg-secondary)',
+            color: 'var(--label)',
+            appearance: 'none' as const
+          }}
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+        >
+          <option value="relevance">Relevance</option>
+          <option value="title">Title</option>
+          <option value="artist">Artist</option>
+          <option value="date">Date Added</option>
+        </select>
+        {(filterGenre || filterYear || sortBy !== 'relevance') && (
+          <button
+            className="chip"
+            style={{ flexShrink: 0, fontSize: 11, padding: '3px 8px', color: 'var(--accent)' }}
+            onClick={() => { setFilterGenre(''); setFilterYear(''); setSortBy('relevance'); }}
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {!query.trim() ? (
@@ -973,26 +1090,28 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
 
-  if (isAutoPlaylist(playlistId)) {
+  if (isAutoPlaylist(playlistId) || isSmartPlaylist(playlistId)) {
     const isFav = playlistId === AUTO_FAVOURITES_ID;
-    const list = isFav ? getFavourites(tracks) : getMostListened(tracks, playCounts, topExcluded);
+    const smartMeta = !isAutoPlaylist(playlistId) ? SMART_PLAYLISTS.find((sp) => sp.id === playlistId) : null;
+    const list = getSmartPlaylistTracks(playlistId, tracks, playCounts, topExcluded);
+    const title = isFav ? 'Favourites' : playlistId === AUTO_MOST_LISTENED_ID ? 'Most Listened' : smartMeta?.name ?? 'Playlist';
     return (
       <div className="fade-page">
         <DetailHeader
-          kicker="Playlist"
-          title={isFav ? 'Favourites' : 'Most Listened'}
-          subtitle={`${list.length} songs · auto`}
+          kicker={smartMeta ? 'Smart Playlist' : 'Playlist'}
+          title={smartMeta ? `${smartMeta.icon} ${title}` : title}
+          subtitle={`${list.length} songs${isAutoPlaylist(playlistId) ? ' · auto' : ''}`}
           artwork={list[0]?.artwork}
         >
           <button
             className="pill-btn primary"
             disabled={list.length === 0}
             style={list.length === 0 ? { opacity: 0.5 } : undefined}
-            onClick={() => playTracks(list, 0, isFav ? 'Favourites' : 'Most Listened')}
+            onClick={() => playTracks(list, 0, title)}
           >
             <PlayIcon size={15} /> Play
           </button>
-          <button className="pill-btn" disabled={list.length === 0} style={list.length === 0 ? { opacity: 0.5 } : undefined} onClick={() => void sharePlaylist(isFav ? 'Favourites' : 'Most Listened', list)}>
+          <button className="pill-btn" disabled={list.length === 0} style={list.length === 0 ? { opacity: 0.5 } : undefined} onClick={() => void sharePlaylist(title, list)}>
             <ShareIcon size={15} /> Share
           </button>
         </DetailHeader>
@@ -1000,22 +1119,26 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
         {list.length === 0 ? (
           <p style={{ textAlign: 'center', color: 'var(--label-secondary)', padding: 30 }}>
             {isFav
-              ? 'Nothing here yet. Use the ⋯ menu on any song and choose “Add to Favourites”.'
-              : 'Play some songs first — this list fills itself with your most-played tracks.'}
+              ? 'Nothing here yet. Use the ⋯ menu on any song and choose "Add to Favourites".'
+              : smartMeta?.id === 'smart-never-played'
+                ? 'All songs have been played at least once.'
+                : 'No songs match this playlist yet.'}
           </p>
         ) : (
           <div className="group">
             {list.map((t) => (
               <div key={t.id} className="rowwrap">
                 <TrackRow track={t} />
-                <button
-                  className="icon-btn"
-                  style={{ paddingRight: 14, color: 'var(--label-secondary)' }}
-                  onClick={() => (isFav ? void toggleFavourite(t.id) : void removeFromMostListened(t.id))}
-                  aria-label="Remove from list"
-                >
-                  A-
-                </button>
+                {isAutoPlaylist(playlistId) && (
+                  <button
+                    className="icon-btn"
+                    style={{ paddingRight: 14, color: 'var(--label-secondary)' }}
+                    onClick={() => (isFav ? void toggleFavourite(t.id) : void removeFromMostListened(t.id))}
+                    aria-label="Remove from list"
+                  >
+                    A-
+                  </button>
+                )}
               </div>
             ))}
         </div>
