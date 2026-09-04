@@ -19,7 +19,20 @@ import { InstallBanner } from './components/InstallBanner';
 import { Toast } from './components/Toast';
 import { PageRouter } from './components/PageRouter';
 import { ReceiveSheet } from './components/ReceiveSheet';
+import { DownloadStatusBar } from './components/DownloadStatusBar';
 import { ChevronLeftIcon } from './components/Icons';
+
+async function checkServerOnMount(showToast: (msg: string) => void): Promise<void> {
+  const server = useSettings.getState().ytdlpServer;
+  if (!server) return;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 3000);
+    const r = await fetch(`${server.replace(/\/+$/, '')}/api/ping`, { signal: ctrl.signal, cache: 'no-store' });
+    clearTimeout(t);
+    if (r.ok) showToast('Server is up');
+  } catch { /* offline */ }
+}
 
 function pageTitle(): string {
   const page = useUI.getState().pageStack[useUI.getState().pageStack.length - 1];
@@ -69,6 +82,11 @@ export default function App(): JSX.Element {
 
   // keep the backend server URL in sync with the published (auto-healed) tunnel
   useEffect(() => startTunnelSync(), []);
+
+  // Check server on mount and show toast
+  useEffect(() => {
+    void checkServerOnMount(useUI.getState().showToast);
+  }, []);
 
   // Handle share_target (Android/Chrome PWA share target)
   const shareTargetFiles = useUI((s) => s.receiveFiles);
@@ -140,6 +158,7 @@ export default function App(): JSX.Element {
         </div>
         <QueueSheet />
         <ActionSheet />
+        <DownloadStatusBar />
         <Toast />
         {shareTargetFiles && <ReceiveSheet files={shareTargetFiles} onClose={() => setShareTargetFiles(null)} />}
       </div>
@@ -171,6 +190,7 @@ export default function App(): JSX.Element {
       <NowPlayingSheet />
       <QueueSheet />
       <ActionSheet />
+      <DownloadStatusBar />
       <InstallBanner />
       <Toast />
       {shareTargetFiles && <ReceiveSheet files={shareTargetFiles} onClose={() => setShareTargetFiles(null)} />}

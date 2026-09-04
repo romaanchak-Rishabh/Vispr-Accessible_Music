@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import type { JSX } from 'react';
 import { useLibrary } from '../store/library';
 import { usePlayer } from '../store/player';
@@ -6,6 +6,7 @@ import { ACCENTS, applyAppearance, useSettings } from '../store/settings';
 import type { AccentId, ThemeMode } from '../store/settings';
 import { exportLibrary, importLibrary, type ImportProgress } from '../lib/backup';
 import { ReceiveSheet } from './ReceiveSheet';
+import { SpinnerIcon } from './Icons';
 
 function SectionTitle({ children }: { children: string }): JSX.Element {
   return (
@@ -77,6 +78,20 @@ export function SettingsPage(): JSX.Element {
   const albumCount = useLibrary((s) => s.albums.length);
   const artistCount = useLibrary((s) => s.artists.length);
   const totalBytes = useLibrary((s) => s.tracks.reduce((n, t) => n + (t.size || 0), 0));
+
+  const [serverStatus, setServerStatus] = useState<'idle' | 'checking' | 'up' | 'down'>('idle');
+  const checkServer = useCallback(async () => {
+    setServerStatus('checking');
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 3000);
+      const r = await fetch(`${ytdlpServer.replace(/\/+$/, '')}/api/ping`, { signal: ctrl.signal, cache: 'no-store' });
+      clearTimeout(t);
+      setServerStatus(r.ok ? 'up' : 'down');
+    } catch {
+      setServerStatus('down');
+    }
+  }, [ytdlpServer]);
 
   // live-apply appearance whenever these settings change
   useEffect(() => {
@@ -167,6 +182,26 @@ export function SettingsPage(): JSX.Element {
           <span style={{ fontSize: 12, color: 'var(--label-secondary)' }}>
             Empty server uses this deployment's built-in yt-dlp API. Manual Song mode needs none of these.
           </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
+            <span style={{ fontSize: 13, color: 'var(--label-secondary)' }}>Server:</span>
+            {serverStatus === 'idle' && (
+              <span style={{ fontSize: 13, color: 'var(--label-secondary)' }}>Not checked</span>
+            )}
+            {serverStatus === 'checking' && (
+              <span style={{ fontSize: 13, color: 'var(--label-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <SpinnerIcon size={12} /> Checking…
+              </span>
+            )}
+            {serverStatus === 'up' && (
+              <span style={{ fontSize: 13, color: '#30d158', fontWeight: 500 }}>● Reachable</span>
+            )}
+            {serverStatus === 'down' && (
+              <span style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 500 }}>● Unreachable</span>
+            )}
+            <button className="pill-btn" style={{ fontSize: 12, padding: '3px 10px', marginLeft: 'auto' }} onClick={() => void checkServer()}>
+              Check
+            </button>
+          </div>
           <div style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-bg)', padding: '8px 10px', borderRadius: 8, lineHeight: 1.5 }}>
             <strong>Run your own server?</strong> Start the Python backend on a laptop with internet, then expose it with Cloudflare Tunnel:
             <code style={{ display: 'block', marginTop: 4, fontSize: 11, fontFamily: 'monospace', wordBreak: 'break-all' }}>
