@@ -67,11 +67,15 @@ export const useUI = create<UIState>((set, get) => ({
     const stack = get().pageStack;
     if (stack.length > 0) {
       const top = stack[stack.length - 1];
-      // Compare by type + key identity fields only (skip tracks, icon, etc.)
       if (top.type === page.type) {
-        const aKey = 'key' in top ? top.key : 'id' in top ? top.id : 'name' in top ? top.name : null;
-        const bKey = 'key' in page ? page.key : 'id' in page ? page.id : 'name' in page ? page.name : null;
-        if (aKey === bKey) return;
+        // For library pages, compare section since they lack key/id/name
+        if (top.type === 'library' && page.type === 'library') {
+          if (top.section === page.section) return;
+        } else {
+          const aKey = 'key' in top ? top.key : 'id' in top ? top.id : 'name' in top ? top.name : null;
+          const bKey = 'key' in page ? page.key : 'id' in page ? page.id : 'name' in page ? page.name : null;
+          if (aKey === bKey) return;
+        }
       }
     }
     set({ pageStack: [...stack, page] });
