@@ -15,6 +15,7 @@ export interface QueuedImport {
   url: string;           // YouTube URL
   title: string;
   artist: string;
+  album?: string;
   thumbnail: string;
   duration: number;
   queuedAt: number;      // timestamp
