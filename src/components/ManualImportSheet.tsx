@@ -7,6 +7,7 @@ import { fetchExternalMetadata } from '../lib/metadataApi';
 import { blobToDataUrl } from '../lib/metadata';
 import { Artwork } from './Artwork';
 import { SpinnerIcon } from './Icons';
+import { TagInput } from './TagInput';
 
 interface Props {
   url: string;
@@ -17,6 +18,7 @@ export function ManualImportSheet({ url, onClose }: Props): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
+  const [album, setAlbum] = useState('');
   const [thumb, setThumb] = useState<string | undefined>(undefined);
   const [customArt, setCustomArt] = useState<string | undefined>(undefined);
   const [file, setFile] = useState<File | null>(null);
@@ -25,6 +27,8 @@ export function ManualImportSheet({ url, onClose }: Props): JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = useUI((s) => s.showToast);
+  const allAlbums = useLibrary((s) => s.albums);
+  const albumOptions = [...new Set(allAlbums.map((a) => a.title))].sort();
 
   useEffect(() => {
     let cancelled = false;
@@ -74,7 +78,7 @@ export function ManualImportSheet({ url, onClose }: Props): JSX.Element {
       await useLibrary.getState().addFileWithMeta(file, {
         title,
         artist: artist.trim() || 'Unknown Artist',
-        album: 'YouTube',
+        album: album.trim() || 'YouTube',
         artwork
       });
       showToast(`Imported “${title.trim()}”`);
@@ -133,6 +137,13 @@ export function ManualImportSheet({ url, onClose }: Props): JSX.Element {
                     placeholder="Artist"
                     value={artist}
                     onChange={(e) => setArtist(e.target.value)}
+                  />
+                  <TagInput
+                    label="Album"
+                    placeholder="Search or type album…"
+                    value={album}
+                    onChange={setAlbum}
+                    options={albumOptions}
                   />
                 </div>
               </div>
