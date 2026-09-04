@@ -22,6 +22,8 @@ interface UIState {
   installBannerDismissed: boolean;
   toast: { msg: string; nonce: number } | null;
   receiveFiles: File[] | null;
+  multiSelectIds: string[];
+  isMultiSelect: boolean;
 
   setTab: (tab: UIState['tab']) => void;
   navigate: (page: Page) => void;
@@ -33,6 +35,8 @@ interface UIState {
   dismissInstall: () => void;
   showToast: (msg: string) => void;
   setReceiveFiles: (files: File[] | null) => void;
+  toggleMultiSelect: (trackId?: string) => void;
+  clearMultiSelect: () => void;
 }
 
 export const useUI = create<UIState>((set, get) => ({
@@ -44,6 +48,8 @@ export const useUI = create<UIState>((set, get) => ({
   installBannerDismissed: false,
   toast: null,
   receiveFiles: null,
+  multiSelectIds: [],
+  isMultiSelect: false,
 
   setTab: (tab) =>
     set({
@@ -103,4 +109,24 @@ export const useUI = create<UIState>((set, get) => ({
   },
 
   setReceiveFiles: (files) => set({ receiveFiles: files }),
+
+  toggleMultiSelect: (trackId) => {
+    const { isMultiSelect, multiSelectIds } = get();
+    if (trackId === undefined) {
+      // Toggle multi-select mode on/off
+      if (isMultiSelect) {
+        set({ isMultiSelect: false, multiSelectIds: [] });
+      } else {
+        set({ isMultiSelect: true });
+      }
+      return;
+    }
+    // Toggle a specific track
+    const next = multiSelectIds.includes(trackId)
+      ? multiSelectIds.filter((id) => id !== trackId)
+      : [...multiSelectIds, trackId];
+    set({ multiSelectIds: next, isMultiSelect: next.length > 0 || isMultiSelect });
+  },
+
+  clearMultiSelect: () => set({ isMultiSelect: false, multiSelectIds: [] }),
 }));

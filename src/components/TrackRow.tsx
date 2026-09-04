@@ -35,10 +35,18 @@ export function TrackRow({
   const togglePlay = usePlayer((s) => s.togglePlay);
   const navigate = useUI((s) => s.navigate);
   const setActionSheet = useUI((s) => s.setActionSheet);
+  const isMultiSelect = useUI((s) => s.isMultiSelect);
+  const multiSelectIds = useUI((s) => s.multiSelectIds);
+  const toggleMultiSelect = useUI((s) => s.toggleMultiSelect);
 
   const isCurrent = currentTrack?.id === track.id;
+  const isSelected = multiSelectIds.includes(track.id);
 
   const handleRowClick = (): void => {
+    if (isMultiSelect) {
+      toggleMultiSelect(track.id);
+      return;
+    }
     if (onPlay) {
       onPlay();
       return;
@@ -52,9 +60,22 @@ export function TrackRow({
   };
 
   return (
-    <div className={`row ${isCurrent && isPlaying ? 'row-playing' : ''}`}>
+    <div
+      className={`row ${isCurrent && isPlaying ? 'row-playing' : ''}`}
+      style={isMultiSelect ? { background: isSelected ? 'var(--accent-bg)' : undefined } : undefined}
+    >
       <button className="row" style={{ flex: 1, minWidth: 0 }} onClick={handleRowClick}>
-        {showIndex !== undefined ? (
+        {isMultiSelect ? (
+          <span style={{
+            width: 24, height: 24, flexShrink: 0, borderRadius: 12,
+            border: `2px solid ${isSelected ? 'var(--accent)' : 'var(--label-tertiary)'}`,
+            background: isSelected ? 'var(--accent)' : 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 14, color: '#fff', fontWeight: 600
+          }}>
+            {isSelected ? '✓' : ''}
+          </span>
+        ) : showIndex !== undefined ? (
           <span style={{ width: 24, textAlign: 'center', color: 'var(--label-tertiary)', fontSize: 15, flexShrink: 0 }}>
             {isCurrent && isPlaying ? <PauseIcon size={14} /> : showIndex}
           </span>
@@ -72,9 +93,11 @@ export function TrackRow({
           <span className="row-trailing">{formatTime(track.duration ?? 0)}</span>
         )}
       </button>
-      <button className="icon-btn row-btn-dots" aria-label="More options" onClick={() => setActionSheet(track.id)}>
-        <EllipsisIcon size={20} />
-      </button>
+      {!isMultiSelect && (
+        <button className="icon-btn row-btn-dots" aria-label="More options" onClick={() => setActionSheet(track.id)}>
+          <EllipsisIcon size={20} />
+        </button>
+      )}
     </div>
   );
 }

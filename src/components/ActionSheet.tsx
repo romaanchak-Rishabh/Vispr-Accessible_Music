@@ -106,7 +106,7 @@ export function ActionSheet(): JSX.Element | null {
     useUI.getState().navigate(page);
   };
 
-  const albumKey = `${track.album}|||${track.albumArtist ?? track.artist}`.toLowerCase();
+  const albumKey = track.album.toLowerCase();
 
   const actions: { label: string; sub?: string; fn: () => void }[] =
     submenu === 'playlist'
@@ -171,6 +171,13 @@ export function ActionSheet(): JSX.Element | null {
             {
               label: 'More…',
               fn: openEdit
+            },
+            {
+              label: 'Select',
+              fn: () => {
+                useUI.getState().toggleMultiSelect(track.id);
+                close();
+              }
             },
             {
               label: 'Delete from Library',
