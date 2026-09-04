@@ -66,7 +66,7 @@ async function saveCopyToDownloadFolder(filename: string, blob: Blob): Promise<b
 function buildAlbums(tracks: Track[]): Album[] {
   const map = new Map<string, Track[]>();
   for (const t of tracks) {
-    const key = `${t.album}|||${t.albumArtist ?? t.artist}`.toLowerCase();
+    const key = t.album.toLowerCase();
     const list = map.get(key);
     if (list) list.push(t);
     else map.set(key, [t]);
@@ -96,7 +96,7 @@ function buildArtists(tracks: Track[], albums: Album[]): Artist[] {
       artist = { name: t.artist, albumKeys: [], trackIds: [] };
       map.set(t.artist, artist);
     }
-    const albumKey = `${t.album}|||${t.albumArtist ?? t.artist}`.toLowerCase();
+    const albumKey = t.album.toLowerCase();
     if (!artist.albumKeys.includes(albumKey)) artist.albumKeys.push(albumKey);
     artist.trackIds.push(t.id);
     if (!artist.artwork) {
