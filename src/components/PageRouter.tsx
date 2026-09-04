@@ -533,6 +533,7 @@ function SearchView(): JSX.Element {
           url: videoUrl,
           title: overrides[item.id]?.title || item.title || '',
           artist: overrides[item.id]?.artist || item.uploader || '',
+          album: overrides[item.id]?.album,
           thumbnail: item.thumbnail || '',
           duration: item.duration || 0,
         });
@@ -719,12 +720,61 @@ function DetailHeader({
 function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null {
   const album = useLibrary((s) => s.albums.find((a) => a.key === albumKey));
   const byId = useLibrary((s) => s.byId);
+  const renameAlbum = useLibrary((s) => s.renameAlbum);
   const playTracks = usePlayer((s) => s.playTracks);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const shuffle = usePlayer((s) => s.shuffle);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
 
   if (!album) return null;
   const tracks = album.trackIds.map((id) => byId[id]).filter(Boolean);
+
+  if (editing) {
+    return (
+      <div className="fade-page">
+        <DetailHeader kicker="Album" title="Rename Album" subtitle={`${album.artist}${album.year ? ` · ${album.year}` : ''}`} artwork={album.artwork}>
+          <></>
+        </DetailHeader>
+        <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <input
+            className="search-input"
+            style={{ paddingLeft: 12, fontSize: 15 }}
+            placeholder="Album name"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && editName.trim()) {
+                renameAlbum(album.title, editName.trim());
+                setEditing(false);
+              } else if (e.key === 'Escape') {
+                setEditing(false);
+              }
+            }}
+            autoFocus
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="pill-btn primary"
+              style={{ flex: 1 }}
+              disabled={!editName.trim()}
+              onClick={() => {
+                if (editName.trim()) {
+                  renameAlbum(album.title, editName.trim());
+                  setEditing(false);
+                }
+              }}
+            >
+              Save
+            </button>
+            <button className="pill-btn" style={{ flex: 1 }} onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fade-page">
@@ -742,6 +792,15 @@ function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null
         </button>
         <button className="pill-btn" onClick={() => void shareAlbum(album.title, tracks)}>
           <ShareIcon size={15} /> Share
+        </button>
+        <button
+          className="pill-btn"
+          onClick={() => {
+            setEditName(album.title);
+            setEditing(true);
+          }}
+        >
+          Edit
         </button>
       </DetailHeader>
       <div className="group">
@@ -828,11 +887,14 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
   const topExcluded = useLibrary((s) => s.topExcluded);
   const playCounts = usePlayer((s) => s.playCounts);
   const deletePlaylist = useLibrary((s) => s.deletePlaylist);
+  const renamePlaylist = useLibrary((s) => s.renamePlaylist);
   const removeFromPlaylist = useLibrary((s) => s.removeFromPlaylist);
   const toggleFavourite = useLibrary((s) => s.toggleFavourite);
   const removeFromMostListened = useLibrary((s) => s.removeFromMostListened);
   const goBack = useUI((s) => s.goBack);
   const playTracks = usePlayer((s) => s.playTracks);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
 
   if (isAutoPlaylist(playlistId)) {
     const isFav = playlistId === AUTO_FAVOURITES_ID;
@@ -889,6 +951,52 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
   const playlist = realPlaylist;
   const plTracks = playlist.trackIds.map((id) => byId[id]).filter(Boolean);
 
+  if (editing) {
+    return (
+      <div className="fade-page">
+        <DetailHeader kicker="Playlist" title="Rename Playlist" subtitle={`${plTracks.length} songs`} artwork={plTracks[0]?.artwork}>
+          <></>
+        </DetailHeader>
+        <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <input
+            className="search-input"
+            style={{ paddingLeft: 12, fontSize: 15 }}
+            placeholder="Playlist name"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && editName.trim()) {
+                renamePlaylist(playlist.id, editName.trim());
+                setEditing(false);
+              } else if (e.key === 'Escape') {
+                setEditing(false);
+              }
+            }}
+            autoFocus
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="pill-btn primary"
+              style={{ flex: 1 }}
+              disabled={!editName.trim()}
+              onClick={() => {
+                if (editName.trim()) {
+                  renamePlaylist(playlist.id, editName.trim());
+                  setEditing(false);
+                }
+              }}
+            >
+              Save
+            </button>
+            <button className="pill-btn" style={{ flex: 1 }} onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fade-page">
       <DetailHeader kicker="Playlist" title={playlist.name} subtitle={`${plTracks.length} songs`} artwork={plTracks[0]?.artwork}>
@@ -897,6 +1005,15 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
         </button>
         <button className="pill-btn" disabled={plTracks.length === 0} style={plTracks.length === 0 ? { opacity: 0.5 } : undefined} onClick={() => void sharePlaylist(playlist.name, plTracks)}>
           <ShareIcon size={15} /> Share
+        </button>
+        <button
+          className="pill-btn"
+          onClick={() => {
+            setEditName(playlist.name);
+            setEditing(true);
+          }}
+        >
+          Edit
         </button>
         <button
           className="pill-btn"
