@@ -10,7 +10,7 @@ import { SpinnerIcon } from './Icons';
 
 function SectionTitle({ children }: { children: string }): JSX.Element {
   return (
-    <div style={{ margin: '0 16px 8px', fontSize: 13, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--label-secondary)' }}>
+    <div style={{ margin: '20px 16px 10px', fontSize: 13, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--label-secondary)' }}>
       {children}
     </div>
   );
@@ -99,7 +99,8 @@ export function SettingsPage(): JSX.Element {
   }, [theme, accent]);
 
   return (
-    <div style={{ paddingTop: 6, paddingBottom: 24 }}>
+    <div className="fade-page">
+      <h1 className="large-title">Settings</h1>
       <SectionTitle>Appearance</SectionTitle>
       <div className="group">
         <Row label="Theme">
@@ -150,7 +151,7 @@ export function SettingsPage(): JSX.Element {
         <Row label="Confirm songs before importing">
           <Switch on={confirmImport} onChange={setConfirmImport} />
         </Row>
-        <div style={{ padding: '10px 16px 14px', borderTop: '0.5px solid var(--separator)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ padding: '12px 16px 16px', borderTop: '0.5px solid var(--separator)', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input
             className="search-input"
             style={{ paddingLeft: 12, fontSize: 14 }}
@@ -179,7 +180,7 @@ export function SettingsPage(): JSX.Element {
             autoCorrect="off"
             autoCapitalize="off"
           />
-          <span style={{ fontSize: 12, color: 'var(--label-secondary)' }}>
+          <span style={{ fontSize: 12, color: 'var(--label-secondary)', lineHeight: 1.4 }}>
             Empty server uses this deployment's built-in yt-dlp API. Manual Song mode needs none of these.
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>

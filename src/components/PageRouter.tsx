@@ -162,27 +162,39 @@ function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums'
       )}
 
       {active === 'albums' && (
-        <div className="grid-albums">
-          {albums.map((a) => (
-            <AlbumGridCard key={a.key} album={a} />
-          ))}
-        </div>
+        <>
+          <h2 className="section-header" style={{ paddingTop: 4 }}>{albums.length} Albums</h2>
+          <div className="grid-albums" style={{ paddingTop: 0 }}>
+            {albums.map((a) => (
+              <AlbumGridCard key={a.key} album={a} />
+            ))}
+          </div>
+        </>
       )}
 
-      {active === 'artists' &&
-        artists.map((a) => (
-          <ArtistRow key={a.name} artist={a} />
-        ))}
+      {active === 'artists' && (
+        <>
+          <h2 className="section-header" style={{ paddingTop: 4 }}>{artists.length} Artists</h2>
+          <div style={{ paddingTop: 0 }}>
+            {artists.map((a) => (
+              <ArtistRow key={a.name} artist={a} />
+            ))}
+          </div>
+        </>
+      )}
 
       {active === 'recent' && (
-        <div className="group">
-          {[...tracks]
-            .sort((a, b) => b.addedAt - a.addedAt)
-            .slice(0, 50)
-            .map((t) => (
-              <TrackRow key={t.id} track={t} />
-            ))}
-        </div>
+        <>
+          <h2 className="section-header" style={{ paddingTop: 4 }}>Recently Added</h2>
+          <div className="group" style={{ marginTop: 0 }}>
+            {[...tracks]
+              .sort((a, b) => b.addedAt - a.addedAt)
+              .slice(0, 50)
+              .map((t) => (
+                <TrackRow key={t.id} track={t} />
+              ))}
+          </div>
+        </>
       )}
 
       {active === 'playlists' && <PlaylistsManager />}
@@ -389,7 +401,7 @@ function ArtistRow({ artist }: { artist: Artist }): JSX.Element | null {
   return (
     <button
       className="row"
-      style={{ margin: '0 16px', width: 'auto', background: 'var(--bg-primary)', borderRadius: 8, marginBottom: 2 }}
+      style={{ margin: '0 16px', width: 'auto', background: 'var(--bg-primary)', borderRadius: 8, marginBottom: 6 }}
       onClick={() => navigate({ type: 'artist', name: artist.name })}
     >
       <Artwork src={artist.artwork} className="row-artwork row-art-circle" placeholderSize={18} alt="" />
@@ -442,18 +454,22 @@ function BrowseView(): JSX.Element {
     <div className="fade-page">
       <h1 className="large-title">Browse</h1>
       {genres.size > 0 && (
-        <div className="chips">
-          {[...genres.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 12)
-            .map(([g]) => (
-              <span key={g} className="chip" style={{ cursor: 'default' }}>
-                {formatGenre(g)}
-              </span>
-            ))}
-        </div>
+        <>
+          <h2 className="section-header" style={{ paddingTop: 4 }}>Genres</h2>
+          <div className="chips" style={{ paddingTop: 0 }}>
+            {[...genres.entries()]
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 8)
+              .map(([g]) => (
+                <span key={g} className="chip" style={{ cursor: 'default' }}>
+                  {formatGenre(g)}
+                </span>
+              ))}
+          </div>
+        </>
       )}
-      <div className="grid-albums">
+      <h2 className="section-header">Albums</h2>
+      <div className="grid-albums" style={{ paddingTop: 0 }}>
         {albums.map((a) => (
           <AlbumGridCard key={a.key} album={a} />
         ))}
