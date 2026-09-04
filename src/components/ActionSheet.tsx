@@ -5,6 +5,7 @@ import { useLibrary } from '../store/library';
 import { useUI, type Page } from '../store/ui';
 import { Artwork } from './Artwork';
 import { SpinnerIcon } from './Icons';
+import { TagInput } from './TagInput';
 import { blobToDataUrl } from '../lib/metadata';
 import { formatArtist } from '../types';
 import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue, eraToYear } from '../lib/tags';
@@ -15,6 +16,8 @@ export function ActionSheet(): JSX.Element | null {
   const setActionSheet = useUI((s) => s.setActionSheet);
   const track = useLibrary((s) => (trackId ? s.byId[trackId] : undefined));
   const playlists = useLibrary((s) => s.playlists);
+  const allAlbums = useLibrary((s) => s.albums);
+  const albumOptions = [...new Set(allAlbums.map((a) => a.title))].sort();
 
   const [submenu, setSubmenu] = useState<'main' | 'playlist' | 'new-playlist' | 'edit'>('main');
   const [newName, setNewName] = useState('');
@@ -253,7 +256,13 @@ export function ActionSheet(): JSX.Element | null {
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Artist 1" value={artist} onChange={(e) => setArtist(e.target.value)} />
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Artist 2 (feat.)" value={artist2} onChange={(e) => setArtist2(e.target.value)} />
-              <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Album" value={album} onChange={(e) => setAlbum(e.target.value)} />
+              <TagInput
+                label="Album"
+                placeholder="Search or type album…"
+                value={album}
+                onChange={setAlbum}
+                options={albumOptions}
+              />
               <select
                 className="search-input"
                 style={{ paddingLeft: 10, fontSize: 13 }}
