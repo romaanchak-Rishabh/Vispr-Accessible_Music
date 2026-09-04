@@ -827,13 +827,15 @@ function DetailHeader({
   title,
   subtitle,
   artwork,
-  children
+  children,
+  topRight
 }: {
   kicker: string;
   title: string;
   subtitle?: string;
   artwork?: string;
   children?: React.ReactNode;
+  topRight?: React.ReactNode;
 }): JSX.Element {
   return (
     <>
@@ -844,8 +846,9 @@ function DetailHeader({
           <h1 className="detail-title">{title}</h1>
           {subtitle && <div className="detail-sub">{subtitle}</div>}
         </div>
+        {topRight}
       </div>
-      <div className="detail-actions">{children}</div>
+      {children && <div className="detail-actions">{children}</div>}
     </>
   );
 }
@@ -897,7 +900,7 @@ function DragRow({ track, index, totalCount, showIndex, onMove, trailing }: {
           cursor: 'grab',
           fontSize: 18,
           color: 'var(--label-tertiary)',
-          padding: '4px 2px 4px 6px',
+          padding: '4px 0 4px 4px',
           userSelect: 'none',
           display: 'flex',
           alignItems: 'center'
@@ -916,15 +919,41 @@ function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null
   const byId = useLibrary((s) => s.byId);
   const renameAlbum = useLibrary((s) => s.renameAlbum);
   const reorderAlbum = useLibrary((s) => s.reorderAlbum);
-  const sortAlbumByDate = useLibrary((s) => s.sortAlbumByDate);
   const playTracks = usePlayer((s) => s.playTracks);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const shuffle = usePlayer((s) => s.shuffle);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [tracks, setTracks] = useState<Track[]>([]);
 
   if (!album) return null;
-  const tracks = album.trackIds.map((id) => byId[id]).filter(Boolean);
+  const albumTracks = album.trackIds.map((id) => byId[id]).filter(Boolean);
+
+  // sort tracks based on selected option
+  const sortTracks = (option: string) => {
+    let sorted = [...albumTracks];
+    switch (option) {
+      case 'az':
+        sorted.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case 'za':
+        sorted.sort((a, b) => b.title.localeCompare(a.title));
+        break;
+      case 'date':
+        sorted.sort((a, b) => b.addedAt - a.addedAt);
+        break;
+      default:
+        break;
+    }
+    setTracks(sorted);
+    setSortMenuOpen(false);
+  };
+
+  // Initialize tracks if empty
+  if (tracks.length === 0 && albumTracks.length > 0) {
+    setTracks(albumTracks);
+  }
 
   if (editing) {
     return (
@@ -974,7 +1003,24 @@ function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null
 
   return (
     <div className="fade-page">
-      <DetailHeader kicker="Album" title={album.title} subtitle={`${album.artist}${album.year ? ` · ${album.year}` : ''}`} artwork={album.artwork}>
+      <DetailHeader
+        kicker="Album"
+        title={album.title}
+        subtitle={`${album.artist}${album.year ? ` · ${album.year}` : ''}`}
+        artwork={album.artwork}
+        topRight={
+          <button
+            className="icon-btn"
+            style={{ position: 'absolute', top: 16, right: 16, zIndex: 1 }}
+            onClick={() => {
+              setEditName(album.title);
+              setEditing(true);
+            }}
+          >
+            Edit
+          </button>
+        }
+      >
         <button className="pill-btn primary" onClick={() => playTracks(tracks, 0, album.title)}>
           <PlayIcon size={15} /> Play
         </button>
@@ -989,20 +1035,28 @@ function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null
         <button className="pill-btn" onClick={() => void shareAlbum(album.title, tracks)}>
           <ShareIcon size={15} /> Share
         </button>
-        <button
-          className="pill-btn"
-          onClick={() => {
-            setEditName(album.title);
-            setEditing(true);
-          }}
-        >
-          Edit
-        </button>
       </DetailHeader>
-      <div style={{ display: 'flex', gap: 8, padding: '0 16px 12px' }}>
-        <button className="pill-btn" style={{ fontSize: 12 }} onClick={() => sortAlbumByDate(album.title)}>
-          Sort by Date
+      <div style={{ display: 'flex', gap: 8, padding: '0 16px 12px', position: 'relative' }}>
+        <button className="pill-btn" style={{ fontSize: 12 }} onClick={() => setSortMenuOpen(!sortMenuOpen)}>
+          Sort
         </button>
+        {sortMenuOpen && (
+          <div className="sort-menu" style={{
+            position: 'absolute',
+            top: '100%',
+            left: 16,
+            background: 'var(--surface)',
+            borderRadius: 12,
+            padding: '6px 0',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            zIndex: 10,
+            minWidth: 140,
+          }}>
+            <button className="sort-menu-item" onClick={() => sortTracks('az')}>A → Z</button>
+            <button className="sort-menu-item" onClick={() => sortTracks('za')}>Z → A</button>
+            <button className="sort-menu-item" onClick={() => sortTracks('date')}>Date Added</button>
+          </div>
+        )}
       </div>
       <div className="group">
         {tracks.map((t, i) => (
@@ -1012,7 +1066,13 @@ function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null
             index={i}
             totalCount={tracks.length}
             showIndex
-            onMove={(from, to) => reorderAlbum(album.title, from, to)}
+            onMove={(from, to) => {
+              const newTracks = [...tracks];
+              const [moved] = newTracks.splice(from, 1);
+              newTracks.splice(to, 0, moved);
+              setTracks(newTracks);
+              reorderAlbum(album.title, from, to);
+            }}
           />
         ))}
       </div>
