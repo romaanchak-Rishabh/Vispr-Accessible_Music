@@ -169,6 +169,7 @@ interface LibraryState {
   createPlaylist: (name: string) => string;
   deletePlaylist: (id: string) => void;
   renamePlaylist: (id: string, name: string) => void;
+  renameAlbum: (oldAlbum: string, newAlbum: string) => void;
   addToPlaylist: (playlistId: string, trackIds: string[]) => void;
   removeFromPlaylist: (playlistId: string, trackId: string) => void;
   removeTrackFromLibrary: (trackId: string) => Promise<void>;
@@ -562,6 +563,19 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     set({ playlists });
     void db.savePlaylists(playlists);
   },
+  renameAlbum: (oldAlbum, newAlbum) => {
+    const trimmed = newAlbum.trim();
+    if (!trimmed) return;
+    const tracks = get().tracks.map((t) =>
+      t.album === oldAlbum ? { ...t, album: trimmed } : t
+    );
+    const byId: Record<string, Track> = {};
+    for (const t of tracks) byId[t.id] = t;
+    const albums = buildAlbums(tracks);
+    const artists = buildArtists(tracks, albums);
+    void db.saveTracks(tracks);
+    set({ tracks, byId, albums, artists });
+  },
   addToPlaylist: (playlistId, trackIds) => {
     const playlists = get().playlists.map((p) =>
       p.id === playlistId ? { ...p, trackIds: [...p.trackIds, ...trackIds.filter((id) => !p.trackIds.includes(id))] } : p
@@ -665,7 +679,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           id: `y-${item.id}`,
           title: item.title,
           artist: item.artist || 'Unknown Artist',
-          album: 'YouTube',
+          album: item.album?.trim() || 'YouTube',
           fileName: dl.filename,
           path: dl.filename,
           source: 'file',
