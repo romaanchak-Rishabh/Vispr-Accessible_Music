@@ -232,12 +232,22 @@ function getGreeting(): string {
 export function HeroSection(): JSX.Element {
   const playTracks = usePlayer((s) => s.playTracks);
   const recentlyPlayed = usePlayer((s) => s.recentlyPlayed);
+  const playCounts = usePlayer((s) => s.playCounts);
   const tracks = useLibrary((s) => s.tracks);
+  const playlists = useLibrary((s) => s.playlists);
+  const favouriteIds = useMemo(() => new Set(tracks.filter((t) => !!t.favouritedAt).map((t) => t.id)), [tracks]);
   const navigate = useUI((s) => s.navigate);
 
   const greeting = getGreeting();
   const rawTopTrack = recentlyPlayed[0]?.track ?? tracks[0];
   const topTrack = rawTopTrack ? (useLibrary.getState().byId[rawTopTrack.id] ?? rawTopTrack) : undefined;
+
+  const mixTracks = useMemo(() => {
+    if (tracks.length === 0) return [];
+    const recentTracks = recentlyPlayed.map((e) => e.track);
+    const recs = getRecommendations(tracks, playCounts, recentTracks, playlists, favouriteIds, 25, Date.now());
+    return recs.map((r) => r.track);
+  }, [tracks, playCounts, recentlyPlayed, playlists, favouriteIds]);
 
   return (
     <div style={{ padding: '0 16px 16px' }}>
@@ -264,7 +274,8 @@ export function HeroSection(): JSX.Element {
         <button
           className="hero-mix-card"
           onClick={() => {
-            playTracks([topTrack], 0);
+            const queue = mixTracks.length > 0 ? mixTracks : [topTrack];
+            playTracks(queue, 0);
             useUI.getState().openNowPlaying();
           }}
           style={{
@@ -314,7 +325,8 @@ export function HeroSection(): JSX.Element {
                 style={{ padding: '10px 20px', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  playTracks([topTrack], 0);
+                  const queue = mixTracks.length > 0 ? mixTracks : [topTrack];
+                  playTracks(queue, 0);
                   useUI.getState().openNowPlaying();
                 }}
               >
@@ -325,7 +337,8 @@ export function HeroSection(): JSX.Element {
                 style={{ padding: '10px 20px', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.2)', color: '#fff' }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  playTracks([topTrack], Math.floor(Math.random() * 10), 'Shuffle');
+                  const queue = mixTracks.length > 0 ? mixTracks : [topTrack];
+                  playTracks(queue, Math.floor(Math.random() * queue.length), 'Shuffle');
                   useUI.getState().openNowPlaying();
                 }}
               >
