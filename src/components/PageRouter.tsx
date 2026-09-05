@@ -556,10 +556,20 @@ function BrowseView(): JSX.Element {
   const status = useLibrary((s) => s.status);
   const albums = useLibrary((s) => s.albums);
   const tracks = useLibrary((s) => s.tracks);
-  const [filterGenre, setFilterGenre] = useState('');
-  const [filterDecade, setFilterDecade] = useState('');
-  const [filterLanguage, setFilterLanguage] = useState('');
-  const [filterSongType, setFilterSongType] = useState('');
+  const playTracks = usePlayer((s) => s.playTracks);
+  const [filterGenres, setFilterGenres] = useState<Set<string>>(new Set());
+  const [filterDecades, setFilterDecades] = useState<Set<string>>(new Set());
+  const [filterLanguages, setFilterLanguages] = useState<Set<string>>(new Set());
+  const [filterSongTypes, setFilterSongTypes] = useState<Set<string>>(new Set());
+
+  const toggleFilter = (set: React.Dispatch<React.SetStateAction<Set<string>>>, value: string): void => {
+    set((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  };
 
   const genres = useMemo(() => tracks.reduce<Map<string, number>>((m, t) => {
     const g = (t.genre1 ?? t.genre2 ?? t.genre ?? '').trim();
@@ -592,32 +602,48 @@ function BrowseView(): JSX.Element {
     return map;
   }, [tracks]);
 
-  const filteredAlbums = useMemo(() => {
-    return albums.filter((a) => {
-      if (filterGenre || filterDecade || filterLanguage || filterSongType) {
-        const aTracks = a.trackIds.map((id) => tracks.find((t) => t.id === id)).filter(Boolean);
-        const match = aTracks.some((t) => {
-          if (filterGenre && (t!.genre1 ?? t!.genre2 ?? t!.genre ?? '').toLowerCase() !== filterGenre.toLowerCase()) return false;
-          if (filterDecade && t!.year) {
-            const d = `${Math.floor(t!.year / 10) * 10}s`;
-            if (d !== filterDecade) return false;
-          } else if (filterDecade && !t!.year) return false;
-          if (filterLanguage && (t!.language ?? '').toLowerCase() !== filterLanguage.toLowerCase()) return false;
-          if (filterSongType && (t!.songType ?? '').toLowerCase() !== filterSongType.toLowerCase()) return false;
-          return true;
-        });
-        return match;
-      }
-      return true;
-    });
-  }, [albums, tracks, filterGenre, filterDecade, filterLanguage, filterSongType]);
+  const matchesFilters = useCallback((t: Track): boolean => {
+    if (filterGenres.size > 0) {
+      const g = (t.genre1 ?? t.genre2 ?? t.genre ?? '').toLowerCase();
+      if (!filterGenres.has(g)) return false;
+    }
+    if (filterDecades.size > 0) {
+      if (!t.year) return false;
+      const d = `${Math.floor(t.year / 10) * 10}s`;
+      if (!filterDecades.has(d)) return false;
+    }
+    if (filterLanguages.size > 0) {
+      const l = (t.language ?? '').toLowerCase();
+      if (!filterLanguages.has(l)) return false;
+    }
+    if (filterSongTypes.size > 0) {
+      const s = (t.songType ?? '').toLowerCase();
+      if (!filterSongTypes.has(s)) return false;
+    }
+    return true;
+  }, [filterGenres, filterDecades, filterLanguages, filterSongTypes]);
 
-  const activeFilter = filterGenre || filterDecade || filterLanguage || filterSongType;
-  const activeLabel = filterGenre ? formatGenre(filterGenre)
-    : filterDecade ? filterDecade
-    : filterLanguage ? filterLanguage.charAt(0).toUpperCase() + filterLanguage.slice(1).toLowerCase()
-    : filterSongType ? filterSongType.charAt(0).toUpperCase() + filterSongType.slice(1)
-    : '';
+  const hasFilters = filterGenres.size > 0 || filterDecades.size > 0 || filterLanguages.size > 0 || filterSongTypes.size > 0;
+
+  const filteredAlbums = useMemo(() => {
+    if (!hasFilters) return albums;
+    return albums.filter((a) => {
+      const aTracks = a.trackIds.map((id) => tracks.find((t) => t.id === id)).filter(Boolean) as Track[];
+      return aTracks.some(matchesFilters);
+    });
+  }, [albums, tracks, hasFilters, matchesFilters]);
+
+  const filteredSongs = useMemo(() => {
+    if (!hasFilters) return [];
+    return tracks.filter(matchesFilters);
+  }, [tracks, hasFilters, matchesFilters]);
+
+  const clearAllFilters = (): void => {
+    setFilterGenres(new Set());
+    setFilterDecades(new Set());
+    setFilterLanguages(new Set());
+    setFilterSongTypes(new Set());
+  };
 
   if (status === 'loading') return <div style={{ padding: 40 }}>Loading…</div>;
   if (status !== 'ready') {
@@ -629,12 +655,10 @@ function BrowseView(): JSX.Element {
     );
   }
 
-  const clearAllFilters = (): void => {
-    setFilterGenre('');
-    setFilterDecade('');
-    setFilterLanguage('');
-    setFilterSongType('');
-  };
+  const chipStyle = (active: boolean): React.CSSProperties => ({
+    cursor: 'pointer',
+    ...(active ? { background: 'var(--accent)', color: '#fff' } : {}),
+  });
 
   return (
     <div className="fade-page">
@@ -647,17 +671,9 @@ function BrowseView(): JSX.Element {
             {[...genres.entries()]
               .sort((a, b) => b[1] - a[1])
               .slice(0, 8)
-              .map(([g]) => (
-                <button
-                  key={g}
-                  className="chip"
-                  style={{
-                    cursor: 'pointer',
-                    ...(filterGenre === g ? { background: 'var(--accent)', color: '#fff' } : {})
-                  }}
-                  onClick={() => setFilterGenre(filterGenre === g ? '' : g)}
-                >
-                  {formatGenre(g)}
+              .map(([g, count]) => (
+                <button key={g} className="chip" style={chipStyle(filterGenres.has(g.toLowerCase()))} onClick={() => toggleFilter(setFilterGenres, g.toLowerCase())}>
+                  {formatGenre(g)} <span style={{ opacity: 0.6, fontSize: 11 }}>({count})</span>
                 </button>
               ))}
           </div>
@@ -671,15 +687,7 @@ function BrowseView(): JSX.Element {
             {[...decades.entries()]
               .sort((a, b) => b[0].localeCompare(a[0]))
               .map(([d, count]) => (
-                <button
-                  key={d}
-                  className="chip"
-                  style={{
-                    cursor: 'pointer',
-                    ...(filterDecade === d ? { background: 'var(--accent)', color: '#fff' } : {})
-                  }}
-                  onClick={() => setFilterDecade(filterDecade === d ? '' : d)}
-                >
+                <button key={d} className="chip" style={chipStyle(filterDecades.has(d))} onClick={() => toggleFilter(setFilterDecades, d)}>
                   {d} <span style={{ opacity: 0.6, fontSize: 11 }}>({count})</span>
                 </button>
               ))}
@@ -694,15 +702,7 @@ function BrowseView(): JSX.Element {
             {[...languages.entries()]
               .sort((a, b) => b[1] - a[1])
               .map(([l, count]) => (
-                <button
-                  key={l}
-                  className="chip"
-                  style={{
-                    cursor: 'pointer',
-                    ...(filterLanguage === l ? { background: 'var(--accent)', color: '#fff' } : {})
-                  }}
-                  onClick={() => setFilterLanguage(filterLanguage === l ? '' : l)}
-                >
+                <button key={l} className="chip" style={chipStyle(filterLanguages.has(l.toLowerCase()))} onClick={() => toggleFilter(setFilterLanguages, l.toLowerCase())}>
                   {l.charAt(0).toUpperCase() + l.slice(1).toLowerCase()} <span style={{ opacity: 0.6, fontSize: 11 }}>({count})</span>
                 </button>
               ))}
@@ -717,15 +717,7 @@ function BrowseView(): JSX.Element {
             {[...songTypes.entries()]
               .sort((a, b) => b[1] - a[1])
               .map(([s, count]) => (
-                <button
-                  key={s}
-                  className="chip"
-                  style={{
-                    cursor: 'pointer',
-                    ...(filterSongType === s ? { background: 'var(--accent)', color: '#fff' } : {})
-                  }}
-                  onClick={() => setFilterSongType(filterSongType === s ? '' : s)}
-                >
+                <button key={s} className="chip" style={chipStyle(filterSongTypes.has(s.toLowerCase()))} onClick={() => toggleFilter(setFilterSongTypes, s.toLowerCase())}>
                   {s.charAt(0).toUpperCase() + s.slice(1)} <span style={{ opacity: 0.6, fontSize: 11 }}>({count})</span>
                 </button>
               ))}
@@ -734,12 +726,12 @@ function BrowseView(): JSX.Element {
       )}
 
       <h2 className="section-header">
-        Albums {activeFilter && (
+        Albums {hasFilters && (
           <button
             onClick={clearAllFilters}
             style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 14, fontWeight: 400, marginLeft: 6, padding: 0 }}
           >
-            — {activeLabel} ✕
+            Clear filters ✕
           </button>
         )}
       </h2>
@@ -749,10 +741,31 @@ function BrowseView(): JSX.Element {
         ))}
         {filteredAlbums.length === 0 && (
           <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 24, color: 'var(--label-secondary)', fontSize: 13 }}>
-            No albums match this filter
+            No albums match these filters
           </div>
         )}
       </div>
+
+      {hasFilters && filteredSongs.length > 0 && (
+        <>
+          <h2 className="section-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            Songs <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--label-secondary)' }}>({filteredSongs.length})</span>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <button className="pill-btn primary" style={{ fontSize: 12, padding: '4px 12px' }} onClick={() => playTracks(filteredSongs, 0, 'Browse — Play')}>
+                <PlayIcon size={13} /> Play
+              </button>
+              <button className="pill-btn" style={{ fontSize: 12, padding: '4px 12px' }} onClick={() => playTracks(filteredSongs, Math.floor(Math.random() * filteredSongs.length), 'Browse — Shuffle')}>
+                <ShuffleIcon size={13} /> Shuffle
+              </button>
+            </div>
+          </h2>
+          <div className="group">
+            {filteredSongs.map((t) => (
+              <TrackRow key={t.id} track={t} showArtwork={false} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
