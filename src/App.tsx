@@ -32,15 +32,18 @@ function requestNotificationPermission(): void {
 function sendServerUpNotification(): void {
   if ('Notification' in window && Notification.permission === 'granted') {
     try {
-      new Notification('Server is back online', {
+      const n = new Notification('Server is back online', {
         body: 'Open the app to resume downloading your music.',
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
         tag: 'server-up',
       });
-    } catch {
-      /* PWA or secure context required */
+      n.onerror = () => console.warn('[notification] error');
+    } catch (e) {
+      console.warn('[notification] failed', e);
     }
+  } else {
+    console.warn('[notification] not sent — permission:', typeof Notification !== 'undefined' ? Notification.permission : 'N/A');
   }
 }
 
