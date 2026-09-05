@@ -557,6 +557,10 @@ function BrowseView(): JSX.Element {
   const albums = useLibrary((s) => s.albums);
   const tracks = useLibrary((s) => s.tracks);
   const [filterGenre, setFilterGenre] = useState('');
+  const [filterDecade, setFilterDecade] = useState('');
+  const [filterLanguage, setFilterLanguage] = useState('');
+  const [filterSongType, setFilterSongType] = useState('');
+
   const genres = useMemo(() => tracks.reduce<Map<string, number>>((m, t) => {
     const g = (t.genre1 ?? t.genre2 ?? t.genre ?? '').trim();
     if (!g) return m;
@@ -564,14 +568,56 @@ function BrowseView(): JSX.Element {
     return m;
   }, new Map()), [tracks]);
 
+  const decades = useMemo(() => tracks.reduce<Map<string, number>>((m, t) => {
+    if (!t.year) return m;
+    const d = `${Math.floor(t.year / 10) * 10}s`;
+    m.set(d, (m.get(d) ?? 0) + 1);
+    return m;
+  }, new Map()), [tracks]);
+
+  const languages = useMemo(() => tracks.reduce<Map<string, number>>((m, t) => {
+    const l = (t.language ?? '').trim();
+    if (!l) return m;
+    m.set(l, (m.get(l) ?? 0) + 1);
+    return m;
+  }, new Map()), [tracks]);
+
+  const songTypes = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of tracks) {
+      const s = (t.songType ?? '').trim();
+      if (!s) continue;
+      map.set(s, (map.get(s) ?? 0) + 1);
+    }
+    return map;
+  }, [tracks]);
+
   const filteredAlbums = useMemo(() => {
-    if (!filterGenre) return albums;
-    const g = filterGenre.toLowerCase();
     return albums.filter((a) => {
-      const aTracks = a.trackIds.map((id) => tracks.find((t) => t.id === id)).filter(Boolean);
-      return aTracks.some((t) => (t!.genre1 ?? t!.genre2 ?? t!.genre ?? '').toLowerCase() === g);
+      if (filterGenre || filterDecade || filterLanguage || filterSongType) {
+        const aTracks = a.trackIds.map((id) => tracks.find((t) => t.id === id)).filter(Boolean);
+        const match = aTracks.some((t) => {
+          if (filterGenre && (t!.genre1 ?? t!.genre2 ?? t!.genre ?? '').toLowerCase() !== filterGenre.toLowerCase()) return false;
+          if (filterDecade && t!.year) {
+            const d = `${Math.floor(t!.year / 10) * 10}s`;
+            if (d !== filterDecade) return false;
+          } else if (filterDecade && !t!.year) return false;
+          if (filterLanguage && (t!.language ?? '').toLowerCase() !== filterLanguage.toLowerCase()) return false;
+          if (filterSongType && (t!.songType ?? '').toLowerCase() !== filterSongType.toLowerCase()) return false;
+          return true;
+        });
+        return match;
+      }
+      return true;
     });
-  }, [albums, tracks, filterGenre]);
+  }, [albums, tracks, filterGenre, filterDecade, filterLanguage, filterSongType]);
+
+  const activeFilter = filterGenre || filterDecade || filterLanguage || filterSongType;
+  const activeLabel = filterGenre ? formatGenre(filterGenre)
+    : filterDecade ? filterDecade
+    : filterLanguage ? filterLanguage.charAt(0).toUpperCase() + filterLanguage.slice(1).toLowerCase()
+    : filterSongType ? filterSongType.charAt(0).toUpperCase() + filterSongType.slice(1)
+    : '';
 
   if (status === 'loading') return <div style={{ padding: 40 }}>Loading…</div>;
   if (status !== 'ready') {
@@ -583,9 +629,17 @@ function BrowseView(): JSX.Element {
     );
   }
 
+  const clearAllFilters = (): void => {
+    setFilterGenre('');
+    setFilterDecade('');
+    setFilterLanguage('');
+    setFilterSongType('');
+  };
+
   return (
     <div className="fade-page">
       <h1 className="large-title">Browse</h1>
+
       {genres.size > 0 && (
         <>
           <h2 className="section-header" style={{ paddingTop: 4 }}>Genres</h2>
@@ -609,14 +663,93 @@ function BrowseView(): JSX.Element {
           </div>
         </>
       )}
-      <h2 className="section-header">Albums {filterGenre && <span style={{ fontWeight: 400, fontSize: 14, color: 'var(--accent)' }}> — {formatGenre(filterGenre)}</span>}</h2>
+
+      {decades.size > 0 && (
+        <>
+          <h2 className="section-header">By Decade</h2>
+          <div className="chips" style={{ paddingTop: 0 }}>
+            {[...decades.entries()]
+              .sort((a, b) => b[0].localeCompare(a[0]))
+              .map(([d, count]) => (
+                <button
+                  key={d}
+                  className="chip"
+                  style={{
+                    cursor: 'pointer',
+                    ...(filterDecade === d ? { background: 'var(--accent)', color: '#fff' } : {})
+                  }}
+                  onClick={() => setFilterDecade(filterDecade === d ? '' : d)}
+                >
+                  {d} <span style={{ opacity: 0.6, fontSize: 11 }}>({count})</span>
+                </button>
+              ))}
+          </div>
+        </>
+      )}
+
+      {languages.size > 0 && (
+        <>
+          <h2 className="section-header">By Language</h2>
+          <div className="chips" style={{ paddingTop: 0 }}>
+            {[...languages.entries()]
+              .sort((a, b) => b[1] - a[1])
+              .map(([l, count]) => (
+                <button
+                  key={l}
+                  className="chip"
+                  style={{
+                    cursor: 'pointer',
+                    ...(filterLanguage === l ? { background: 'var(--accent)', color: '#fff' } : {})
+                  }}
+                  onClick={() => setFilterLanguage(filterLanguage === l ? '' : l)}
+                >
+                  {l.charAt(0).toUpperCase() + l.slice(1).toLowerCase()} <span style={{ opacity: 0.6, fontSize: 11 }}>({count})</span>
+                </button>
+              ))}
+          </div>
+        </>
+      )}
+
+      {songTypes.size > 0 && (
+        <>
+          <h2 className="section-header">By Type</h2>
+          <div className="chips" style={{ paddingTop: 0 }}>
+            {[...songTypes.entries()]
+              .sort((a, b) => b[1] - a[1])
+              .map(([s, count]) => (
+                <button
+                  key={s}
+                  className="chip"
+                  style={{
+                    cursor: 'pointer',
+                    ...(filterSongType === s ? { background: 'var(--accent)', color: '#fff' } : {})
+                  }}
+                  onClick={() => setFilterSongType(filterSongType === s ? '' : s)}
+                >
+                  {s.charAt(0).toUpperCase() + s.slice(1)} <span style={{ opacity: 0.6, fontSize: 11 }}>({count})</span>
+                </button>
+              ))}
+          </div>
+        </>
+      )}
+
+      <h2 className="section-header">
+        Albums {activeFilter && (
+          <button
+            onClick={clearAllFilters}
+            style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 14, fontWeight: 400, marginLeft: 6, padding: 0 }}
+          >
+            — {activeLabel} ✕
+          </button>
+        )}
+      </h2>
       <div className="grid-albums" style={{ paddingTop: 0 }}>
         {filteredAlbums.map((a) => (
           <AlbumGridCard key={a.key} album={a} />
         ))}
         {filteredAlbums.length === 0 && (
           <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 24, color: 'var(--label-secondary)', fontSize: 13 }}>
-            No albums in this genre
+            No albums match this filter
           </div>
         )}
       </div>
