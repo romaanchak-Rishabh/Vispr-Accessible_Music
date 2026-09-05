@@ -101,9 +101,9 @@ export default function App(): JSX.Element {
       serverRef.current = up;
       if (prev === null) {
         // First check — only toast if down (up is handled below)
-        if (!up) showToast('Server is not reachable');
+        if (!up) showToast('Server offline');
       } else if (prev !== up) {
-        showToast(up ? 'Server is up' : 'Server is not reachable');
+        showToast(up ? 'Server is up' : 'Server offline');
       }
     };
     void check();

@@ -1,6 +1,6 @@
 import { mapGenre } from './metadataLookup';
 
-const MODEL = 'gemini-2.0-flash-lite';
+const MODEL = 'gemini-3.5-flash-lite';
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 declare const __GEMINI_API_KEY__: string;

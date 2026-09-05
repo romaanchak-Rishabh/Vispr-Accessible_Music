@@ -631,7 +631,7 @@ function SearchView(): JSX.Element {
           thumbnail: item.thumbnail || '',
           duration: item.duration || 0,
         });
-        showToast('Added to download queue — will start when server is up');
+        showToast('Queued — downloads start when server is up');
       }
     } catch {
       // silent
