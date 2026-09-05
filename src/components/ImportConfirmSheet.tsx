@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { YtItem } from '../lib/ytdlp';
-import { fetchYtInfo } from '../lib/ytdlp';
 import { Artwork } from './Artwork';
 import { TagInput } from './TagInput';
 import { useLibrary } from '../store/library';
-import { useSettings } from '../store/settings';
 import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue, formatGenre } from '../lib/tags';
-import { lookupMetadata, yearToEra, parseYoutubeDescription } from '../lib/metadataLookup';
 import { fetchGeminiMetadata, mapGeminiGenres, getGeminiApiKey, type GeminiMetadata } from '../lib/geminiMetadata';
 import { SONG_TYPE_OPTIONS } from '../types';
 import { SparklesIcon } from './Icons';
@@ -100,7 +97,6 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   const [geminiLoading, setGeminiLoading] = useState<Record<string, boolean>>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { ytdlpServer, ytdlpToken } = useSettings();
   const geminiApiKey = getGeminiApiKey();
 
   const libraryTracks = useLibrary((s) => s.tracks);
@@ -117,64 +113,13 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   const field = FIELDS[fieldIdx];
   const showYear = field.key === 'year';
 
-  // Auto-prefill artist/album/year/genre from a free music API (no key needed).
-  // Only fills fields the user hasn't set yet; never overwrites their answers.
+  // iTunes/YouTube metadata lookup — disabled in favour of AI (Gemini).
+  // Immediately marks all items as 'none' so AI suggestion shows right away.
   useEffect(() => {
     const it = items[songIdx];
     if (!it) return;
-    if (lookup[it.id] === 'done' || lookup[it.id] === 'none') return;
-    const title = (it.title ?? '')
-      .replace(/\s*\((official\s*)?(lyric|lyrics|audio|audio\s*only|video|official\s*video|music\s*video|full\s*song|song|hd|4k|extended)\)\s*$/i, '')
-      .replace(/\s*-\s*(topic|official|lyrics?)\s*$/i, '')
-      .trim();
-    if (!title) {
-      setLookup((prev) => ({ ...prev, [it.id]: 'none' }));
-      return;
-    }
-    setLookup((prev) => ({ ...prev, [it.id]: 'pending' }));
-    let cancelled = false;
-    // iTunes is the primary source; if it comes up short (very common for
-    // Indian/regional songs) fall back to reading the YouTube description.
-    const fallback = async (res: { artist?: string; album?: string; year?: number; genre?: string } | null):
-      Promise<{ artist?: string; album?: string; year?: number; genre?: string }> => {
-      if (res && res.artist && res.album && res.genre && res.year) return res;
-      const videoUrl = it.webpage_url ?? (it.id ? `https://www.youtube.com/watch?v=${it.id}` : '');
-      if (!videoUrl) return res ?? {};
-      const info = await fetchYtInfo(ytdlpServer, ytdlpToken, videoUrl);
-      if (!info) return res ?? {};
-      const parsed = parseYoutubeDescription(info);
-      if (!parsed) return res ?? {};
-      return {
-        artist: parsed.artist ?? res?.artist,
-        album: parsed.album ?? res?.album,
-        year: parsed.year ?? res?.year,
-        genre: parsed.genre ?? res?.genre
-      };
-    };
-    let applied = false;
-    void lookupMetadata(title, it.uploader)
-      .then(fallback)
-      .then((res) => {
-        if (cancelled || !res) return;
-        const era = yearToEra(res.year);
-        if (res.artist || res.album || res.genre || era) applied = true;
-        setEdits((prev) => {
-          const cur = prev[it.id] ?? {};
-          const next: ImportOverrides = { ...cur };
-          if (!next.artist && res.artist) next.artist = res.artist;
-          if (!next.album && res.album) next.album = res.album;
-          if (!next.genre1 && res.genre) next.genre1 = res.genre;
-          if (era && !cur.year) next.year = era;
-          return { ...prev, [it.id]: next };
-        });
-      })
-      .finally(() => {
-        if (!cancelled) setLookup((prev) => ({ ...prev, [it.id]: applied ? 'done' : 'none' }));
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (lookup[it.id] !== undefined) return;
+    setLookup((prev) => ({ ...prev, [it.id]: 'none' }));
   }, [songIdx, items]);
 
   // Gemini metadata lookup - runs after iTunes lookup

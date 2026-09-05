@@ -607,7 +607,6 @@ function SearchView(): JSX.Element {
     const item = pendingYtItem;
     setPendingYtItem(null);
     setImportingId(item.id);
-    const showToast = useUI.getState().showToast;
     try {
       const videoUrl = item.webpage_url || `https://www.youtube.com/watch?v=${item.id}`;
       const serverUp = ytdlpServer ? await isServerReachable(ytdlpServer) : false;
@@ -632,7 +631,6 @@ function SearchView(): JSX.Element {
           thumbnail: item.thumbnail || '',
           duration: item.duration || 0,
         });
-        showToast('Queued — downloads start when server is up');
       }
     } catch {
       // silent
