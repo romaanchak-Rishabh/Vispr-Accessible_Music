@@ -24,6 +24,27 @@ import { DownloadStatusBar } from './components/DownloadStatusBar';
 import { BatchBar } from './components/BatchBar';
 import { ChevronLeftIcon } from './components/Icons';
 
+function requestNotificationPermission(): void {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {});
+  }
+}
+
+function sendServerUpNotification(): void {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification('Server is back online', {
+        body: 'Open the app to resume downloading your music.',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: 'server-up',
+      });
+    } catch {
+      /* PWA or secure context required */
+    }
+  }
+}
+
 async function pingServer(server: string): Promise<boolean> {
   if (!server) return false;
   try {
@@ -87,7 +108,10 @@ export default function App(): JSX.Element {
   // keep the backend server URL in sync with the published (auto-healed) tunnel
   useEffect(() => startTunnelSync(), []);
 
-  // Periodic server health check — toast on status change (up ↔ down)
+  // Request notification permission on mount
+  useEffect(() => { requestNotificationPermission(); }, []);
+
+  // Periodic server health check — toast + notification on status change (up ↔ down)
   const showToast = useUI((s) => s.showToast);
   const serverRef = useRef<boolean | null>(null); // null = unknown, true = up, false = down
   useEffect(() => {
@@ -100,10 +124,10 @@ export default function App(): JSX.Element {
       const prev = serverRef.current;
       serverRef.current = up;
       if (prev === null) {
-        // First check — only toast if down (up is handled below)
         if (!up) showToast('Server offline');
       } else if (prev !== up) {
         showToast(up ? 'Server is up' : 'Server offline');
+        if (up) sendServerUpNotification();
       }
     };
     void check();
