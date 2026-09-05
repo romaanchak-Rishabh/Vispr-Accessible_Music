@@ -20,7 +20,6 @@ import { InstallBanner } from './components/InstallBanner';
 import { Toast } from './components/Toast';
 import { PageRouter } from './components/PageRouter';
 import { ReceiveSheet } from './components/ReceiveSheet';
-import { DownloadStatusBar } from './components/DownloadStatusBar';
 import { BatchBar } from './components/BatchBar';
 import { ChevronLeftIcon } from './components/Icons';
 
@@ -217,7 +216,6 @@ export default function App(): JSX.Element {
         </div>
         <QueueSheet />
         <ActionSheet />
-        <DownloadStatusBar />
         <BatchBar />
         <Toast />
         {shareTargetFiles && <ReceiveSheet files={shareTargetFiles} onClose={() => setShareTargetFiles(null)} />}
@@ -250,7 +248,6 @@ export default function App(): JSX.Element {
       <NowPlayingSheet />
       <QueueSheet />
       <ActionSheet />
-      <DownloadStatusBar />
       <BatchBar />
       <InstallBanner />
       <Toast />
