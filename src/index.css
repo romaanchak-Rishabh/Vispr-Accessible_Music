@@ -370,6 +370,7 @@ input:focus-visible {
 
 .rowwrap > .row {
   min-width: 0;
+  padding-left: 4px;
 }
 
 .rowwrap:not(:last-child)::after {
