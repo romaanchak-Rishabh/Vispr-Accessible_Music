@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { JSX } from 'react';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { useMediaQuery } from './hooks/useMediaQuery';
@@ -24,16 +24,17 @@ import { DownloadStatusBar } from './components/DownloadStatusBar';
 import { BatchBar } from './components/BatchBar';
 import { ChevronLeftIcon } from './components/Icons';
 
-async function checkServerOnMount(showToast: (msg: string) => void): Promise<void> {
-  const server = useSettings.getState().ytdlpServer;
-  if (!server) return;
+async function pingServer(server: string): Promise<boolean> {
+  if (!server) return false;
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 3000);
     const r = await fetch(`${server.replace(/\/+$/, '')}/api/ping`, { signal: ctrl.signal, cache: 'no-store' });
     clearTimeout(t);
-    if (r.ok) showToast('Server is up');
-  } catch { /* offline */ }
+    return r.ok;
+  } catch {
+    return false;
+  }
 }
 
 function pageTitle(): string {
@@ -86,10 +87,29 @@ export default function App(): JSX.Element {
   // keep the backend server URL in sync with the published (auto-healed) tunnel
   useEffect(() => startTunnelSync(), []);
 
-  // Check server on mount and show toast
+  // Periodic server health check — toast on status change (up ↔ down)
+  const showToast = useUI((s) => s.showToast);
+  const serverRef = useRef<boolean | null>(null); // null = unknown, true = up, false = down
   useEffect(() => {
-    void checkServerOnMount(useUI.getState().showToast);
-  }, []);
+    let active = true;
+    const check = async () => {
+      const server = useSettings.getState().ytdlpServer;
+      if (!server) { serverRef.current = null; return; }
+      const up = await pingServer(server);
+      if (!active) return;
+      const prev = serverRef.current;
+      serverRef.current = up;
+      if (prev === null) {
+        // First check — only toast if down (up is handled below)
+        if (!up) showToast('Server is not reachable');
+      } else if (prev !== up) {
+        showToast(up ? 'Server is up' : 'Server is not reachable');
+      }
+    };
+    void check();
+    const id = setInterval(check, 30_000);
+    return () => { active = false; clearInterval(id); };
+  }, [showToast]);
 
   // Handle share_target (Android/Chrome PWA share target)
   const shareTargetFiles = useUI((s) => s.receiveFiles);

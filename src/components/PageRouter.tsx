@@ -578,10 +578,13 @@ function SearchView(): JSX.Element {
     // Check server every 10s and process queue if server is up
     queueCheckRef.current = setInterval(async () => {
       if (queueProcessing) return;
-      const pending = downloadQueue.filter((q) => q.status === 'pending');
+      const pending = downloadQueue.filter((q) => q.status === 'pending' || q.status === 'failed');
       if (pending.length === 0) return;
-      const up = await isServerReachable(ytdlpServer);
-      if (up) processQueue();
+      const up = ytdlpServer ? await isServerReachable(ytdlpServer) : false;
+      if (up) {
+        useUI.getState().showToast('Server is up — starting downloads');
+        processQueue();
+      }
     }, 10_000);
     return () => { if (queueCheckRef.current) clearInterval(queueCheckRef.current); };
   }, [ytdlpServer, downloadQueue, queueProcessing, processQueue]);
@@ -603,9 +606,10 @@ function SearchView(): JSX.Element {
     const item = pendingYtItem;
     setPendingYtItem(null);
     setImportingId(item.id);
+    const showToast = useUI.getState().showToast;
     try {
       const videoUrl = item.webpage_url || `https://www.youtube.com/watch?v=${item.id}`;
-      const serverUp = await isServerReachable(ytdlpServer);
+      const serverUp = ytdlpServer ? await isServerReachable(ytdlpServer) : false;
       if (serverUp) {
         await importYouTube(videoUrl, undefined, overrides);
       } else {
@@ -618,6 +622,7 @@ function SearchView(): JSX.Element {
           thumbnail: item.thumbnail || '',
           duration: item.duration || 0,
         });
+        showToast('Added to download queue — will start when server is up');
       }
     } catch {
       // silent

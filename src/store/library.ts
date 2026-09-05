@@ -715,7 +715,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   processDownloadQueue: async () => {
     const state = get();
     if (state.queueProcessing) return;
-    const queue = state.downloadQueue.filter((q) => q.status === 'pending');
+    const queue = state.downloadQueue.filter((q) => q.status === 'pending' || q.status === 'failed');
     if (queue.length === 0) return;
 
     set({ queueProcessing: true });
