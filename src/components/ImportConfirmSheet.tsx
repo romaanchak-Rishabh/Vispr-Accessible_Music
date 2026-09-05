@@ -481,6 +481,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                       ...prev,
                       [item.id]: {
                         ...prev[item.id],
+                        title: meta.title || prev[item.id]?.title,
                         artist: meta.artists[0] || prev[item.id]?.artist,
                         artist2: meta.artists[1] || prev[item.id]?.artist2,
                         album: meta.album || prev[item.id]?.album,
@@ -629,6 +630,15 @@ function GeminiSuggestion({ meta, onAccept }: { meta: GeminiMetadata; onAccept: 
         <SparklesIcon size={14} />
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>AI found metadata</span>
       </div>
+
+      {meta.title && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: 'var(--label-secondary)', marginBottom: 3 }}>Title</div>
+          <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label)' }}>
+            {meta.title}
+          </span>
+        </div>
+      )}
 
       {meta.artists.length > 0 && (
         <div style={{ marginBottom: 6 }}>
