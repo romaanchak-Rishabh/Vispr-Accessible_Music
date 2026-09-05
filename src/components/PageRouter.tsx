@@ -224,12 +224,17 @@ function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums'
     <div className="fade-page">
       <h1 className="large-title">Library</h1>
       <LibraryStats />
-      <div className="chips" style={{ paddingBottom: 14 }}>
+      <div className="chips" style={{ paddingBottom: 14, gap: 6 }}>
         {LIB_SECTIONS.map((s) => (
           <button
             key={s.id}
-            className={`chip ${active === s.id ? '' : ''}`}
-            style={active === s.id ? { background: 'var(--accent)', color: '#fff' } : undefined}
+            className="chip"
+            style={{
+              padding: '5px 12px',
+              fontSize: 13,
+              fontWeight: 500,
+              ...(active === s.id ? { background: 'var(--accent)', color: '#fff' } : {})
+            }}
             onClick={() => navigate({ type: 'library', section: s.id })}
           >
             {s.label}

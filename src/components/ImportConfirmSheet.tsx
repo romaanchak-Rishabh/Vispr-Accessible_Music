@@ -122,7 +122,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
     setLookup((prev) => ({ ...prev, [it.id]: 'none' }));
   }, [songIdx, items]);
 
-  // Gemini metadata lookup - runs after iTunes lookup
+  // AI metadata lookup
   useEffect(() => {
     const it = items[songIdx];
     if (!it || !geminiApiKey) return;
@@ -136,6 +136,10 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
     let cancelled = false;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 8000);
+    // Hard fallback — ensure loading clears even if abort doesn't propagate
+    const fallback = setTimeout(() => {
+      if (!cancelled) setGeminiLoading((prev) => ({ ...prev, [it.id]: false }));
+    }, 10_000);
     void fetchGeminiMetadata(geminiApiKey, title, it.uploader, undefined, undefined, ctrl.signal)
       .then((meta) => {
         if (cancelled || !meta) return;
@@ -143,12 +147,14 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
       })
       .finally(() => {
         clearTimeout(timer);
+        clearTimeout(fallback);
         if (!cancelled) setGeminiLoading((prev) => ({ ...prev, [it.id]: false }));
       });
     return () => {
       cancelled = true;
       ctrl.abort();
       clearTimeout(timer);
+      clearTimeout(fallback);
     };
   }, [songIdx, items, geminiApiKey]);
 
