@@ -96,6 +96,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   const [geminiMeta, setGeminiMeta] = useState<Record<string, GeminiMetadata | null>>({});
   const [geminiLoading, setGeminiLoading] = useState<Record<string, boolean>>({});
   const [geminiAccepted, setGeminiAccepted] = useState<Record<string, boolean>>({});
+  const [acceptedMsg, setAcceptedMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const geminiApiKey = getGeminiApiKey();
@@ -149,7 +150,10 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
       .finally(() => {
         clearTimeout(timer);
         clearTimeout(fallback);
-        if (!cancelled) setGeminiLoading((prev) => ({ ...prev, [it.id]: false }));
+        setGeminiLoading((prev) => {
+          if (prev[it.id]) return { ...prev, [it.id]: false };
+          return prev;
+        });
       });
     return () => {
       cancelled = true;
@@ -492,8 +496,17 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                       }
                     }));
                     setGeminiAccepted((prev) => ({ ...prev, [item.id]: true }));
+                    setAcceptedMsg(`Applied: ${meta.title || item.title}`);
+                    setTimeout(() => setAcceptedMsg(null), 2000);
+                    advance();
                   }}
                 />
+              )}
+
+              {acceptedMsg && (
+                <div style={{ padding: '8px 12px', background: 'var(--accent-soft)', borderRadius: 8, marginBottom: 6, fontSize: 12, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontWeight: 600 }}>✓</span> {acceptedMsg}
+                </div>
               )}
 
               {['album', 'genre1', 'genre2', 'artist'].includes(field.key) && edits[item.id]?.[field.key] && (
