@@ -38,9 +38,19 @@ export function ReceiveTextSheet({ payload, onClose }: ReceiveTextSheetProps): J
   const [phase, setPhase] = useState<'review' | 'importing' | 'done'>('review');
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0, label: '' });
   const [applyAllChoice, setApplyAllChoice] = useState<'mine' | 'incoming' | null>(null);
+  const [skippedIds, setSkippedIds] = useState<Set<string>>(new Set());
   const [imported, setImported] = useState(0);
   const [skipped, setSkipped] = useState(0);
   const [failed, setFailed] = useState(0);
+
+  const toggleSkip = (trackId: string): void => {
+    setSkippedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(trackId)) next.delete(trackId);
+      else next.add(trackId);
+      return next;
+    });
+  };
 
   const startImport = async (): Promise<void> => {
     setPhase('importing');
@@ -68,6 +78,13 @@ export function ReceiveTextSheet({ payload, onClose }: ReceiveTextSheetProps): J
         trackIdsForPlaylist.push(item.existing!.id);
         done++;
         setImportProgress({ done, total: totalToImport, label: `Skipped: ${item.incoming.title} (already in library)` });
+        continue;
+      }
+
+      if (skippedIds.has(item.incoming.id)) {
+        setSkipped((s) => s + 1);
+        done++;
+        setImportProgress({ done, total: totalToImport, label: `Skipped: ${item.incoming.title} (you chose to skip)` });
         continue;
       }
 
@@ -171,7 +188,12 @@ export function ReceiveTextSheet({ payload, onClose }: ReceiveTextSheetProps): J
   const exactCount = conflicts.filter((c) => c.status === 'exact').length;
   const conflictCount = conflicts.filter((c) => c.status === 'conflict').length;
   const newCount = conflicts.filter((c) => c.status === 'new').length;
-  const importableCount = newCount + (applyAllChoice === 'incoming' ? conflictCount : 0);
+  const importableCount = conflicts.filter((c) => {
+    if (c.status === 'exact') return false;
+    if (c.status === 'conflict' && applyAllChoice !== 'incoming') return false;
+    if (skippedIds.has(c.incoming.id)) return false;
+    return true;
+  }).length;
 
   return (
     <div className="sheet-overlay" style={{ alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
@@ -189,22 +211,29 @@ export function ReceiveTextSheet({ payload, onClose }: ReceiveTextSheetProps): J
             </div>
 
             <div style={{ maxHeight: 240, overflow: 'auto', padding: '0 8px' }}>
-              {conflicts.map((item, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px', borderTop: '0.5px solid var(--separator)' }}>
-                  <Artwork src={item.incoming.artwork} placeholderSize={16} style={{ width: 36, height: 36, borderRadius: 6, flexShrink: 0 } as React.CSSProperties} />
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.incoming.title}</div>
-                    <div style={{ fontSize: 12, color: 'var(--label-secondary)' }}>{item.incoming.artist}</div>
+              {conflicts.map((item, i) => {
+                const isSkipped = skippedIds.has(item.incoming.id);
+                return (
+                  <div
+                    key={i}
+                    onClick={() => item.status !== 'exact' && toggleSkip(item.incoming.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px', borderTop: '0.5px solid var(--separator)', cursor: item.status !== 'exact' ? 'pointer' : 'default', opacity: isSkipped ? 0.4 : 1, background: isSkipped ? 'var(--fill-1)' : undefined, borderRadius: 6 }}
+                  >
+                    <Artwork src={item.incoming.artwork} placeholderSize={16} style={{ width: 36, height: 36, borderRadius: 6, flexShrink: 0 } as React.CSSProperties} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: isSkipped ? 'line-through' : undefined }}>{item.incoming.title}</div>
+                      <div style={{ fontSize: 12, color: 'var(--label-secondary)' }}>{item.incoming.artist}</div>
+                    </div>
+                    <span style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 10, fontWeight: 500,
+                      background: isSkipped ? 'rgba(255,59,48,0.15)' : item.status === 'exact' ? 'var(--fill-1)' : item.status === 'conflict' ? 'rgba(255,149,0,0.15)' : 'rgba(0,122,255,0.15)',
+                      color: isSkipped ? '#ff3b30' : item.status === 'exact' ? 'var(--label-secondary)' : item.status === 'conflict' ? '#ff9500' : '#007aff',
+                    }}>
+                      {isSkipped ? 'Skip' : item.status === 'exact' ? 'Have it' : item.status === 'conflict' ? 'Differs' : 'New'}
+                    </span>
                   </div>
-                  <span style={{
-                    fontSize: 11, padding: '2px 8px', borderRadius: 10, fontWeight: 500,
-                    background: item.status === 'exact' ? 'var(--fill-1)' : item.status === 'conflict' ? 'rgba(255,149,0,0.15)' : 'rgba(0,122,255,0.15)',
-                    color: item.status === 'exact' ? 'var(--label-secondary)' : item.status === 'conflict' ? '#ff9500' : '#007aff',
-                  }}>
-                    {item.status === 'exact' ? 'Have it' : item.status === 'conflict' ? 'Differs' : 'New'}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {conflictCount > 0 && (

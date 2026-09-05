@@ -17,7 +17,7 @@ import { getTrackProfile } from '../lib/classifier';
 import { formatGenre } from '../lib/tags';
 import { ReceiveTextSheet } from './ReceiveTextSheet';
 import { PasteShareSheet } from './PasteShareSheet';
-import { shareAlbum, shareArtist, sharePlaylist, shareMix } from '../lib/share';
+import { shareTracks, shareAlbum, shareArtist, sharePlaylist, shareMix } from '../lib/share';
 import { searchYouTube, type YtSearchResult } from '../lib/ytdlp';
 import type { YtItem } from '../lib/ytdlp';
 import { ImportConfirmSheet, type ImportOverrides } from './ImportConfirmSheet';
@@ -272,6 +272,14 @@ function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums'
             >
               Receive Share
             </button>
+            {tracks.length > 0 && (
+              <button
+                className="pill-btn"
+                onClick={() => void shareTracks(tracks)}
+              >
+                Share Library
+              </button>
+            )}
             <span style={{ fontSize: 13, color: 'var(--label-secondary)' }}>{tracks.length} songs</span>
           </div>
           <div className="group">
