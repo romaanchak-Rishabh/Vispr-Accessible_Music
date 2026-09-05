@@ -121,27 +121,25 @@ export default function App(): JSX.Element {
   // Periodic server health check — toast + notification on status change (up ↔ down)
   const showToast = useUI((s) => s.showToast);
   const serverRef = useRef<boolean | null>(null); // null = unknown, true = up, false = down
-  const prevUrlRef = useRef<string>('');
   useEffect(() => {
     let active = true;
     const check = async () => {
       const server = useSettings.getState().ytdlpServer;
-      if (!server) { serverRef.current = null; prevUrlRef.current = ''; return; }
-      // If the server URL changed (tunnel healed), treat previous state as unknown
-      // so we don't miss a down→up transition
-      const urlChanged = prevUrlRef.current !== '' && prevUrlRef.current !== server;
-      if (urlChanged) serverRef.current = null;
-      prevUrlRef.current = server;
+      if (!server) { serverRef.current = null; return; }
       const up = await pingServer(server);
       if (!active) return;
       const prev = serverRef.current;
       serverRef.current = up;
       if (prev === null) {
-        if (!up) showToast('Server offline');
-        else sendServerUpNotification(); // URL changed and is up → notify
-      } else if (prev !== up) {
-        showToast(up ? 'Server is up' : 'Server offline');
+        // First check after idle — always notify if server is up (covers URL change + fresh start)
         if (up) sendServerUpNotification();
+        else showToast('Server offline');
+      } else if (prev === false && up) {
+        // Genuine down→up transition
+        showToast('Server is up');
+        sendServerUpNotification();
+      } else if (prev === true && !up) {
+        showToast('Server offline');
       }
     };
     void check();
