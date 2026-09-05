@@ -131,11 +131,9 @@ export default function App(): JSX.Element {
       const prev = serverRef.current;
       serverRef.current = up;
       if (prev === null) {
-        // First check after idle — always notify if server is up (covers URL change + fresh start)
         if (up) sendServerUpNotification();
         else showToast('Server offline');
       } else if (prev === false && up) {
-        // Genuine down→up transition
         showToast('Server is up');
         sendServerUpNotification();
       } else if (prev === true && !up) {
@@ -144,7 +142,18 @@ export default function App(): JSX.Element {
     };
     void check();
     const id = setInterval(check, 10_000);
-    return () => { active = false; clearInterval(id); };
+
+    // Also check immediately when app comes back to foreground (mobile throttles background intervals)
+    const onVisible = (): void => {
+      if (document.visibilityState === 'visible') void check();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      active = false;
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [showToast]);
 
   // Handle share_target (Android/Chrome PWA share target)
