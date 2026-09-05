@@ -613,12 +613,21 @@ function SearchView(): JSX.Element {
       if (serverUp) {
         await importYouTube(videoUrl, undefined, overrides);
       } else {
+        const ov = overrides[item.id];
         await queueYouTubeImport({
           id: item.id,
           url: videoUrl,
-          title: overrides[item.id]?.title || item.title || '',
-          artist: overrides[item.id]?.artist || item.uploader || '',
-          album: overrides[item.id]?.album,
+          title: ov?.title || item.title || '',
+          artist: ov?.artist || item.uploader || '',
+          artists: ov?.artists,
+          album: ov?.album,
+          genre1: ov?.genre1,
+          genre2: ov?.genre2,
+          year: ov?.year ? parseInt(ov.year) || undefined : undefined,
+          mood: ov?.mood,
+          language: ov?.language,
+          tags: ov?.tags,
+          songType: ov?.songType,
           thumbnail: item.thumbnail || '',
           duration: item.duration || 0,
         });

@@ -139,6 +139,7 @@ interface LibraryState {
       title?: string;
       artist?: string;
       artist2?: string;
+      artists?: string[];
       album?: string;
       genre1?: string;
       genre2?: string;
@@ -468,6 +469,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             title: ov?.title?.trim() || item.title || dl.filename,
             artist: ov?.artist?.trim() || item.uploader || 'Unknown Artist',
             artist2: ov?.artist2?.trim() || undefined,
+            artists: ov?.artists?.length ? ov.artists : undefined,
             album: ov?.album?.trim() || item.playlist_title || 'YouTube',
             genre1,
             genre2,
@@ -754,7 +756,15 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           id: `y-${item.id}`,
           title: item.title,
           artist: item.artist || 'Unknown Artist',
+          artists: item.artists,
           album: item.album?.trim() || 'YouTube',
+          genre1: item.genre1,
+          genre2: item.genre2,
+          year: item.year,
+          mood: item.mood,
+          language: item.language,
+          tags: item.tags,
+          songType: item.songType,
           fileName: dl.filename,
           path: dl.filename,
           source: 'file',
