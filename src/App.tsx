@@ -108,8 +108,13 @@ export default function App(): JSX.Element {
   // keep the backend server URL in sync with the published (auto-healed) tunnel
   useEffect(() => startTunnelSync(), []);
 
-  // Request notification permission on mount
-  useEffect(() => { requestNotificationPermission(); }, []);
+  // Request notification permission on mount + on first click (PWAs need user gesture)
+  useEffect(() => {
+    requestNotificationPermission();
+    const handleClick = (): void => { requestNotificationPermission(); };
+    document.addEventListener('click', handleClick, { once: true });
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
 
   // Periodic server health check — toast + notification on status change (up ↔ down)
   const showToast = useUI((s) => s.showToast);

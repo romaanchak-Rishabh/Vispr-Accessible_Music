@@ -80,6 +80,11 @@ export function SettingsPage(): JSX.Element {
   const totalBytes = useLibrary((s) => s.tracks.reduce((n, t) => n + (t.size || 0), 0));
 
   const [serverStatus, setServerStatus] = useState<'idle' | 'checking' | 'up' | 'down'>('idle');
+  const [notifStatus, setNotifStatus] = useState<string>(() => {
+    if (!('Notification' in window)) return 'Not supported';
+    return Notification.permission;
+  });
+
   const checkServer = useCallback(async () => {
     setServerStatus('checking');
     try {
@@ -199,10 +204,30 @@ export function SettingsPage(): JSX.Element {
             {serverStatus === 'down' && (
               <span style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 500 }}>● Unreachable</span>
             )}
-            <button className="pill-btn" style={{ fontSize: 12, padding: '3px 10px', marginLeft: 'auto' }} onClick={() => void checkServer()}>
+            <button className="pill-btn" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => void checkServer()}>
               Check
             </button>
+            <button className="pill-btn" style={{ fontSize: 12, padding: '3px 10px' }} onClick={async () => {
+              if (!('Notification' in window)) { setNotifStatus('Not supported'); return; }
+              const perm = await Notification.requestPermission();
+              setNotifStatus(perm);
+              if (perm === 'granted') {
+                try { new Notification('Test Notification', { body: 'Notifications are working!', tag: 'test' }); } catch (e) { setNotifStatus('Failed: ' + String(e)); }
+              }
+            }}>
+              {notifStatus === 'granted' ? 'Send Test' : notifStatus === 'denied' ? 'Notifications Blocked' : notifStatus === 'Not supported' ? 'Notifications N/A' : 'Enable Notifications'}
+            </button>
           </div>
+          {notifStatus === 'denied' && (
+            <div style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-bg)', padding: '8px 10px', borderRadius: 8, lineHeight: 1.5 }}>
+              <strong>Notifications blocked.</strong> On iOS: go to Settings → Notifications → Vispr → Allow Notifications. On Android: long-press the app icon → App info → Notifications → enable.
+            </div>
+          )}
+          {notifStatus === 'Not supported' && (
+            <div style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-bg)', padding: '8px 10px', borderRadius: 8, lineHeight: 1.5 }}>
+              <strong>iOS users:</strong> Notifications require iOS 16.4+ and the app must be added to Home Screen (not opened in Safari). Go to Safari → Share → Add to Home Screen.
+            </div>
+          )}
           <div style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-bg)', padding: '8px 10px', borderRadius: 8, lineHeight: 1.5 }}>
             <strong>Run your own server?</strong> Start the Python backend on a laptop with internet, then expose it with Cloudflare Tunnel:
             <code style={{ display: 'block', marginTop: 4, fontSize: 11, fontFamily: 'monospace', wordBreak: 'break-all' }}>
