@@ -82,7 +82,7 @@ export async function fetchGeminiMetadata(
   tags?: string[],
   signal?: AbortSignal
 ): Promise<GeminiMetadata | null> {
-  if (!apiKey || !title) return null;
+  if (!apiKey || !title) { console.warn('[gemini] no apiKey or title', { apiKey: !!apiKey, title }); return null; }
 
   const userMsg = [
     `Title: ${title}`,
@@ -106,12 +106,13 @@ export async function fetchGeminiMetadata(
       signal,
     });
 
-    if (!resp.ok) return null;
+    if (!resp.ok) { console.warn('[gemini] API error', resp.status, await resp.text().catch(() => '')); return null; }
 
     const data = await resp.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     return parseResponse(text);
-  } catch {
+  } catch (e) {
+    console.warn('[gemini] fetch failed', e);
     return null;
   }
 }
