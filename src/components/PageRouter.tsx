@@ -1170,29 +1170,29 @@ function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null
         <button className="pill-btn" onClick={() => void shareAlbum(album.title, tracks)}>
           <ShareIcon size={15} /> Share
         </button>
+        <div style={{ position: 'relative', marginLeft: 'auto' }}>
+          <button className="pill-btn" style={{ fontSize: 12 }} onClick={() => setSortMenuOpen(!sortMenuOpen)}>
+            Sort
+          </button>
+          {sortMenuOpen && (
+            <div className="sort-menu" style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              background: 'var(--surface)',
+              borderRadius: 12,
+              padding: '6px 0',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              zIndex: 10,
+              minWidth: 140,
+            }}>
+              <button className="sort-menu-item" onClick={() => sortTracks('az')}>A → Z</button>
+              <button className="sort-menu-item" onClick={() => sortTracks('za')}>Z → A</button>
+              <button className="sort-menu-item" onClick={() => sortTracks('date')}>Date Added</button>
+            </div>
+          )}
+        </div>
       </DetailHeader>
-      <div style={{ display: 'flex', gap: 8, padding: '0 16px 12px', position: 'relative' }}>
-        <button className="pill-btn" style={{ fontSize: 12 }} onClick={() => setSortMenuOpen(!sortMenuOpen)}>
-          Sort
-        </button>
-        {sortMenuOpen && (
-          <div className="sort-menu" style={{
-            position: 'absolute',
-            top: '100%',
-            left: 16,
-            background: 'var(--surface)',
-            borderRadius: 12,
-            padding: '6px 0',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            zIndex: 10,
-            minWidth: 140,
-          }}>
-            <button className="sort-menu-item" onClick={() => sortTracks('az')}>A → Z</button>
-            <button className="sort-menu-item" onClick={() => sortTracks('za')}>Z → A</button>
-            <button className="sort-menu-item" onClick={() => sortTracks('date')}>Date Added</button>
-          </div>
-        )}
-      </div>
       <div className="group">
         {tracks.map((t, i) => (
           <DragRow
