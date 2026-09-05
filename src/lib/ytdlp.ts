@@ -194,12 +194,13 @@ export async function searchYouTube(
       headers: authHeaders(token),
       body: JSON.stringify({ query, limit })
     }, 15_000);
-    if (!resp.ok) return [];
+    if (!resp.ok) { console.warn(`[search] ${resp.status} from ${url}`); return []; }
     const data = (await resp.json()) as { results?: YtSearchResult[] };
     const results = data.results ?? [];
     if (results.length > 0) cacheSearchResults(query, results);
     return results;
-  } catch {
+  } catch (e) {
+    console.warn('[search] failed:', e);
     return [];
   }
 }

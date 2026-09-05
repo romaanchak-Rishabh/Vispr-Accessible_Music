@@ -57,7 +57,11 @@ export async function syncTunnelUrl(): Promise<void> {
 
     // Fetch latest from GitHub
     const latest = await fetchLatestTunnel();
-    if (!latest) return;
+    if (!latest) {
+      // No tunnel available — clear any stale dead URL so search falls back to same-origin
+      if (isManaged) setYtdlpServer('');
+      return;
+    }
     if (cur === latest) return;
     if (!isManaged) return;
 
