@@ -95,6 +95,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   const [lookup, setLookup] = useState<Record<string, 'pending' | 'done' | 'none'>>({});
   const [geminiMeta, setGeminiMeta] = useState<Record<string, GeminiMetadata | null>>({});
   const [geminiLoading, setGeminiLoading] = useState<Record<string, boolean>>({});
+  const [geminiAccepted, setGeminiAccepted] = useState<Record<string, boolean>>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
   const geminiApiKey = getGeminiApiKey();
@@ -465,7 +466,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                 </div>
               )}
 
-              {!geminiLoading[item.id] && geminiMeta[item.id] && lookup[item.id] !== 'pending' && (
+              {!geminiLoading[item.id] && geminiMeta[item.id] && !geminiAccepted[item.id] && lookup[item.id] !== 'pending' && (
                 <GeminiSuggestion
                   meta={geminiMeta[item.id]!}
                   onAccept={() => {
@@ -490,6 +491,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
                         language: meta.language ?? undefined,
                       }
                     }));
+                    setGeminiAccepted((prev) => ({ ...prev, [item.id]: true }));
                   }}
                 />
               )}
