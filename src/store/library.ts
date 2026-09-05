@@ -156,12 +156,16 @@ interface LibraryState {
       title?: string;
       artist?: string;
       artist2?: string;
+      artists?: string[];
       album?: string;
       artwork?: string;
       genre1?: string;
       genre2?: string;
       year?: number;
       songType?: string;
+      mood?: string;
+      language?: string;
+      tags?: string[];
     }
   ) => Promise<void>;
   addFileWithMeta: (
@@ -528,12 +532,16 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             ...(patch.title?.trim() ? { title: patch.title.trim() } : {}),
             ...(patch.artist?.trim() ? { artist: patch.artist.trim() } : {}),
             ...(patch.artist2 !== undefined ? { artist2: patch.artist2?.trim() || undefined } : {}),
+            ...(patch.artists !== undefined ? { artists: patch.artists } : {}),
             ...(patch.album?.trim() ? { album: patch.album.trim() } : {}),
             ...(patch.artwork !== undefined ? { artwork: patch.artwork || undefined } : {}),
             ...(patch.genre1 !== undefined ? { genre1: patch.genre1 || undefined } : {}),
             ...(patch.genre2 !== undefined ? { genre2: patch.genre2 || undefined } : {}),
             ...(patch.year !== undefined ? { year: patch.year || undefined } : {}),
-            ...(patch.songType !== undefined ? { songType: patch.songType || undefined } : {})
+            ...(patch.songType !== undefined ? { songType: patch.songType || undefined } : {}),
+            ...(patch.mood !== undefined ? { mood: patch.mood || undefined } : {}),
+            ...(patch.language !== undefined ? { language: patch.language || undefined } : {}),
+            ...(patch.tags !== undefined ? { tags: patch.tags } : {})
           }
         : t
     );

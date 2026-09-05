@@ -7,9 +7,11 @@ import { Artwork } from './Artwork';
 import { SpinnerIcon } from './Icons';
 import { TagInput } from './TagInput';
 import { blobToDataUrl } from '../lib/metadata';
-import { formatArtist } from '../types';
+import { formatArtist, SONG_TYPE_OPTIONS, type SongType } from '../types';
 import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue, eraToYear } from '../lib/tags';
 import { shareTracks } from '../lib/share';
+import { getGeminiApiKey } from '../lib/geminiMetadata';
+import { fetchGeminiMetadata, mapGeminiGenres } from '../lib/geminiMetadata';
 
 export function ActionSheet(): JSX.Element | null {
   const trackId = useUI((s) => s.actionSheetTrackId);
@@ -22,8 +24,7 @@ export function ActionSheet(): JSX.Element | null {
   const [submenu, setSubmenu] = useState<'main' | 'playlist' | 'new-playlist' | 'edit'>('main');
   const [newName, setNewName] = useState('');
   const [title, setTitle] = useState('');
-  const [artist, setArtist] = useState('');
-  const [artist2, setArtist2] = useState('');
+  const [artists, setArtists] = useState<string[]>(['']);
   const [album, setAlbum] = useState('');
   const [genre1, setGenre1] = useState('');
   const [genre2, setGenre2] = useState('');
@@ -31,6 +32,11 @@ export function ActionSheet(): JSX.Element | null {
   const [artwork, setArtwork] = useState<string | undefined>(undefined);
   const [ytUrl, setYtUrl] = useState('');
   const [artworkLoading, setArtworkLoading] = useState(false);
+  const [mood, setMood] = useState('');
+  const [language, setLanguage] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [songType, setSongType] = useState<SongType>('');
+  const [rescanning, setRescanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!trackId || !track) return null;
@@ -43,8 +49,14 @@ export function ActionSheet(): JSX.Element | null {
 
   const openEdit = (): void => {
     setTitle(track.title);
-    setArtist(track.artist);
-    setArtist2(track.artist2 ?? '');
+    // Populate artists list from track.artists or fallback to artist/artist2
+    if (track.artists && track.artists.length > 0) {
+      setArtists([...track.artists]);
+    } else {
+      const list = [track.artist];
+      if (track.artist2) list.push(track.artist2);
+      setArtists(list);
+    }
     setAlbum(track.album);
     setGenre1(track.genre1 ?? '');
     setGenre2(track.genre2 ?? '');
@@ -57,6 +69,10 @@ export function ActionSheet(): JSX.Element | null {
       '1970s'
     ) : '');
     setArtwork(track.artwork);
+    setMood(track.mood ?? '');
+    setLanguage(track.language ?? '');
+    setTags(track.tags ? [...track.tags] : []);
+    setSongType((track.songType as SongType) ?? '');
     setSubmenu('edit');
   };
 
@@ -68,7 +84,6 @@ export function ActionSheet(): JSX.Element | null {
   const fetchArtworkFromUrl = async (): Promise<void> => {
     const trimmed = ytUrl.trim();
     if (!trimmed) return;
-    // Extract video ID from various YouTube URL formats
     const match = trimmed.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/);
     const videoId = match?.[1];
     if (!videoId) return;
@@ -91,15 +106,62 @@ export function ActionSheet(): JSX.Element | null {
   const saveEdit = async (): Promise<void> => {
     const y = year.trim();
     const yearNum = eraToYear(y);
-    await useLibrary.getState().updateTrackMeta(track.id, { title, artist, artist2, album, artwork, genre1, genre2, year: yearNum });
+    const cleanedArtists = artists.filter((a) => a.trim());
+    await useLibrary.getState().updateTrackMeta(track.id, {
+      title,
+      artist: cleanedArtists[0] || '',
+      artist2: cleanedArtists[1] || '',
+      artists: cleanedArtists.length > 1 ? cleanedArtists : undefined,
+      album,
+      artwork,
+      genre1,
+      genre2,
+      year: yearNum,
+      songType,
+      mood,
+      language,
+      tags,
+    });
     close();
+  };
+
+  const rescanMetadata = async (): Promise<void> => {
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) {
+      useUI.getState().showToast('Gemini API key not configured');
+      return;
+    }
+    setRescanning(true);
+    try {
+      const meta = await fetchGeminiMetadata(apiKey, track.title, track.artist, undefined, undefined);
+      if (!meta) {
+        useUI.getState().showToast('No metadata found');
+        return;
+      }
+      const genreMapped = mapGeminiGenres(meta.genres);
+      const updatedArtists = meta.artists.length > 0 ? meta.artists : [track.artist];
+      await useLibrary.getState().updateTrackMeta(track.id, {
+        artist: updatedArtists[0] || track.artist,
+        artist2: updatedArtists[1] || '',
+        artists: updatedArtists.length > 1 ? updatedArtists : undefined,
+        album: meta.album || track.album,
+        genre1: genreMapped.genre1 ?? track.genre1,
+        genre2: genreMapped.genre2 ?? track.genre2,
+        year: meta.year ?? track.year,
+        mood: meta.mood ?? track.mood,
+        language: meta.language ?? track.language,
+        tags: meta.tags.length > 0 ? meta.tags : track.tags,
+      });
+      useUI.getState().showToast('Metadata updated from Gemini');
+    } catch {
+      useUI.getState().showToast('Rescan failed');
+    }
+    setRescanning(false);
   };
 
   const player = usePlayer.getState();
   const lib = useLibrary.getState();
 
-  // Apple Music behaviour: the now-playing sheet slides down to the mini pill,
-  // then the target page opens.
   const goToPage = (page: Page): void => {
     useUI.setState({ showNowPlaying: false, showQueue: false });
     close();
@@ -116,7 +178,7 @@ export function ActionSheet(): JSX.Element | null {
             fn: () => setSubmenu('new-playlist')
           },
           ...playlists.map((p) => ({
-            label: `Add to “${p.name}”`,
+            label: `Add to "${p.name}"`,
             fn: () => {
               lib.addToPlaylist(p.id, [track.id]);
               close();
@@ -169,7 +231,12 @@ export function ActionSheet(): JSX.Element | null {
               fn: () => setSubmenu('playlist')
             },
             {
-              label: 'More…',
+              label: 'Rescan Metadata',
+              sub: 'Re-fetch from Gemini AI',
+              fn: () => void rescanMetadata()
+            },
+            {
+              label: 'Edit Song Info',
               fn: openEdit
             },
             {
@@ -210,7 +277,7 @@ export function ActionSheet(): JSX.Element | null {
     return (
       <div className="sheet-overlay" style={{ alignItems: 'flex-end', justifyContent: 'center' }} onClick={close}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }} onClick={(e) => e.stopPropagation()}>
-          <div className="action-sheet" style={{ width: 'min(420px, 100%)' }}>
+          <div className="action-sheet" style={{ width: 'min(420px, 100%)', maxHeight: '85vh', overflowY: 'auto' }}>
             <div className="action-sheet-head">
               <span style={{ fontSize: 17, fontWeight: 600 }}>Edit Song Info</span>
             </div>
@@ -261,8 +328,43 @@ export function ActionSheet(): JSX.Element | null {
                 </button>
               </div>
               <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-              <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Artist 1" value={artist} onChange={(e) => setArtist(e.target.value)} />
-              <input className="search-input" style={{ paddingLeft: 12 }} placeholder="Artist 2 (feat.)" value={artist2} onChange={(e) => setArtist2(e.target.value)} />
+
+              {/* Dynamic Artists List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {artists.map((a, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <input
+                      className="search-input"
+                      style={{ flex: 1, paddingLeft: 12, fontSize: 13 }}
+                      placeholder={i === 0 ? 'Primary Artist' : `Featured Artist ${i}`}
+                      value={a}
+                      onChange={(e) => {
+                        const next = [...artists];
+                        next[i] = e.target.value;
+                        setArtists(next);
+                      }}
+                    />
+                    {artists.length > 1 && (
+                      <button
+                        className="icon-btn"
+                        style={{ fontSize: 16, color: 'var(--accent)', flexShrink: 0, padding: '4px 6px' }}
+                        onClick={() => setArtists(artists.filter((_, j) => j !== i))}
+                        aria-label="Remove artist"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  className="pill-btn"
+                  style={{ alignSelf: 'flex-start', padding: '4px 10px', fontSize: 12 }}
+                  onClick={() => setArtists([...artists, ''])}
+                >
+                  + Add Artist
+                </button>
+              </div>
+
               <TagInput
                 label="Album"
                 placeholder="Search or type album…"
@@ -305,12 +407,34 @@ export function ActionSheet(): JSX.Element | null {
                   ))}
                 </select>
               </div>
+              <select
+                className="search-input"
+                style={{ paddingLeft: 10, fontSize: 13 }}
+                value={songType}
+                onChange={(e) => setSongType(e.target.value as SongType)}
+              >
+                {SONG_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <input className="search-input" style={{ paddingLeft: 12, fontSize: 13 }} placeholder="Mood (e.g. upbeat, romantic)" value={mood} onChange={(e) => setMood(e.target.value)} />
+              <input className="search-input" style={{ paddingLeft: 12, fontSize: 13 }} placeholder="Language" value={language} onChange={(e) => setLanguage(e.target.value)} />
+
+              {/* Tags */}
+              <TagInput
+                label="Tags"
+                placeholder="Add tag…"
+                value={tags.join(', ')}
+                onChange={(v) => setTags(v.split(',').map((t) => t.trim()).filter(Boolean))}
+                options={[]}
+              />
+
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   className="pill-btn primary"
                   style={{ flex: 1 }}
                   onClick={() => void saveEdit()}
-                  disabled={!title.trim() || !artist.trim()}
+                  disabled={!title.trim() || !artists[0]?.trim()}
                 >
                   Save
                 </button>
@@ -362,6 +486,7 @@ export function ActionSheet(): JSX.Element | null {
                   <div className="row-title">{track.title}</div>
                   <div className="row-subtitle">{formatArtist(track)}</div>
                 </div>
+                {rescanning && <SpinnerIcon size={16} />}
               </div>
               {actions.map((a) => (
                 <button
@@ -371,6 +496,7 @@ export function ActionSheet(): JSX.Element | null {
                   onClick={() => {
                     a.fn();
                   }}
+                  disabled={rescanning}
                 >
                   <span>{a.label}</span>
                   {a.sub && (

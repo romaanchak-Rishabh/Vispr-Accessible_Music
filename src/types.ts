@@ -3,6 +3,7 @@ export interface Track {
   title: string;
   artist: string;
   artist2?: string;
+  artists?: string[];
   album: string;
   albumArtist?: string;
   genre?: string;
@@ -72,7 +73,8 @@ export function isAudioFile(name: string): boolean {
   return AUDIO_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
-export function formatArtist(track: Pick<Track, 'artist' | 'artist2'>): string {
+export function formatArtist(track: Pick<Track, 'artist' | 'artist2' | 'artists'>): string {
+  if (track.artists && track.artists.length > 0) return track.artists.join(' × ');
   const a = track.artist;
   const b = track.artist2?.trim();
   if (!b) return a;
