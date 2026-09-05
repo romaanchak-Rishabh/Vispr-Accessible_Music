@@ -64,11 +64,11 @@ PORT = int(os.environ.get("PORT", "8080"))
 AUDIO_FORMAT = "bestaudio[ext=m4a]/bestaudio[acodec!=none]/best"
 MAX_PLAYLIST = 300
 # Player clients tried in order (after the default) when YouTube bot-checks us.
-# tv / web_safari are currently the least-challenged clients on datacenter IPs;
+# tv_embedded / mediaconnect are currently the least-challenged clients on datacenter IPs;
 # visionos (JS-less, no PO token needed) is already tried by yt-dlp's default.
 FALLBACK_CLIENTS = [
     c.strip()
-    for c in os.environ.get("YTDLP_PLAYER_CLIENT", "tv,web_safari,mweb,android_vr").split(",")
+    for c in os.environ.get("YTDLP_PLAYER_CLIENT", "tv_embedded,mediaconnect,android,android_vr").split(",")
     if c.strip()
 ]
 # Optional anti-bot-check credentials:
