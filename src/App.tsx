@@ -107,7 +107,7 @@ export default function App(): JSX.Element {
       }
     };
     void check();
-    const id = setInterval(check, 30_000);
+    const id = setInterval(check, 10_000);
     return () => { active = false; clearInterval(id); };
   }, [showToast]);
 

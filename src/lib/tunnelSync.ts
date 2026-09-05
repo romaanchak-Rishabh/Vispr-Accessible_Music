@@ -2,7 +2,7 @@ import { useSettings } from '../store/settings';
 import { useUI } from '../store/ui';
 
 const RAW_URL = 'https://raw.githubusercontent.com/romaanchak-Rishabh/Vispr-Accessible_Music/main/tunnel.txt';
-const POLL_MS = 30_000;
+const POLL_MS = 10_000;
 const HEALTH_TIMEOUT = 8_000;
 
 function hostOf(u: string): string | null {
