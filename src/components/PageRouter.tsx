@@ -11,7 +11,7 @@ import { Artwork } from './Artwork';
 import { PlaylistArtwork } from './PlaylistArtwork';
 import { EmptyLibrary, AlbumCard } from './Views';
 import { ImportBar } from './ImportBar';
-import { ChevronRightIcon, PlusCircleIcon, EllipsisIcon, ShuffleIcon, PlayIcon, SparklesIcon, ShareIcon } from './Icons';
+import { ChevronRightIcon, PlusCircleIcon, EllipsisIcon, ShuffleIcon, PlayIcon, SparklesIcon, ShareIcon, SpinnerIcon } from './Icons';
 import { getRecommendations, getSmartRecommendations, type Recommendation } from '../lib/recommender';
 import { getTrackProfile } from '../lib/classifier';
 import { formatGenre } from '../lib/tags';
@@ -78,10 +78,125 @@ const LIB_SECTIONS = [
   { id: 'artists', label: 'Artists' },
   { id: 'albums', label: 'Albums' },
   { id: 'songs', label: 'Songs' },
-  { id: 'recent', label: 'Recently Added' }
+  { id: 'recent', label: 'Recently Added' },
+  { id: 'downloads', label: 'Downloads' }
 ] as const;
 
-function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums' | 'songs' | 'recent' }): JSX.Element {
+function DownloadsView(): JSX.Element {
+  const queue = useLibrary((s) => s.downloadQueue);
+  const processQueue = useLibrary((s) => s.processDownloadQueue);
+
+  const pending = queue.filter((q) => q.status === 'pending');
+  const downloading = queue.filter((q) => q.status === 'downloading');
+  const failed = queue.filter((q) => q.status === 'failed');
+  const done = queue.filter((q) => q.status === 'done');
+
+  const statusColor = (s: string) => {
+    if (s === 'downloading') return 'var(--accent)';
+    if (s === 'pending') return 'var(--label-secondary)';
+    if (s === 'failed') return '#ff3b30';
+    if (s === 'done') return '#34c759';
+    return 'var(--label-secondary)';
+  };
+
+  const statusLabel = (s: string) => {
+    if (s === 'downloading') return 'Downloading…';
+    if (s === 'pending') return 'Pending';
+    if (s === 'failed') return 'Failed';
+    if (s === 'done') return 'Done';
+    return s;
+  };
+
+  return (
+    <>
+      <h2 className="section-header" style={{ paddingTop: 4 }}>
+        Downloads
+        {queue.length > 0 && <span style={{ fontWeight: 400, fontSize: 13, marginLeft: 6 }}>({queue.length})</span>}
+      </h2>
+
+      {queue.length === 0 ? (
+        <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--label-secondary)', fontSize: 14 }}>
+          No downloads yet
+        </div>
+      ) : (
+        <>
+          {downloading.length > 0 && (
+            <div className="group" style={{ marginTop: 0 }}>
+              {downloading.map((q) => (
+                <div key={q.id} className="row" style={{ margin: '0 16px', width: 'auto' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.title}</div>
+                    <div style={{ fontSize: 12, color: statusColor(q.status) }}>{statusLabel(q.status)}</div>
+                  </div>
+                  <SpinnerIcon size={16} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {pending.length > 0 && (
+            <div className="group" style={{ marginTop: downloading.length > 0 ? 12 : 0 }}>
+              <div style={{ padding: '0 16px 6px', fontSize: 12, fontWeight: 600, color: 'var(--label-secondary)', textTransform: 'uppercase' }}>
+                Queued ({pending.length})
+              </div>
+              {pending.map((q) => (
+                <div key={q.id} className="row" style={{ margin: '0 16px', width: 'auto' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.title}</div>
+                    <div style={{ fontSize: 12, color: 'var(--label-secondary)' }}>{q.artist}</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: statusColor(q.status) }}>{statusLabel(q.status)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {failed.length > 0 && (
+            <div className="group" style={{ marginTop: 12 }}>
+              <div style={{ padding: '0 16px 6px', fontSize: 12, fontWeight: 600, color: '#ff3b30', textTransform: 'uppercase' }}>
+                Failed ({failed.length})
+              </div>
+              {failed.map((q) => (
+                <div key={q.id} className="row" style={{ margin: '0 16px', width: 'auto' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.title}</div>
+                    <div style={{ fontSize: 12, color: '#ff3b30' }}>{q.error || 'Download failed'}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {done.length > 0 && (
+            <div className="group" style={{ marginTop: 12 }}>
+              <div style={{ padding: '0 16px 6px', fontSize: 12, fontWeight: 600, color: '#34c759', textTransform: 'uppercase' }}>
+                Completed ({done.length})
+              </div>
+              {done.map((q) => (
+                <div key={q.id} className="row" style={{ margin: '0 16px', width: 'auto', opacity: 0.6 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.title}</div>
+                    <div style={{ fontSize: 12, color: '#34c759' }}>Added to library</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {pending.length > 0 && (
+            <div style={{ padding: '12px 16px' }}>
+              <button className="pill-btn primary" style={{ width: '100%' }} onClick={() => void processQueue()}>
+                Start Downloads
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums' | 'songs' | 'recent' | 'downloads' }): JSX.Element {
   const status = useLibrary((s) => s.status);
   const tracks = useLibrary((s) => s.tracks);
   const albums = useLibrary((s) => s.albums);
@@ -197,6 +312,8 @@ function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums'
           </div>
         </>
       )}
+
+      {active === 'downloads' && <DownloadsView />}
 
       {active === 'playlists' && <PlaylistsManager />}
 

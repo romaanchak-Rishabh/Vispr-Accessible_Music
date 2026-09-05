@@ -5,7 +5,7 @@ export type Page =
   | { type: 'listen' }
   | { type: 'forYou' }
   | { type: 'browse' }
-  | { type: 'library'; section?: 'playlists' | 'artists' | 'albums' | 'songs' | 'recent' }
+  | { type: 'library'; section?: 'playlists' | 'artists' | 'albums' | 'songs' | 'recent' | 'downloads' }
   | { type: 'search' }
   | { type: 'album'; key: string }
   | { type: 'artist'; name: string }
