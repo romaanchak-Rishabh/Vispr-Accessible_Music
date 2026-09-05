@@ -636,7 +636,7 @@ function GeminiSuggestion({ meta, onAccept }: { meta: GeminiMetadata; onAccept: 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {meta.artists.map((a, i) => (
               <span key={i} style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label)' }}>
-                {a}
+                {a.charAt(0).toUpperCase() + a.slice(1)}
               </span>
             ))}
           </div>
@@ -658,7 +658,7 @@ function GeminiSuggestion({ meta, onAccept }: { meta: GeminiMetadata; onAccept: 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {meta.genres.map((g, i) => (
               <span key={i} style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label)' }}>
-                {g}
+                {g.charAt(0).toUpperCase() + g.slice(1).toLowerCase()}
               </span>
             ))}
           </div>
@@ -673,12 +673,12 @@ function GeminiSuggestion({ meta, onAccept }: { meta: GeminiMetadata; onAccept: 
         )}
         {meta.mood && (
           <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label-secondary)' }}>
-            {meta.mood}
+            {meta.mood.charAt(0).toUpperCase() + meta.mood.slice(1).toLowerCase()}
           </span>
         )}
         {meta.language && (
           <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label-secondary)' }}>
-            {meta.language}
+            {meta.language.charAt(0).toUpperCase() + meta.language.slice(1).toLowerCase()}
           </span>
         )}
         {meta.isMashup && (
@@ -691,7 +691,25 @@ function GeminiSuggestion({ meta, onAccept }: { meta: GeminiMetadata; onAccept: 
             Remix
           </span>
         )}
+        {meta.remixer && (
+          <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label-secondary)' }}>
+            Remixed by {meta.remixer}
+          </span>
+        )}
       </div>
+
+      {meta.tags.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--label-secondary)', marginBottom: 3 }}>Tags</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {meta.tags.map((t, i) => (
+              <span key={i} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label-secondary)' }}>
+                {t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <button className="pill-btn primary" onClick={onAccept} style={{ width: '100%', fontSize: 13, padding: '8px 16px' }}>
         <SparklesIcon size={14} /> Accept & Apply
