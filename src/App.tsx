@@ -29,21 +29,28 @@ function requestNotificationPermission(): void {
   }
 }
 
-function sendServerUpNotification(): void {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    try {
-      const n = new Notification('Server is back online', {
+async function sendServerUpNotification(): Promise<void> {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    // Use Service Worker's showNotification (works from non-gesture contexts on mobile)
+    const reg = await navigator.serviceWorker?.ready;
+    if (reg?.showNotification) {
+      await reg.showNotification('Server is back online', {
         body: 'Open the app to resume downloading your music.',
         icon: '/icons/icon-192.png',
         badge: '/icons/icon-192.png',
         tag: 'server-up',
       });
-      n.onerror = () => console.warn('[notification] error');
-    } catch (e) {
-      console.warn('[notification] failed', e);
+      return;
     }
-  } else {
-    console.warn('[notification] not sent — permission:', typeof Notification !== 'undefined' ? Notification.permission : 'N/A');
+    // Fallback to basic Notification API (desktop)
+    new Notification('Server is back online', {
+      body: 'Open the app to resume downloading your music.',
+      icon: '/icons/icon-192.png',
+      tag: 'server-up',
+    });
+  } catch (e) {
+    console.warn('[notification] failed', e);
   }
 }
 
