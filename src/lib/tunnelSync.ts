@@ -46,7 +46,7 @@ export async function syncTunnelUrl(): Promise<void> {
     const { ytdlpServer, setYtdlpServer } = useSettings.getState();
     const cur = (ytdlpServer ?? '').trim().replace(/\/+$/, '');
     const curHost = hostOf(cur);
-    const isManaged = cur === '' || (!!curHost && curHost.endsWith('.trycloudflare.com'));
+    const isManaged = !!curHost && curHost.endsWith('.trycloudflare.com');
 
     // If we have a managed URL, health-check it first
     if (isManaged && cur) {
