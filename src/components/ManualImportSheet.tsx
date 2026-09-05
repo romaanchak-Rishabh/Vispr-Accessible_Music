@@ -4,10 +4,12 @@ import { useLibrary } from '../store/library';
 import { useSettings } from '../store/settings';
 import { useUI } from '../store/ui';
 import { fetchExternalMetadata } from '../lib/metadataApi';
+import { fetchGeminiMetadata, mapGeminiGenres, getGeminiApiKey } from '../lib/geminiMetadata';
 import { blobToDataUrl } from '../lib/metadata';
 import { Artwork } from './Artwork';
-import { SpinnerIcon } from './Icons';
+import { SpinnerIcon, SparklesIcon } from './Icons';
 import { TagInput } from './TagInput';
+import { SONG_TYPE_OPTIONS } from '../types';
 
 interface Props {
   url: string;
@@ -19,11 +21,13 @@ export function ManualImportSheet({ url, onClose }: Props): JSX.Element {
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [album, setAlbum] = useState('');
+  const [songType, setSongType] = useState('');
   const [thumb, setThumb] = useState<string | undefined>(undefined);
   const [customArt, setCustomArt] = useState<string | undefined>(undefined);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [geminiMeta, setGeminiMeta] = useState<ReturnType<typeof mapGeminiGenres> & { artists?: string[]; mood?: string; language?: string; isMashup?: boolean; isRemix?: boolean } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = useUI((s) => s.showToast);
@@ -34,6 +38,7 @@ export function ManualImportSheet({ url, onClose }: Props): JSX.Element {
     let cancelled = false;
     (async () => {
       const { youtubeApiKey } = useSettings.getState();
+      const geminiApiKey = getGeminiApiKey();
       const meta = await fetchExternalMetadata(url, youtubeApiKey);
       if (cancelled) return;
       if (!meta?.title && !meta?.artist) {
@@ -43,6 +48,26 @@ export function ManualImportSheet({ url, onClose }: Props): JSX.Element {
       setArtist(meta?.artist ?? '');
       setThumb(meta?.thumbnail);
       setLoading(false);
+      // Gemini enrichment
+      if (geminiApiKey && meta?.title) {
+        const geminiResult = await fetchGeminiMetadata(geminiApiKey, meta.title, meta?.artist);
+        if (cancelled || !geminiResult) return;
+        const mapped = mapGeminiGenres(geminiResult.genres);
+        setGeminiMeta({
+          ...mapped,
+          artists: geminiResult.artists,
+          mood: geminiResult.mood ?? undefined,
+          language: geminiResult.language ?? undefined,
+          isMashup: geminiResult.isMashup,
+          isRemix: geminiResult.isRemix,
+        });
+        // Auto-fill from Gemini if fields are empty
+        if (!title && geminiResult.title) setTitle(geminiResult.title);
+        if (!artist && geminiResult.artists[0]) setArtist(geminiResult.artists[0]);
+        if (!album && geminiResult.album) setAlbum(geminiResult.album);
+        if (geminiResult.isMashup) setSongType('Mashup');
+        else if (geminiResult.isRemix) setSongType('Remix');
+      }
     })();
     return () => {
       cancelled = true;
@@ -75,13 +100,15 @@ export function ManualImportSheet({ url, onClose }: Props): JSX.Element {
     setError(null);
     try {
       const artwork = await resolveArtwork();
+      const songTypeValue = SONG_TYPE_OPTIONS.find(o => o.label === songType)?.value || songType;
       await useLibrary.getState().addFileWithMeta(file, {
         title,
         artist: artist.trim() || 'Unknown Artist',
         album: album.trim() || 'YouTube',
-        artwork
+        artwork,
+        songType: songTypeValue || undefined,
       });
-      showToast(`Imported “${title.trim()}”`);
+      showToast(`Imported "${title.trim()}"`);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Import failed');
@@ -145,11 +172,35 @@ export function ManualImportSheet({ url, onClose }: Props): JSX.Element {
                     onChange={setAlbum}
                     options={albumOptions}
                   />
+                  <TagInput
+                    label="Type"
+                    placeholder="Song type…"
+                    value={songType}
+                    onChange={setSongType}
+                    options={SONG_TYPE_OPTIONS.map(o => o.label)}
+                  />
                 </div>
               </div>
               <p style={{ fontSize: 12, color: 'var(--label-secondary)', margin: 0 }}>
                 Download the audio yourself (yt2mp3 site, screen recorder…), then attach the file here — info above is applied automatically.
               </p>
+
+              {geminiMeta && (
+                <div style={{
+                  padding: '8px 10px',
+                  background: 'var(--accent-soft)',
+                  borderRadius: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}>
+                  <SparklesIcon size={12} />
+                  <span style={{ fontSize: 11, color: 'var(--accent)' }}>
+                    Gemini: {geminiMeta.artists?.join(', ')}
+                    {geminiMeta.mood ? ` · ${geminiMeta.mood}` : ''}
+                  </span>
+                </div>
+              )}
 
               <input
                 type="file"

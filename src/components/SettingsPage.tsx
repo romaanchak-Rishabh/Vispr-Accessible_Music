@@ -181,7 +181,7 @@ export function SettingsPage(): JSX.Element {
             autoCapitalize="off"
           />
           <span style={{ fontSize: 12, color: 'var(--label-secondary)', lineHeight: 1.4 }}>
-            Empty server uses this deployment's built-in yt-dlp API. Manual Song mode needs none of these.
+            Empty server uses this deployment's built-in yt-dlp API. Gemini AI metadata is enabled via environment key. Manual Song mode needs none of these.
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
             <span style={{ fontSize: 13, color: 'var(--label-secondary)' }}>Server:</span>

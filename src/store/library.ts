@@ -144,6 +144,10 @@ interface LibraryState {
       genre2?: string;
       year?: string;
       artwork?: string;
+      mood?: string;
+      language?: string;
+      tags?: string[];
+      songType?: string;
     }>
   ) => Promise<{ imported: number; skipped: number; failed: number; trackIds: string[] }>;
   updateTrackMeta: (
@@ -157,11 +161,12 @@ interface LibraryState {
       genre1?: string;
       genre2?: string;
       year?: number;
+      songType?: string;
     }
   ) => Promise<void>;
   addFileWithMeta: (
     file: File,
-    meta: { title: string; artist: string; album?: string; artwork?: string }
+    meta: { title: string; artist: string; album?: string; artwork?: string; songType?: string }
   ) => Promise<Track>;
   toggleFavourite: (trackId: string) => Promise<void>;
   removeFromMostListened: (trackId: string) => Promise<void>;
@@ -385,7 +390,8 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       source: 'file',
       size: file.size,
       addedAt: Date.now(),
-      artwork: meta.artwork
+      artwork: meta.artwork,
+      songType: meta.songType?.trim() || undefined,
     };
     cacheFile(track.id, file);
     await db.saveFileBlob(track.id, file);
@@ -468,7 +474,11 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             size: dl.blob.size,
             addedAt: Date.now(),
             duration: item.duration,
-            artwork: ov?.artwork ?? artwork ?? (existing && !artwork ? existing.artwork : undefined)
+            artwork: ov?.artwork ?? artwork ?? (existing && !artwork ? existing.artwork : undefined),
+            mood: ov?.mood || undefined,
+            language: ov?.language || undefined,
+            tags: ov?.tags?.length ? ov.tags : undefined,
+            songType: ov?.songType?.trim() || undefined,
           };
           fileCache.set(track.id, new File([dl.blob], dl.filename, { type: dl.blob.type || 'audio/mp4' }));
           try {
@@ -522,7 +532,8 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             ...(patch.artwork !== undefined ? { artwork: patch.artwork || undefined } : {}),
             ...(patch.genre1 !== undefined ? { genre1: patch.genre1 || undefined } : {}),
             ...(patch.genre2 !== undefined ? { genre2: patch.genre2 || undefined } : {}),
-            ...(patch.year !== undefined ? { year: patch.year || undefined } : {})
+            ...(patch.year !== undefined ? { year: patch.year || undefined } : {}),
+            ...(patch.songType !== undefined ? { songType: patch.songType || undefined } : {})
           }
         : t
     );

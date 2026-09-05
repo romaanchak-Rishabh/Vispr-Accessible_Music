@@ -8,6 +8,8 @@ import { useLibrary } from '../store/library';
 import { useSettings } from '../store/settings';
 import { GENRE_OPTIONS, YEAR_OPTIONS, yearToEraValue, eraToDisplayValue, formatGenre } from '../lib/tags';
 import { lookupMetadata, yearToEra, parseYoutubeDescription } from '../lib/metadataLookup';
+import { fetchGeminiMetadata, mapGeminiGenres, getGeminiApiKey, type GeminiMetadata } from '../lib/geminiMetadata';
+import { SONG_TYPE_OPTIONS } from '../types';
 import { SparklesIcon } from './Icons';
 
 export interface ImportOverrides {
@@ -19,6 +21,12 @@ export interface ImportOverrides {
   genre2?: string;
   year?: string;
   artwork?: string;
+  artists?: string[];
+  genres?: string[];
+  tags?: string[];
+  mood?: string;
+  language?: string;
+  songType?: string;
 }
 
 interface Props {
@@ -27,7 +35,7 @@ interface Props {
   onCancel: () => void;
 }
 
-type FieldKey = 'title' | 'artist' | 'artist2' | 'album' | 'genre1' | 'genre2' | 'year';
+type FieldKey = 'title' | 'artist' | 'artist2' | 'album' | 'genre1' | 'genre2' | 'year' | 'songType';
 
 interface FieldDef {
   key: FieldKey;
@@ -43,7 +51,8 @@ const FIELDS: FieldDef[] = [
   { key: 'album', label: 'Film / Album', hint: 'Aashiqui 2, Dil Bechara, …', skipLabel: 'No film / album' },
   { key: 'genre1', label: 'Tag 1', hint: 'Genre, e.g. Bollywood, Rock…', skipLabel: 'No Tag 1' },
   { key: 'genre2', label: 'Tag 2', hint: 'Second genre, e.g. Hindi, Pop…', skipLabel: 'No Tag 2' },
-  { key: 'year', label: 'Year', hint: 'Release era of the song.', skipLabel: 'No year' }
+  { key: 'year', label: 'Year', hint: 'Release era of the song.', skipLabel: 'No year' },
+  { key: 'songType', label: 'Song Type', hint: 'Mashup, Remix, Lofi, Live, etc.', skipLabel: 'Original' }
 ];
 
 // Bulk fields for playlist import - applied to all songs at once
@@ -87,9 +96,12 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
   const [bulkStage, setBulkStage] = useState<'album' | 'genre1' | 'genre2' | 'artist' | 'done'>('album');
   const [dontAsk, setDontAsk] = useState(false);
   const [lookup, setLookup] = useState<Record<string, 'pending' | 'done' | 'none'>>({});
+  const [geminiMeta, setGeminiMeta] = useState<Record<string, GeminiMetadata | null>>({});
+  const [geminiLoading, setGeminiLoading] = useState<Record<string, boolean>>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { ytdlpServer, ytdlpToken } = useSettings();
+  const geminiApiKey = getGeminiApiKey();
 
   const libraryTracks = useLibrary((s) => s.tracks);
   const allAlbums = useLibrary((s) => s.albums);
@@ -164,6 +176,36 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songIdx, items]);
+
+  // Gemini metadata lookup - runs after iTunes lookup
+  useEffect(() => {
+    const it = items[songIdx];
+    if (!it || !geminiApiKey) return;
+    if (geminiMeta[it.id] !== undefined || geminiLoading[it.id]) return;
+    const title = (it.title ?? '')
+      .replace(/\s*\((official\s*)?(lyric|lyrics|audio|audio\s*only|video|official\s*video|music\s*video|full\s*song|song|hd|4k|extended)\)\s*$/i, '')
+      .replace(/\s*-\s*(topic|official|lyrics?)\s*$/i, '')
+      .trim();
+    if (!title) return;
+    setGeminiLoading((prev) => ({ ...prev, [it.id]: true }));
+    let cancelled = false;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    void fetchGeminiMetadata(geminiApiKey, title, it.uploader, undefined, undefined, ctrl.signal)
+      .then((meta) => {
+        if (cancelled || !meta) return;
+        setGeminiMeta((prev) => ({ ...prev, [it.id]: meta }));
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        if (!cancelled) setGeminiLoading((prev) => ({ ...prev, [it.id]: false }));
+      });
+    return () => {
+      cancelled = true;
+      ctrl.abort();
+      clearTimeout(timer);
+    };
+  }, [songIdx, items, geminiApiKey]);
 
   const getValue = (it: YtItem, key: FieldKey): string => {
     const ov = edits[it.id];
@@ -335,12 +377,21 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
       if (ov.genre2?.trim()) clean.genre2 = ov.genre2.trim();
       if (ov.year?.trim()) clean.year = ov.year.trim();
       if (ov.artwork) clean.artwork = ov.artwork;
+      if (ov.songType?.trim()) {
+        const match = SONG_TYPE_OPTIONS.find(o => o.label.toLowerCase() === ov.songType!.trim().toLowerCase());
+        clean.songType = match?.value || ov.songType.trim();
+      }
+      if (ov.mood?.trim()) clean.mood = ov.mood.trim();
+      if (ov.language?.trim()) clean.language = ov.language.trim();
+      if (ov.artists?.length) clean.artists = ov.artists;
+      if (ov.genres?.length) clean.genres = ov.genres;
+      if (ov.tags?.length) clean.tags = ov.tags;
       if (Object.keys(clean).length > 0) out[it.id] = clean;
     }
     return out;
   };
 
-  const answeredCount = () => Object.values(edits).filter((e) => e && (e.title?.trim() || e.artist?.trim() || e.artist2?.trim() || e.album?.trim() || e.genre1?.trim() || e.genre2?.trim() || e.year?.trim())).length;
+  const answeredCount = () => Object.values(edits).filter((e) => e && (e.title?.trim() || e.artist?.trim() || e.artist2?.trim() || e.album?.trim() || e.genre1?.trim() || e.genre2?.trim() || e.year?.trim() || e.songType?.trim())).length;
 
   const pickArtwork = async (file: File): Promise<void> => {
     const { blobToDataUrl } = await import('../lib/metadata');
@@ -365,6 +416,8 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
         return GENRE_OPTIONS;
       case 'year':
         return YEAR_OPTIONS;
+      case 'songType':
+        return SONG_TYPE_OPTIONS.map((o) => o.label);
       default:
         return [];
     }
@@ -454,6 +507,41 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
               </div>
 
               {metaChip && <div style={{ marginBottom: -4 }}>{metaChip}</div>}
+
+              {geminiLoading[item.id] && (
+                <div style={{ padding: '8px 0', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--label-secondary)' }}>
+                  <span className="meta-spinner" /> Gemini analyzing…
+                </div>
+              )}
+
+              {!geminiLoading[item.id] && geminiMeta[item.id] && !edits[item.id]?.artist && (
+                <GeminiSuggestion
+                  meta={geminiMeta[item.id]!}
+                  onAccept={() => {
+                    const meta = geminiMeta[item.id]!;
+                    const { genre1, genre2 } = mapGeminiGenres(meta.genres);
+                    const songType = meta.isMashup ? 'mashup' : meta.isRemix ? 'remix' : '';
+                    setEdits((prev) => ({
+                      ...prev,
+                      [item.id]: {
+                        ...prev[item.id],
+                        artist: meta.artists[0] || prev[item.id]?.artist,
+                        artist2: meta.artists[1] || prev[item.id]?.artist2,
+                        album: meta.album || prev[item.id]?.album,
+                        genre1: genre1 || prev[item.id]?.genre1,
+                        genre2: genre2 || prev[item.id]?.genre2,
+                        year: meta.year ? String(meta.year) : prev[item.id]?.year,
+                        songType: songType || prev[item.id]?.songType,
+                        artists: meta.artists,
+                        genres: meta.genres,
+                        tags: meta.tags,
+                        mood: meta.mood ?? undefined,
+                        language: meta.language ?? undefined,
+                      }
+                    }));
+                  }}
+                />
+              )}
 
               {['album', 'genre1', 'genre2', 'artist'].includes(field.key) && edits[item.id]?.[field.key] && (
                 <div style={{ 
@@ -558,6 +646,90 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function GeminiSuggestion({ meta, onAccept }: { meta: GeminiMetadata; onAccept: () => void }): JSX.Element {
+  return (
+    <div style={{
+      padding: '10px 12px',
+      background: 'var(--accent-soft)',
+      borderRadius: 10,
+      marginBottom: 8,
+      border: '1px solid var(--accent)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <SparklesIcon size={14} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Gemini found metadata</span>
+      </div>
+
+      {meta.artists.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: 'var(--label-secondary)', marginBottom: 3 }}>Artists</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {meta.artists.map((a, i) => (
+              <span key={i} style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label)' }}>
+                {a}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {meta.album && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: 'var(--label-secondary)', marginBottom: 3 }}>Album</div>
+          <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label)' }}>
+            {meta.album}
+          </span>
+        </div>
+      )}
+
+      {meta.genres.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: 'var(--label-secondary)', marginBottom: 3 }}>Genres</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {meta.genres.map((g, i) => (
+              <span key={i} style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label)' }}>
+                {g}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+        {meta.year && (
+          <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label-secondary)' }}>
+            {meta.year}
+          </span>
+        )}
+        {meta.mood && (
+          <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label-secondary)' }}>
+            {meta.mood}
+          </span>
+        )}
+        {meta.language && (
+          <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 999, background: 'var(--surface)', color: 'var(--label-secondary)' }}>
+            {meta.language}
+          </span>
+        )}
+        {meta.isMashup && (
+          <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 999, background: 'var(--accent)', color: '#fff' }}>
+            Mashup
+          </span>
+        )}
+        {meta.isRemix && (
+          <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 999, background: 'var(--accent)', color: '#fff' }}>
+            Remix
+          </span>
+        )}
+      </div>
+
+      <button className="pill-btn primary" onClick={onAccept} style={{ width: '100%', fontSize: 13, padding: '8px 16px' }}>
+        <SparklesIcon size={14} /> Accept & Apply
+      </button>
     </div>
   );
 }

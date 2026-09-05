@@ -18,7 +18,24 @@ export interface Track {
   favouritedAt?: number;
   duration?: number;
   artwork?: string;
+  mood?: string;
+  language?: string;
+  tags?: string[];
+  songType?: string;
 }
+
+export type SongType = '' | 'mashup' | 'remix' | 'lofi' | 'live' | 'acoustic' | 'unplugged' | 'cover' | 'original';
+
+export const SONG_TYPE_OPTIONS: { value: SongType; label: string }[] = [
+  { value: '', label: 'Original' },
+  { value: 'mashup', label: 'Mashup' },
+  { value: 'remix', label: 'Remix' },
+  { value: 'lofi', label: 'Lofi' },
+  { value: 'live', label: 'Live' },
+  { value: 'acoustic', label: 'Acoustic' },
+  { value: 'unplugged', label: 'Unplugged' },
+  { value: 'cover', label: 'Cover' },
+];
 
 export interface Album {
   key: string;
