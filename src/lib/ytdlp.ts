@@ -140,11 +140,19 @@ export async function downloadAudioViaYtDlp(
 
   // Download via yt-dlp only (v1 endpoint) — saves API tokens
   const endpoint = base ? `${base}/api/download` : '/api/download';
-  const resp = await fetchWithTimeout(endpoint, {
-    method: 'POST',
-    headers: authHeaders(token),
-    body: JSON.stringify({ url: videoUrl })
-  }, 180_000);
+  let resp: Response;
+  try {
+    resp = await fetchWithTimeout(endpoint, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ url: videoUrl })
+    }, 180_000);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('abort') || msg.includes('timeout')) throw new Error('Download timed out');
+    if (!base) throw new Error('Server offline — start the tunnel server');
+    throw new Error(`Cannot reach server — check tunnel is running`);
+  }
   if (!resp.ok) {
     let msg = `HTTP ${resp.status}`;
     try {

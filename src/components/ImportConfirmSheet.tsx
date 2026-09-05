@@ -192,7 +192,7 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
       </span>
     ) : metaState === 'found' ? (
       <span className="meta-status found">✓ Metadata found &amp; pre-filled</span>
-    ) : metaState === 'none' ? (
+    ) : metaState === 'none' && !geminiLoading[item.id] && !geminiMeta[item.id] ? (
       <span className="meta-status none">No metadata found — fill in manually</span>
     ) : null;
 
