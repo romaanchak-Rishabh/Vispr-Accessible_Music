@@ -556,12 +556,22 @@ function BrowseView(): JSX.Element {
   const status = useLibrary((s) => s.status);
   const albums = useLibrary((s) => s.albums);
   const tracks = useLibrary((s) => s.tracks);
+  const [filterGenre, setFilterGenre] = useState('');
   const genres = useMemo(() => tracks.reduce<Map<string, number>>((m, t) => {
     const g = (t.genre1 ?? t.genre2 ?? t.genre ?? '').trim();
     if (!g) return m;
     m.set(g, (m.get(g) ?? 0) + 1);
     return m;
   }, new Map()), [tracks]);
+
+  const filteredAlbums = useMemo(() => {
+    if (!filterGenre) return albums;
+    const g = filterGenre.toLowerCase();
+    return albums.filter((a) => {
+      const aTracks = a.trackIds.map((id) => tracks.find((t) => t.id === id)).filter(Boolean);
+      return aTracks.some((t) => (t!.genre1 ?? t!.genre2 ?? t!.genre ?? '').toLowerCase() === g);
+    });
+  }, [albums, tracks, filterGenre]);
 
   if (status === 'loading') return <div style={{ padding: 40 }}>Loading…</div>;
   if (status !== 'ready') {
@@ -584,18 +594,31 @@ function BrowseView(): JSX.Element {
               .sort((a, b) => b[1] - a[1])
               .slice(0, 8)
               .map(([g]) => (
-                <span key={g} className="chip" style={{ cursor: 'default' }}>
+                <button
+                  key={g}
+                  className="chip"
+                  style={{
+                    cursor: 'pointer',
+                    ...(filterGenre === g ? { background: 'var(--accent)', color: '#fff' } : {})
+                  }}
+                  onClick={() => setFilterGenre(filterGenre === g ? '' : g)}
+                >
                   {formatGenre(g)}
-                </span>
+                </button>
               ))}
           </div>
         </>
       )}
-      <h2 className="section-header">Albums</h2>
+      <h2 className="section-header">Albums {filterGenre && <span style={{ fontWeight: 400, fontSize: 14, color: 'var(--accent)' }}> — {formatGenre(filterGenre)}</span>}</h2>
       <div className="grid-albums" style={{ paddingTop: 0 }}>
-        {albums.map((a) => (
+        {filteredAlbums.map((a) => (
           <AlbumGridCard key={a.key} album={a} />
         ))}
+        {filteredAlbums.length === 0 && (
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 24, color: 'var(--label-secondary)', fontSize: 13 }}>
+            No albums in this genre
+          </div>
+        )}
       </div>
     </div>
   );
