@@ -177,7 +177,7 @@ export interface YtSearchResult {
 }
 
 export async function searchYouTube(
-  server: string,
+  _server: string,
   token: string,
   query: string,
   limit: number = 10
@@ -186,8 +186,8 @@ export async function searchYouTube(
   const cached = getCachedSearchSync(query);
   if (cached) return cached.slice(0, limit);
 
-  const base = effectiveServerBase(server);
-  const url = base ? `${base}/api/search_v2` : '/api/search_v2';
+  // Search always uses same-origin Vercel API (RapidAPI), not the tunnel
+  const url = '/api/search_v2';
   try {
     const resp = await fetchWithTimeout(url, {
       method: 'POST',
