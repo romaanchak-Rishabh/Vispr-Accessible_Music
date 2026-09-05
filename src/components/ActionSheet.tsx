@@ -128,7 +128,7 @@ export function ActionSheet(): JSX.Element | null {
   const rescanMetadata = async (): Promise<void> => {
     const apiKey = getGeminiApiKey();
     if (!apiKey) {
-      useUI.getState().showToast('Gemini API key not configured');
+      useUI.getState().showToast('AI API key not configured');
       return;
     }
     setRescanning(true);
@@ -152,7 +152,7 @@ export function ActionSheet(): JSX.Element | null {
         language: meta.language ?? track.language,
         tags: meta.tags.length > 0 ? meta.tags : track.tags,
       });
-      useUI.getState().showToast('Metadata updated from Gemini');
+      useUI.getState().showToast('Metadata updated via AI');
     } catch {
       useUI.getState().showToast('Rescan failed');
     }
@@ -232,7 +232,7 @@ export function ActionSheet(): JSX.Element | null {
             },
             {
               label: 'Rescan Metadata',
-              sub: 'Re-fetch from Gemini AI',
+              sub: 'Re-fetch via AI',
               fn: () => void rescanMetadata()
             },
             {

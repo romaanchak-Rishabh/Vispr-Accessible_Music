@@ -510,11 +510,11 @@ export function ImportConfirmSheet({ items, onConfirm, onCancel }: Props): JSX.E
 
               {geminiLoading[item.id] && (
                 <div style={{ padding: '8px 0', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--label-secondary)' }}>
-                  <span className="meta-spinner" /> Gemini analyzing…
+                  <span className="meta-spinner" /> AI analyzing…
                 </div>
               )}
 
-              {!geminiLoading[item.id] && geminiMeta[item.id] && !edits[item.id]?.artist && (
+              {!geminiLoading[item.id] && geminiMeta[item.id] && lookup[item.id] !== 'pending' && (
                 <GeminiSuggestion
                   meta={geminiMeta[item.id]!}
                   onAccept={() => {
@@ -661,7 +661,7 @@ function GeminiSuggestion({ meta, onAccept }: { meta: GeminiMetadata; onAccept: 
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
         <SparklesIcon size={14} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Gemini found metadata</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>AI found metadata</span>
       </div>
 
       {meta.artists.length > 0 && (

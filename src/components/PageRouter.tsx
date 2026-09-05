@@ -23,11 +23,12 @@ import type { YtItem } from '../lib/ytdlp';
 import { ImportConfirmSheet, type ImportOverrides } from './ImportConfirmSheet';
 
 async function isServerReachable(server: string): Promise<boolean> {
-  if (!server) return false;
+  const base = server?.trim().replace(/\/+$/, '') || '';
+  const url = base ? `${base}/api/ping` : '/api/ping';
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 3000);
-    const r = await fetch(`${server.replace(/\/+$/, '')}/api/ping`, { signal: ctrl.signal, cache: 'no-store' });
+    const r = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
     clearTimeout(t);
     return r.ok;
   } catch {

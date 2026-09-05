@@ -196,7 +196,7 @@ export function ManualImportSheet({ url, onClose }: Props): JSX.Element {
                 }}>
                   <SparklesIcon size={12} />
                   <span style={{ fontSize: 11, color: 'var(--accent)' }}>
-                    Gemini: {geminiMeta.artists?.join(', ')}
+                    AI: {geminiMeta.artists?.join(', ')}
                     {geminiMeta.mood ? ` · ${geminiMeta.mood}` : ''}
                   </span>
                 </div>
