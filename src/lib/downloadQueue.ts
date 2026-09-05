@@ -75,6 +75,13 @@ export async function clearCompletedQueue(): Promise<QueuedImport[]> {
   return pending;
 }
 
+export async function clearPendingQueue(): Promise<QueuedImport[]> {
+  const queue = await loadQueue();
+  const remaining = queue.filter((q) => q.status === 'downloading' || q.status === 'done');
+  await saveQueue(remaining);
+  return remaining;
+}
+
 // ── Search cache (in-memory + IndexedDB) ──────────────────────
 
 interface CacheEntry {

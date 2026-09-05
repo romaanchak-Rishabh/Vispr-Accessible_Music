@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useLibrary } from '../store/library';
 import { usePlayer } from '../store/player';
 import { SpinnerIcon } from './Icons';
@@ -5,9 +6,37 @@ import { SpinnerIcon } from './Icons';
 export function DownloadStatusBar(): JSX.Element | null {
   const queue = useLibrary((s) => s.downloadQueue);
   const hasQueue = usePlayer((s) => s.queue.length > 0);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [failedAt, setFailedAt] = useState<Record<string, number>>({});
 
   const active = queue.filter((q) => q.status === 'downloading' || q.status === 'pending');
-  const failed = queue.filter((q) => q.status === 'failed');
+  const failed = queue.filter((q) => q.status === 'failed' && !dismissed.has(q.id));
+
+  // Track when items fail so we can auto-dismiss after 8s
+  useEffect(() => {
+    for (const q of queue) {
+      if (q.status === 'failed' && !failedAt[q.id]) {
+        setFailedAt((prev) => ({ ...prev, [q.id]: Date.now() }));
+      }
+    }
+  }, [queue, failedAt]);
+
+  // Auto-dismiss failed items after 8 seconds
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (const q of failed) {
+      const at = failedAt[q.id];
+      if (at) {
+        const remaining = 8000 - (Date.now() - at);
+        if (remaining <= 0) {
+          setDismissed((prev) => new Set(prev).add(q.id));
+        } else {
+          timers.push(setTimeout(() => setDismissed((prev) => new Set(prev).add(q.id)), remaining));
+        }
+      }
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [failed, failedAt]);
 
   if (active.length === 0 && failed.length === 0) return null;
 
@@ -16,7 +45,6 @@ export function DownloadStatusBar(): JSX.Element | null {
   const doneCount = queue.filter((q) => q.status === 'done').length;
   const totalActive = active.length;
 
-  // Position above mini player if playing, above tabbar if not
   const bottomOffset = hasQueue ? 150 : 70;
 
   return (

@@ -55,18 +55,16 @@ export async function syncTunnelUrl(): Promise<void> {
       // Tunnel is dead — fall through to fetch latest from GitHub
     }
 
+    // If user set a custom (non-tunnel) URL, don't touch it
+    if (cur && !isManaged) return;
+
     // Fetch latest from GitHub
     const latest = await fetchLatestTunnel();
-    if (!latest) {
-      // No tunnel available — clear any stale dead URL so search falls back to same-origin
-      if (isManaged) setYtdlpServer('');
-      return;
-    }
+    if (!latest) return;
     if (cur === latest) return;
-    if (!isManaged) return;
 
     setYtdlpServer(latest);
-    useUI.getState().showToast('Backend tunnel updated automatically');
+    useUI.getState().showToast('Backend tunnel updated');
   } catch {
     /* offline / not published yet — retry on next tick */
   }
