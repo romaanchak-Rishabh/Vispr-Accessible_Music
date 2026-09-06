@@ -48,7 +48,6 @@ function trackToShareTrack(track: Track): ShareTrack {
     trackNo: track.trackNo,
     duration: track.duration,
     youtubeId: extractYoutubeId(track.id),
-    artwork: track.artwork,
     fileName: track.fileName,
   };
 }
@@ -81,7 +80,9 @@ function getShareTitle(p: SharePayload): string {
 }
 
 function encodeSharePayload(payload: SharePayload): string {
-  const json = JSON.stringify(payload);
+  // Compact: strip undefined values + minify JSON (no whitespace)
+  const cleaned = JSON.parse(JSON.stringify(payload, (_k, v) => v === undefined ? null : v));
+  const json = JSON.stringify(cleaned);
   return btoa(unescape(encodeURIComponent(json)));
 }
 
