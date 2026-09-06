@@ -153,8 +153,8 @@ export default function App(): JSX.Element {
       const prev = serverRef.current;
       serverRef.current = up;
       if (prev === null) {
-        if (up) sendServerUpNotification();
-        else showToast('Server offline');
+        if (!up) showToast('Server offline');
+        // Don't notify on first load — user just opened the app
       } else if (prev === false && up) {
         showToast('Server is up');
         sendServerUpNotification();
