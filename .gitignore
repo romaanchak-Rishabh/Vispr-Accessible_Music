@@ -27,3 +27,5 @@ tunnel_err.txt
 server/push-tokens.json
 server/vapid-keys.json
 server/firebase-service-account.json
+server/server_out.txt
+server/server_err.txt
