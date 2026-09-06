@@ -1,3 +1,4 @@
+import LZString from 'lz-string';
 import type { Track } from '../types';
 
 export type ShareType = 'track' | 'playlist' | 'album' | 'artist' | 'mix';
@@ -80,21 +81,35 @@ function getShareTitle(p: SharePayload): string {
 }
 
 function encodeSharePayload(payload: SharePayload): string {
-  // Compact: strip undefined values + minify JSON (no whitespace)
   const cleaned = JSON.parse(JSON.stringify(payload, (_k, v) => v === undefined ? null : v));
   const json = JSON.stringify(cleaned);
-  return btoa(unescape(encodeURIComponent(json)));
+  return LZString.compressToBase64(json);
+}
+
+function tryDecompress(text: string): string | null {
+  // Try LZ-String decompress first
+  try {
+    const decompressed = LZString.decompressFromBase64(text);
+    if (decompressed) return decompressed;
+  } catch { /* not compressed */ }
+  // Fallback: try plain base64 (backward compat with old shares)
+  try {
+    return decodeURIComponent(escape(atob(text)));
+  } catch { /* not plain base64 either */ }
+  return null;
 }
 
 export function decodeSharePayload(encoded: string): SharePayload {
-  const json = decodeURIComponent(escape(atob(encoded.trim())));
+  const json = tryDecompress(encoded.trim());
+  if (!json) throw new Error('Failed to decode share data');
   return parseSharePayload(json);
 }
 
 function isBase64Share(text: string): boolean {
   try {
-    const decoded = decodeURIComponent(escape(atob(text.trim())));
-    const data = JSON.parse(decoded);
+    const json = tryDecompress(text);
+    if (!json) return false;
+    const data = JSON.parse(json);
     return data.v === 1 && Array.isArray(data.tracks) && data.tracks.length > 0;
   } catch {
     return false;
@@ -167,7 +182,7 @@ export function tryParseShareText(text: string): SharePayload | null {
     }
   } catch { /* not JSON */ }
 
-  // Try as base64-encoded share (full text)
+  // Try as compressed or plain base64 share (full text)
   if (isBase64Share(trimmed)) {
     try {
       return decodeSharePayload(trimmed);
