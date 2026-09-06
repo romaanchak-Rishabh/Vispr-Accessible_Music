@@ -95,21 +95,13 @@ def _ensure_vapid_keys():
             keys = json.load(f)
         _vapid_pub_cache = (keys["public"], keys["private"])
         return _vapid_pub_cache
-    # Generate new key pair
-    try:
-        from py_vapid import Vapid  # type: ignore[import-untyped]
-        vapid = Vapid()
-        vapid.generate_keys()
-        pub = vapid.public_key.decode()
-        priv = vapid.private_key.decode()
-    except ImportError:
-        # Fallback: use ecdsa directly
-        import base64
-        from ecdsa import SigningKey, NIST256p  # type: ignore[import-untyped]
-        sk = SigningKey.generate(curve=NIST256p)
-        pk = sk.get_verifying_key()
-        pub = base64.urlsafe_b64encode(pk.to_string()).rstrip(b"=").decode()
-        priv = base64.urlsafe_b64encode(sk.to_string()).rstrip(b"=").decode()
+    # Generate new key pair using ecdsa
+    import base64
+    from ecdsa import SigningKey, NIST256p  # type: ignore[import-untyped]
+    sk = SigningKey.generate(curve=NIST256p)
+    pk = sk.get_verifying_key()
+    pub = base64.urlsafe_b64encode(pk.to_string()).rstrip(b"=").decode()
+    priv = base64.urlsafe_b64encode(sk.to_string()).rstrip(b"=").decode()
     with open(_vapid_keys_path, "w") as f:
         json.dump({"public": pub, "private": priv}, f)
     _vapid_pub_cache = (pub, priv)
@@ -120,21 +112,13 @@ def _ensure_vapid_keys():
 def _send_webpush(subscription_info, payload_json):
     """Send a Web Push notification to a single subscription."""
     try:
-        import base64 as b64
-        from urllib.parse import urlparse
-        endpoint = subscription_info["endpoint"]
-        auth = subscription_info.get("keys", {}).get("auth", "")
-        p256dh = subscription_info.get("keys", {}).get("p256dh", "")
-        # Try pywebpush first
         from pywebpush import webpush  # type: ignore[import-untyped]
-        from py_vapid import Vapid  # type: ignore[import-untyped]
         _, priv_b64 = _ensure_vapid_keys()
-        vapid = Vapid()
-        vapid.private_key = priv_b64.encode()
         webpush(
             subscription_info,
             payload_json.encode(),
-            vapid=vapid,
+            vapid_private_key=priv_b64,
+            vapid_claims={"sub": "mailto:vispr@local"},
             ttl=86400,
         )
         return True

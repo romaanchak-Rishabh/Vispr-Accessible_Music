@@ -116,8 +116,20 @@ export default function App(): JSX.Element {
   useEffect(() => startTunnelSync(), []);
 
   // Register for push notifications (so server can notify when it comes back online)
+  // Must wait for ytdlpServer to be set by tunnel sync first
   useEffect(() => {
-    void registerForPush();
+    const tryRegister = (): void => {
+      const server = useSettings.getState().ytdlpServer;
+      if (server) {
+        void registerForPush();
+        return;
+      }
+      // Server URL not ready yet — retry in 3s
+      setTimeout(tryRegister, 3000);
+    };
+    // Delay first attempt to let tunnel sync populate ytdlpServer
+    const id = setTimeout(tryRegister, 5000);
+    return () => clearTimeout(id);
   }, []);
 
   // Request notification permission on mount + on first click (PWAs need user gesture)
