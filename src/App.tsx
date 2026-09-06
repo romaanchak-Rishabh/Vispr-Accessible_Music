@@ -4,6 +4,7 @@ import { useAudioEngine } from './hooks/useAudioEngine';
 import { useMediaQuery } from './hooks/useMediaQuery';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { startTunnelSync } from './lib/tunnelSync';
+import { registerForPush } from './lib/pushRegistration';
 import { useLibrary } from './store/library';
 import { usePlayer } from './store/player';
 import { applyAppearance, useSettings } from './store/settings';
@@ -31,24 +32,21 @@ function requestNotificationPermission(): void {
 
 async function sendServerUpNotification(): Promise<void> {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const opts: NotificationOptions = {
+    body: 'Open the app to resume downloading your music.',
+    icon: '/icons/icon-192.png',
+    tag: 'server-up',
+  };
   try {
-    // Use Service Worker's showNotification (works from non-gesture contexts on mobile)
+    // new Notification() works reliably on mobile PWAs (confirmed by test button)
+    new Notification('Server is back online', opts);
+    return;
+  } catch { /* fall through to SW */ }
+  try {
     const reg = await navigator.serviceWorker?.ready;
     if (reg?.showNotification) {
-      await reg.showNotification('Server is back online', {
-        body: 'Open the app to resume downloading your music.',
-        icon: '/icons/icon-192.png',
-        badge: '/icons/icon-192.png',
-        tag: 'server-up',
-      });
-      return;
+      await reg.showNotification('Server is back online', { ...opts, badge: '/icons/icon-192.png' });
     }
-    // Fallback to basic Notification API (desktop)
-    new Notification('Server is back online', {
-      body: 'Open the app to resume downloading your music.',
-      icon: '/icons/icon-192.png',
-      tag: 'server-up',
-    });
   } catch (e) {
     console.warn('[notification] failed', e);
   }
@@ -116,6 +114,11 @@ export default function App(): JSX.Element {
 
   // keep the backend server URL in sync with the published (auto-healed) tunnel
   useEffect(() => startTunnelSync(), []);
+
+  // Register for push notifications (so server can notify when it comes back online)
+  useEffect(() => {
+    void registerForPush();
+  }, []);
 
   // Request notification permission on mount + on first click (PWAs need user gesture)
   useEffect(() => {

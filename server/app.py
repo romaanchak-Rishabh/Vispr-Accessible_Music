@@ -36,8 +36,178 @@ import json
 import os
 import re
 import tempfile
+import threading
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+# ── Firebase Admin (optional — enables push notifications) ──────────────
+_firebase_app = None
+_push_tokens_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "push-tokens.json")
+_push_tokens_lock = threading.Lock()
+
+# ── VAPID keys for Web Push (auto-generated on first run) ──────────────
+_vapid_keys_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vapid-keys.json")
+_vapid_pub_cache = None
+
+
+def _init_firebase():
+    """Initialize Firebase Admin SDK if service-account file is present."""
+    global _firebase_app  # noqa: PLW0603
+    if _firebase_app is not None:
+        return _firebase_app is not None
+    sa_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "firebase-service-account.json")
+    if not os.path.isfile(sa_path):
+        return False
+    try:
+        import firebase_admin  # type: ignore[import-untyped]
+        from firebase_admin import credentials  # type: ignore[import-untyped]
+        cred = credentials.Certificate(sa_path)
+        _firebase_app = firebase_admin.initialize_app(cred)
+        print("[push] Firebase Admin initialized")
+        return True
+    except Exception as exc:
+        print(f"[push] Firebase init failed: {exc}")
+        _firebase_app = False
+        return False
+
+
+def _load_tokens():
+    with _push_tokens_lock:
+        if os.path.isfile(_push_tokens_path):
+            with open(_push_tokens_path) as f:
+                return json.load(f)
+        return []
+
+
+def _save_tokens(tokens):
+    with _push_tokens_lock:
+        with open(_push_tokens_path, "w") as f:
+            json.dump(tokens, f)
+
+
+def _ensure_vapid_keys():
+    """Load or generate VAPID key pair. Returns (pub_b64, priv_b64)."""
+    global _vapid_pub_cache  # noqa: PLW0603
+    if _vapid_pub_cache:
+        return _vapid_pub_cache
+    if os.path.isfile(_vapid_keys_path):
+        with open(_vapid_keys_path) as f:
+            keys = json.load(f)
+        _vapid_pub_cache = (keys["public"], keys["private"])
+        return _vapid_pub_cache
+    # Generate new key pair
+    try:
+        from py_vapid import Vapid  # type: ignore[import-untyped]
+        vapid = Vapid()
+        vapid.generate_keys()
+        pub = vapid.public_key.decode()
+        priv = vapid.private_key.decode()
+    except ImportError:
+        # Fallback: use ecdsa directly
+        import base64
+        from ecdsa import SigningKey, NIST256p  # type: ignore[import-untyped]
+        sk = SigningKey.generate(curve=NIST256p)
+        pk = sk.get_verifying_key()
+        pub = base64.urlsafe_b64encode(pk.to_string()).rstrip(b"=").decode()
+        priv = base64.urlsafe_b64encode(sk.to_string()).rstrip(b"=").decode()
+    with open(_vapid_keys_path, "w") as f:
+        json.dump({"public": pub, "private": priv}, f)
+    _vapid_pub_cache = (pub, priv)
+    print(f"[push] Generated VAPID keys → {_vapid_keys_path}")
+    return _vapid_pub_cache
+
+
+def _send_webpush(subscription_info, payload_json):
+    """Send a Web Push notification to a single subscription."""
+    try:
+        import base64 as b64
+        from urllib.parse import urlparse
+        endpoint = subscription_info["endpoint"]
+        auth = subscription_info.get("keys", {}).get("auth", "")
+        p256dh = subscription_info.get("keys", {}).get("p256dh", "")
+        # Try pywebpush first
+        from pywebpush import webpush  # type: ignore[import-untyped]
+        from py_vapid import Vapid  # type: ignore[import-untyped]
+        _, priv_b64 = _ensure_vapid_keys()
+        vapid = Vapid()
+        vapid.private_key = priv_b64.encode()
+        webpush(
+            subscription_info,
+            payload_json.encode(),
+            vapid=vapid,
+            ttl=86400,
+        )
+        return True
+    except ImportError:
+        pass
+    # Minimal fallback using urllib (no encryption — works for empty payloads)
+    try:
+        endpoint = subscription_info["endpoint"]
+        req = urllib.request.Request(
+            endpoint,
+            data=payload_json.encode() if payload_json else b"",
+            method="POST",
+        )
+        req.add_header("TTL", "86400")
+        urllib.request.urlopen(req, timeout=10)
+        return True
+    except Exception as exc:
+        print(f"[push] webpush failed: {exc}")
+        return False
+
+
+def _send_fcm_push(title, body, url="/"):
+    """Send a push notification to all registered tokens/subscriptions. Returns count sent."""
+    tokens = _load_tokens()
+    if not tokens:
+        return 0
+    payload = json.dumps({"title": title, "body": body, "url": url})
+
+    # Check if Firebase is available
+    if _init_firebase():
+        from firebase_admin import messaging  # type: ignore[import-untyped]
+        messages = []
+        for t in tokens:
+            if isinstance(t, dict) and "endpoint" in t:
+                # Web Push subscription
+                continue
+            messages.append(messaging.Message(
+                notification=messaging.Notification(title=title, body=body),
+                data={"url": url},
+                token=t if isinstance(t, str) else t.get("token", ""),
+            ))
+        if messages:
+            sent = 0
+            bad_tokens = []
+            for i in range(0, len(messages), 500):
+                batch = messages[i : i + 500]
+                resp = messaging.send_each(batch)
+                sent += resp.success_count
+                for idx, r in enumerate(resp.responses):
+                    if not r.success:
+                        tok = tokens[i + idx] if (i + idx) < len(tokens) else None
+                        if tok:
+                            bad_tokens.append(tok)
+            if bad_tokens:
+                remaining = [t for t in tokens if t not in bad_tokens]
+                _save_tokens(remaining)
+            return sent
+
+    # Web Push path — send to all subscription-type entries
+    sent = 0
+    failed_subs = []
+    for t in tokens:
+        if isinstance(t, dict) and "endpoint" in t:
+            if _send_webpush(t, payload):
+                sent += 1
+            else:
+                failed_subs.append(t)
+    if failed_subs:
+        remaining = [t for t in tokens if t not in failed_subs]
+        _save_tokens(remaining)
+        print(f"[push] Cleaned {len(failed_subs)} dead subscription(s)")
+    print(f"[push] Sent push to {sent}/{len(tokens)} device(s)")
+    return sent
 
 # Load .env file from project root (if present)
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
@@ -381,8 +551,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):  # noqa: N802
-        if self.path.split("?")[0] == "/api/ping":
+        path = self.path.split("?")[0]
+        if path == "/api/ping":
             self._json(200, {"ok": True})
+            return
+        if path == "/api/push/vapid-public-key":
+            try:
+                pub, _ = _ensure_vapid_keys()
+                self._json(200, {"key": pub})
+            except Exception as exc:
+                self._json(500, {"error": str(exc)})
             return
         self._json(404, {"error": "not found"})
 
@@ -397,6 +575,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):  # noqa: N802
         path = self.path.split("?")[0]
+
+        # ── Push notification endpoints (no auth required) ───────────
+        if path == "/api/push/register":
+            self._handle_push_register()
+            return
+        if path == "/api/push/unregister":
+            self._handle_push_unregister()
+            return
+        if path == "/api/push/notify":
+            self._handle_push_notify()
+            return
+
         valid = ("/api/resolve", "/api/resolve_v2", "/api/info", "/api/download", "/api/download_v2", "/api/search_v2")
         if path not in valid:
             self._json(404, {"error": "not found"})
@@ -565,10 +755,83 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    # ── Push notification handlers ────────────────────────────────────
+
+    def _handle_push_register(self):
+        """Store an FCM token or Web Push subscription."""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(length) or b"{}")
+        except Exception:
+            self._json(400, {"error": "invalid json"})
+            return
+        token = (payload.get("token") or "").strip()
+        subscription = payload.get("subscription")
+        if subscription and isinstance(subscription, dict) and subscription.get("endpoint"):
+            # Web Push subscription
+            tokens = _load_tokens()
+            endpoints = [t.get("endpoint") if isinstance(t, dict) else None for t in tokens]
+            if subscription["endpoint"] not in endpoints:
+                tokens.append(subscription)
+                _save_tokens(tokens)
+                print(f"[push] Registered web-push subscription ({len(tokens)} total)")
+            self._json(200, {"ok": True, "count": len(tokens)})
+        elif token:
+            tokens = _load_tokens()
+            if token not in tokens:
+                tokens.append(token)
+                _save_tokens(tokens)
+                print(f"[push] Registered token ({len(tokens)} total)")
+            self._json(200, {"ok": True, "count": len(tokens)})
+        else:
+            self._json(400, {"error": "missing token or subscription"})
+
+    def _handle_push_unregister(self):
+        """Remove an FCM token or Web Push subscription."""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(length) or b"{}")
+        except Exception:
+            self._json(400, {"error": "invalid json"})
+            return
+        token = (payload.get("token") or "").strip()
+        endpoint = (payload.get("endpoint") or "").strip()
+        tokens = _load_tokens()
+        if endpoint:
+            tokens = [t for t in tokens if not (isinstance(t, dict) and t.get("endpoint") == endpoint)]
+        elif token:
+            tokens = [t for t in tokens if t != token]
+        _save_tokens(tokens)
+        self._json(200, {"ok": True, "count": len(tokens)})
+
+    def _handle_push_notify(self):
+        """Send a push notification to all registered devices."""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(length) or b"{}")
+        except Exception:
+            self._json(400, {"error": "invalid json"})
+            return
+        title = payload.get("title") or "Vispr"
+        body = payload.get("body") or "Check your music library."
+        url = payload.get("url") or "/"
+        count = _send_fcm_push(title, body, url)
+        self._json(200, {"ok": True, "sent": count})
+
     def log_message(self, fmt, *args):  # noqa: A003
         print("[ytdlp-server]", fmt % args)
 
 
 if __name__ == "__main__":
     print(f"yt-dlp bridge listening on :{PORT}" + (" (auth enabled)" if SECRET else ""))
+    # Attempt Firebase init on startup (non-blocking)
+    _init_firebase()
+    # Send "server is back online" push to all registered devices
+    def _startup_push():
+        import time as _time
+        _time.sleep(3)  # let server bind first
+        count = _send_fcm_push("Server is back online", "Your music server is ready. Open the app to resume downloads.")
+        if count:
+            print(f"[push] Startup notification sent to {count} device(s)")
+    threading.Thread(target=_startup_push, daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

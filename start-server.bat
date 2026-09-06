@@ -26,6 +26,13 @@ echo  Starting yt-dlp backend on :8080...
 start /b "C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe" server\app.py
 timeout /t 2 /nobreak >nul
 
+REM Install push notification deps (silently, if not present)
+"C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe" -c "import pywebpush" 2>nul
+if errorlevel 1 (
+    echo  Installing push notification dependencies...
+    "C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe" -m pip install py-vapid pywebpush ecdsa -q 2>nul
+)
+
 REM Start Cloudflare tunnel in background
 echo  Starting Cloudflare tunnel...
 start /b cloudflared.exe tunnel --url http://localhost:8080 --no-autoupdate

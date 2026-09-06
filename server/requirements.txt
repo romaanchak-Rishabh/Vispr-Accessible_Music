@@ -1,0 +1,9 @@
+# Core (required)
+yt-dlp
+mutagen
+
+# Push notifications (optional — enables background server-up alerts)
+# Install with:  pip install -r server/requirements.txt
+py-vapid
+pywebpush
+ecdsa

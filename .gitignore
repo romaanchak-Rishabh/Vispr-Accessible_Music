@@ -23,3 +23,7 @@ qr.png
 watch-tunnel.log
 tunnel_out.txt
 tunnel_err.txt
+# push notification secrets
+server/push-tokens.json
+server/vapid-keys.json
+server/firebase-service-account.json
