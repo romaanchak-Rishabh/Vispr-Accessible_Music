@@ -120,7 +120,7 @@ def _send_webpush(subscription_info, payload_json):
             subscription_info,
             payload_json.encode(),
             vapid_private_key=priv_b64,
-            vapid_claims={"sub": "mailto:vispr@local"},
+            vapid_claims={"sub": "mailto:noreply@example.com"},
             ttl=86400,
         )
         return True
