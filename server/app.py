@@ -100,7 +100,9 @@ def _ensure_vapid_keys():
     from ecdsa import SigningKey, NIST256p  # type: ignore[import-untyped]
     sk = SigningKey.generate(curve=NIST256p)
     pk = sk.get_verifying_key()
-    pub = base64.urlsafe_b64encode(pk.to_string()).rstrip(b"=").decode()
+    # Web Push requires 65-byte uncompressed point (04 || x || y)
+    raw = b"\x04" + pk.to_string()
+    pub = base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
     priv = base64.urlsafe_b64encode(sk.to_string()).rstrip(b"=").decode()
     with open(_vapid_keys_path, "w") as f:
         json.dump({"public": pub, "private": priv}, f)
