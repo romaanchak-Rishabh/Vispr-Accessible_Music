@@ -66,6 +66,10 @@ export function useAudioEngine(): void {
         void silentEl.play().catch(() => { /* ignore */ });
         const st = usePlayer.getState();
         if (st.isPlaying && st.queue[st.index]) {
+          // Force a seek to current position to re-sync the audio output pipeline.
+          // The system may have muted audio while the element kept ticking internally.
+          const pos = els[cur].currentTime;
+          els[cur].currentTime = pos;
           void safePlay(els[cur]);
         }
         registerMediaHandlers();
@@ -79,6 +83,8 @@ export function useAudioEngine(): void {
         if (audioCtx?.state === 'running') {
           const st = usePlayer.getState();
           if (st.isPlaying && st.queue[st.index]) {
+            const pos = els[cur].currentTime;
+            els[cur].currentTime = pos;
             void safePlay(els[cur]);
           }
         }
