@@ -35,6 +35,56 @@ export function useAudioEngine(): void {
     silentEl.volume = 0;
     silentEl.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
 
+    // --- AudioContext resume helpers ---
+    let audioCtx: AudioContext | undefined;
+    try {
+      audioCtx = new AudioContext();
+    } catch { /* ignore */ }
+
+    const resumeContext = async (): Promise<void> => {
+      if (audioCtx && audioCtx.state === 'suspended') {
+        try { await audioCtx.resume(); } catch { /* ignore */ }
+      }
+    };
+
+    const safePlay = async (a: HTMLAudioElement): Promise<void> => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await resumeContext();
+          await a.play();
+          return;
+        } catch (err) {
+          if (attempt < 2) await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+        }
+      }
+    };
+
+    // Resume audio on visibility change (screen unlock / app foreground)
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === 'visible') {
+        void resumeContext();
+        void silentEl.play().catch(() => { /* ignore */ });
+        const st = usePlayer.getState();
+        if (st.isPlaying && st.queue[st.index]) {
+          void safePlay(els[cur]);
+        }
+        registerMediaHandlers();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // Auto-resume AudioContext when browser transitions from suspended
+    if (audioCtx) {
+      audioCtx.onstatechange = () => {
+        if (audioCtx?.state === 'running') {
+          const st = usePlayer.getState();
+          if (st.isPlaying && st.queue[st.index]) {
+            void safePlay(els[cur]);
+          }
+        }
+      };
+    }
+
     const els: [HTMLAudioElement, HTMLAudioElement] = [new Audio(), new Audio()];
     els.forEach((a) => { a.preload = 'auto'; });
 
@@ -217,7 +267,7 @@ export function useAudioEngine(): void {
         registerMediaSession(nextTrack);
         usePlayer.getState().setDuration(nextTrack.duration || 0);
         other.load();
-        await other.play();
+        await safePlay(other);
       } catch {
         console.warn('[audio] crossfade start failed');
         fading = false;
@@ -326,11 +376,7 @@ export function useAudioEngine(): void {
           lastQueueId = trackId;
           if (playState) {
             applyVol(st.volume);
-            try {
-              await els[cur].play();
-            } catch (err) {
-              console.warn('[audio] play() rejected:', err);
-            }
+            await safePlay(els[cur]);
           } else {
             els[cur].pause();
           }
@@ -382,6 +428,11 @@ export function useAudioEngine(): void {
     return () => {
       unsub();
       abortFade();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (audioCtx) {
+        audioCtx.onstatechange = null;
+        void audioCtx.close().catch(() => { /* ignore */ });
+      }
       durationFallbackTimeouts.forEach((t) => clearTimeout(t));
       durationFallbackTimeouts.clear();
       silentEl.pause();
