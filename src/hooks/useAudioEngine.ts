@@ -35,66 +35,29 @@ export function useAudioEngine(): void {
     silentEl.volume = 0;
     silentEl.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
 
-    // --- AudioContext resume helpers ---
-    let audioCtx: AudioContext | undefined;
-    try {
-      audioCtx = new AudioContext();
-    } catch { /* ignore */ }
-
-    const resumeContext = async (): Promise<void> => {
-      if (audioCtx && audioCtx.state === 'suspended') {
-        try { await audioCtx.resume(); } catch { /* ignore */ }
-      }
-    };
-
-    const safePlay = async (a: HTMLAudioElement): Promise<void> => {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          await resumeContext();
-          await a.play();
-          return;
-        } catch (err) {
-          if (attempt < 2) await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
-        }
-      }
-    };
-
-    // Resume audio on visibility change (screen unlock / app foreground)
-    const onVisibilityChange = (): void => {
-      if (document.visibilityState === 'visible') {
-        void resumeContext();
-        void silentEl.play().catch(() => { /* ignore */ });
-        const st = usePlayer.getState();
-        if (st.isPlaying && st.queue[st.index]) {
-          // Force a seek to current position to re-sync the audio output pipeline.
-          // The system may have muted audio while the element kept ticking internally.
-          const pos = els[cur].currentTime;
-          els[cur].currentTime = pos;
-          void safePlay(els[cur]);
-        }
-        registerMediaHandlers();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-
-    // Auto-resume AudioContext when browser transitions from suspended
-    if (audioCtx) {
-      audioCtx.onstatechange = () => {
-        if (audioCtx?.state === 'running') {
-          const st = usePlayer.getState();
-          if (st.isPlaying && st.queue[st.index]) {
-            const pos = els[cur].currentTime;
-            els[cur].currentTime = pos;
-            void safePlay(els[cur]);
-          }
-        }
-      };
-    }
-
     const els: [HTMLAudioElement, HTMLAudioElement] = [new Audio(), new Audio()];
     els.forEach((a) => { a.preload = 'auto'; });
 
     silentEl.play().catch(() => { /* ignore */ });
+
+    // Play with background-safe retry. Browsers may reject play() when the
+    // tab is hidden; setTimeout still fires in background so we retry there.
+    const pendingRetries: ReturnType<typeof setTimeout>[] = [];
+    const safePlay = (a: HTMLAudioElement): void => {
+      const attempt = (n: number): void => {
+        a.play().catch(() => {
+          if (n < 5) {
+            const t = setTimeout(() => attempt(n + 1), 500 * (n + 1));
+            pendingRetries.push(t);
+          }
+        });
+      };
+      attempt(0);
+    };
+    const clearPendingRetries = (): void => {
+      pendingRetries.forEach(clearTimeout);
+      pendingRetries.length = 0;
+    };
 
     const urls: (string | null)[] = [null, null];
     const loadedFor: (string | null)[] = [null, null];
@@ -273,7 +236,7 @@ export function useAudioEngine(): void {
         registerMediaSession(nextTrack);
         usePlayer.getState().setDuration(nextTrack.duration || 0);
         other.load();
-        await safePlay(other);
+        safePlay(other);
       } catch {
         console.warn('[audio] crossfade start failed');
         fading = false;
@@ -382,8 +345,10 @@ export function useAudioEngine(): void {
           lastQueueId = trackId;
           if (playState) {
             applyVol(st.volume);
-            await safePlay(els[cur]);
+            clearPendingRetries();
+            safePlay(els[cur]);
           } else {
+            clearPendingRetries();
             els[cur].pause();
           }
         }
@@ -434,11 +399,7 @@ export function useAudioEngine(): void {
     return () => {
       unsub();
       abortFade();
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      if (audioCtx) {
-        audioCtx.onstatechange = null;
-        void audioCtx.close().catch(() => { /* ignore */ });
-      }
+      clearPendingRetries();
       durationFallbackTimeouts.forEach((t) => clearTimeout(t));
       durationFallbackTimeouts.clear();
       silentEl.pause();
