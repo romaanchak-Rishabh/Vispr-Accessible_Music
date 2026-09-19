@@ -21,13 +21,15 @@ export function TrackRow({
   showArtwork = true,
   showIndex,
   trailingDuration = true,
-  onPlay
+  onPlay,
+  contextTracks
 }: {
   track: Track;
   showArtwork?: boolean;
   showIndex?: number;
   trailingDuration?: boolean;
   onPlay?: () => void;
+  contextTracks?: Track[];
 }) {
   const currentTrack = usePlayer((s) => s.queue[s.index]);
   const isPlaying = usePlayer((s) => s.isPlaying);
@@ -55,7 +57,12 @@ export function TrackRow({
       togglePlay();
       return;
     }
-    playTracks([track], 0);
+    if (contextTracks && contextTracks.length > 0) {
+      const idx = contextTracks.findIndex((t) => t.id === track.id);
+      playTracks(contextTracks, idx >= 0 ? idx : 0);
+    } else {
+      playTracks([track], 0);
+    }
     navigate({ type: 'listen' });
   };
 
