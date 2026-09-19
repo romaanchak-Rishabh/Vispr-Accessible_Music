@@ -1423,7 +1423,6 @@ function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null
 
 function ArtistDetailView({ name }: { name: string }): JSX.Element | null {
   const artist = useLibrary((s) => s.artists.find((a) => a.name === name));
-  const albums = useLibrary((s) => s.albums);
   const byId = useLibrary((s) => s.byId);
   const playTracks = usePlayer((s) => s.playTracks);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
@@ -1432,8 +1431,7 @@ function ArtistDetailView({ name }: { name: string }): JSX.Element | null {
   const [tracks, setTracks] = useState<Track[]>([]);
 
   if (!artist) return null;
-  const artistAlbums = artist.albumKeys.map((k) => albums.find((a) => a.key === k)).filter((a): a is Album => Boolean(a));
-  const artistTracks = artistAlbums.flatMap((a) => a.trackIds.map((id) => byId[id])).filter(Boolean);
+  const artistTracks = artist.trackIds.map((id) => byId[id]).filter(Boolean);
 
   const sortTracks = (option: string) => {
     let sorted = [...tracks];
