@@ -9,7 +9,7 @@ import { formatArtist } from '../types';
 import { TrackRow } from './TrackRow';
 import { Artwork } from './Artwork';
 import { PlaylistArtwork } from './PlaylistArtwork';
-import { EmptyLibrary, AlbumCard } from './Views';
+import { EmptyLibrary } from './Views';
 import { ImportBar } from './ImportBar';
 import { ChevronRightIcon, PlusCircleIcon, EllipsisIcon, ShuffleIcon, PlayIcon, SparklesIcon, ShareIcon, SpinnerIcon } from './Icons';
 import { getRecommendations, getSmartRecommendations, type Recommendation } from '../lib/recommender';
@@ -284,7 +284,7 @@ function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums'
           </div>
           <div className="group">
             {tracks.map((t) => (
-              <TrackRow key={t.id} track={t} />
+              <TrackRow key={t.id} track={t} contextTracks={tracks} />
             ))}
           </div>
         </>
@@ -319,8 +319,8 @@ function LibraryView({ section }: { section?: 'playlists' | 'artists' | 'albums'
             {[...tracks]
               .sort((a, b) => b.addedAt - a.addedAt)
               .slice(0, 50)
-              .map((t) => (
-                <TrackRow key={t.id} track={t} />
+              .map((t, _, arr) => (
+                <TrackRow key={t.id} track={t} contextTracks={arr} />
               ))}
           </div>
         </>
@@ -769,7 +769,7 @@ function BrowseView(): JSX.Element {
           </h2>
           <div className="group">
             {filteredSongs.map((t) => (
-              <TrackRow key={t.id} track={t} showArtwork={false} />
+              <TrackRow key={t.id} track={t} showArtwork={false} contextTracks={filteredSongs} />
             ))}
           </div>
         </>
@@ -781,6 +781,8 @@ function BrowseView(): JSX.Element {
 function SearchView(): JSX.Element {
   const status = useLibrary((s) => s.status);
   const tracks = useLibrary((s) => s.tracks);
+  const artists = useLibrary((s) => s.artists);
+  const navigate = useUI((s) => s.navigate);
   const [query, setQuery] = useState('');
   const [ytResults, setYtResults] = useState<YtSearchResult[]>([]);
   const [ytLoading, setYtLoading] = useState(false);
@@ -814,6 +816,12 @@ function SearchView(): JSX.Element {
     }
     return [...set].sort().reverse();
   }, [tracks]);
+
+  const artistResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return artists.filter((a) => a.name.toLowerCase().includes(q)).slice(0, 10);
+  }, [query, artists]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -1032,12 +1040,31 @@ function SearchView(): JSX.Element {
         </div>
       ) : (
         <>
+          {artistResults.length > 0 && (
+            <>
+              <h2 className="section-header">Artists</h2>
+              <div className="hscroll">
+                {artistResults.map((a) => (
+                  <button
+                    key={a.name}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', minWidth: 100, padding: '8px 4px' }}
+                    onClick={() => navigate({ type: 'artist', name: a.name })}
+                  >
+                    <Artwork src={a.artwork} className="row-artwork row-art-circle" style={{ width: 80, height: 80 }} placeholderSize={32} alt="" />
+                    <span style={{ fontSize: 12, fontWeight: 600, textAlign: 'center', lineHeight: 1.2, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--label-secondary)' }}>{a.trackIds.length} songs</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
           {results.length > 0 && (
             <>
               <h2 className="section-header">Your Library</h2>
               <div className="group">
                 {results.slice(0, 60).map((t) => (
-                  <TrackRow key={t.id} track={t} />
+                  <TrackRow key={t.id} track={t} contextTracks={results.slice(0, 60)} />
                 ))}
               </div>
             </>
@@ -1167,13 +1194,14 @@ function DetailHeader({
 
 const ROW_H = 56;
 
-function DragRow({ track, index, totalCount, showIndex, onMove, trailing }: {
+function DragRow({ track, index, totalCount, showIndex, onMove, trailing, contextTracks }: {
   track: Track;
   index: number;
   totalCount: number;
   showIndex?: boolean;
   onMove: (from: number, to: number) => void;
   trailing?: React.ReactNode;
+  contextTracks?: Track[];
 }): JSX.Element {
   const dragRef = useRef<{ startY: number } | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
@@ -1220,7 +1248,7 @@ function DragRow({ track, index, totalCount, showIndex, onMove, trailing }: {
       >
         ≡
       </span>
-      <TrackRow track={track} showIndex={showIndex ? index + 1 : undefined} showArtwork={!showIndex} />
+      <TrackRow track={track} showIndex={showIndex ? index + 1 : undefined} showArtwork={!showIndex} contextTracks={contextTracks} />
       {trailing}
     </div>
   );
@@ -1378,6 +1406,7 @@ function AlbumDetailView({ albumKey }: { albumKey: string }): JSX.Element | null
             index={i}
             totalCount={tracks.length}
             showIndex
+            contextTracks={tracks}
             onMove={(from, to) => {
               const newTracks = [...tracks];
               const [moved] = newTracks.splice(from, 1);
@@ -1397,10 +1426,37 @@ function ArtistDetailView({ name }: { name: string }): JSX.Element | null {
   const albums = useLibrary((s) => s.albums);
   const byId = useLibrary((s) => s.byId);
   const playTracks = usePlayer((s) => s.playTracks);
+  const toggleShuffle = usePlayer((s) => s.toggleShuffle);
+  const shuffle = usePlayer((s) => s.shuffle);
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [tracks, setTracks] = useState<Track[]>([]);
 
   if (!artist) return null;
   const artistAlbums = artist.albumKeys.map((k) => albums.find((a) => a.key === k)).filter((a): a is Album => Boolean(a));
-  const tracks = artistAlbums.flatMap((a) => a.trackIds.map((id) => byId[id])).filter(Boolean);
+  const artistTracks = artistAlbums.flatMap((a) => a.trackIds.map((id) => byId[id])).filter(Boolean);
+
+  const sortTracks = (option: string) => {
+    let sorted = [...tracks];
+    switch (option) {
+      case 'az':
+        sorted.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case 'za':
+        sorted.sort((a, b) => b.title.localeCompare(a.title));
+        break;
+      case 'date':
+        sorted.sort((a, b) => b.addedAt - a.addedAt);
+        break;
+      default:
+        break;
+    }
+    setTracks(sorted);
+    setSortMenuOpen(false);
+  };
+
+  if (tracks.length === 0 && artistTracks.length > 0) {
+    setTracks(artistTracks);
+  }
 
   return (
     <div className="fade-page">
@@ -1408,55 +1464,59 @@ function ArtistDetailView({ name }: { name: string }): JSX.Element | null {
         <button className="pill-btn primary" onClick={() => playTracks(tracks, 0, artist.name)}>
           <PlayIcon size={15} /> Play
         </button>
+        <button className={`pill-btn ${shuffle ? 'primary' : ''}`} onClick={() => {
+          if (!shuffle) {
+            playTracks(tracks, Math.floor(Math.random() * tracks.length), artist.name);
+            if (!usePlayer.getState().shuffle) toggleShuffle();
+          }
+        }}>
+          <ShuffleIcon size={15} /> Shuffle
+        </button>
         <button className="pill-btn" onClick={() => void shareArtist(artist.name, tracks)}>
           <ShareIcon size={15} /> Share
         </button>
+        <div style={{ position: 'relative', marginLeft: 'auto' }}>
+          <button className="pill-btn" style={{ fontSize: 12 }} onClick={() => setSortMenuOpen(!sortMenuOpen)}>
+            Sort
+          </button>
+          {sortMenuOpen && (
+            <div className="sort-menu" style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              background: 'var(--surface)',
+              borderRadius: 12,
+              padding: '6px 0',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              zIndex: 10,
+              minWidth: 140,
+            }}>
+              <button className="sort-menu-item" onClick={() => sortTracks('az')}>A → Z</button>
+              <button className="sort-menu-item" onClick={() => sortTracks('za')}>Z → A</button>
+              <button className="sort-menu-item" onClick={() => sortTracks('date')}>Date Added</button>
+            </div>
+          )}
+        </div>
       </DetailHeader>
-
-      <h2 className="section-header">Albums</h2>
-      <div className="hscroll">
-        {artistAlbums.map((a) => (
-          <AlbumCard key={a.key} album={a} />
-        ))}
-      </div>
-
-      <h2 className="section-header">Songs</h2>
       <div className="group">
-        {tracks.map((t) => (
-          <ArtistSongRow key={t.id} trackId={t.id} />
+        {tracks.map((t, i) => (
+          <DragRow
+            key={t.id}
+            track={t}
+            index={i}
+            totalCount={tracks.length}
+            showIndex
+            contextTracks={tracks}
+            onMove={(from, to) => {
+              const newTracks = [...tracks];
+              const [moved] = newTracks.splice(from, 1);
+              newTracks.splice(to, 0, moved);
+              setTracks(newTracks);
+            }}
+          />
         ))}
       </div>
     </div>
-  );
-}
-
-function ArtistSongRow({ trackId }: { trackId: string }): JSX.Element | null {
-  const track = useLibrary((s) => s.byId[trackId]);
-  const setActionSheet = useUI((s) => s.setActionSheet);
-  const playTracks = usePlayer((s) => s.playTracks);
-  const currentId = usePlayer((s) => s.queue[s.index]?.id);
-  const isPlaying = usePlayer((s) => s.isPlaying);
-  if (!track) return null;
-  const current = currentId === track.id;
-  return (
-    <button className="row" onClick={() => (current ? usePlayer.getState().togglePlay() : playTracks([track], 0))}>
-      <Artwork src={track.artwork} className="row-artwork row-art-circle" placeholderSize={16} alt="" />
-      <span className="row-texts">
-        <span className="row-title" style={{ display: 'block', color: current ? 'var(--accent)' : undefined }}>
-          {isPlaying && current ? '▶ ' : ''}
-          {track.title}
-        </span>
-      </span>
-      <span
-        className="icon-btn row-btn-dots"
-        onClick={(e) => {
-          e.stopPropagation();
-          setActionSheet(track.id);
-        }}
-      >
-        <EllipsisIcon size={18} />
-      </span>
-    </button>
   );
 }
 
@@ -1516,7 +1576,7 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
           <div className="group">
             {list.map((t) => (
               <div key={t.id} className="rowwrap">
-                <TrackRow track={t} />
+                <TrackRow track={t} contextTracks={list} />
                 {isAutoPlaylist(playlistId) && (
                   <button
                     className="icon-btn"
@@ -1632,6 +1692,7 @@ function PlaylistDetailView({ playlistId }: { playlistId: string }): JSX.Element
                 track={t}
                 index={i}
                 totalCount={plTracks.length}
+                contextTracks={plTracks}
                 onMove={(from, to) => reorderPlaylist(playlist.id, from, to)}
                 trailing={
                   <button
@@ -1693,7 +1754,7 @@ function MixDetailView({ mix }: { mix: { id: string; title: string; subtitle: st
       </DetailHeader>
       <div className="group">
         {mix.tracks.map((t) => (
-          <TrackRow key={t.id} track={t} />
+          <TrackRow key={t.id} track={t} contextTracks={mix.tracks} />
         ))}
       </div>
     </div>
