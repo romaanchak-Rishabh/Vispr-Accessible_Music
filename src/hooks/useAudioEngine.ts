@@ -66,6 +66,20 @@ export function useAudioEngine(): void {
     let lastQueueId: string | null = usePlayer.getState().queue[usePlayer.getState().index]?.id ?? null;
     let lastPlaying = usePlayer.getState().isPlaying;
 
+    // listen-time tracking
+    let lastListenTrackId: string | null = null;
+    let lastListenTime = 0;
+    let listenAccumulator = 0;
+    const FLUSH_INTERVAL_MS = 5000;
+
+    const flushListenTime = (): void => {
+      if (listenAccumulator > 0 && lastListenTrackId) {
+        usePlayer.getState().addListenSeconds(lastListenTrackId, Math.round(listenAccumulator));
+        listenAccumulator = 0;
+      }
+    };
+    const listenFlushInterval = setInterval(flushListenTime, FLUSH_INTERVAL_MS);
+
     // crossfade state
     let fading = false;
     let fadeRaf = 0;
@@ -155,7 +169,23 @@ export function useAudioEngine(): void {
 
       if (justAdvanced) {
         justAdvanced = false;
+        lastListenTrackId = st.queue[st.index]?.id ?? null;
+        lastListenTime = a.currentTime;
+        listenAccumulator = 0;
         return;
+      }
+
+      // Track listen seconds (forward progress only, ignore seeks)
+      const currentTrackId = st.queue[st.index]?.id ?? null;
+      if (currentTrackId && st.isPlaying) {
+        if (lastListenTrackId !== currentTrackId) {
+          flushListenTime();
+          lastListenTrackId = currentTrackId;
+          lastListenTime = a.currentTime;
+        } else if (a.currentTime > lastListenTime && a.currentTime - lastListenTime < 3) {
+          listenAccumulator += a.currentTime - lastListenTime;
+        }
+        lastListenTime = a.currentTime;
       }
 
       if (!st.seekTo) {
@@ -397,6 +427,8 @@ export function useAudioEngine(): void {
 
     // -- Cleanup --
     return () => {
+      flushListenTime();
+      clearInterval(listenFlushInterval);
       unsub();
       abortFade();
       clearPendingRetries();

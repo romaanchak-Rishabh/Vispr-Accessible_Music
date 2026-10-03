@@ -93,6 +93,12 @@ function pageTitle(): string {
       return 'Settings';
     case 'mix-detail':
       return page.title;
+    case 'wrapped':
+      return 'Wrapped';
+    case 'stats':
+      return 'Listening Stats';
+    default:
+      return 'Vispr';
   }
 }
 

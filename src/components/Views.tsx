@@ -61,6 +61,7 @@ export function ListenNowView(): JSX.Element {
   return (
     <div className="fade-page">
       <HeroSection />
+      <WrappedBanner />
       <MadeForYouSection />
       <EnhancedRecentlyPlayedSection />
       <TopPicksSection />
@@ -74,6 +75,58 @@ export function ListenNowView(): JSX.Element {
           Importing music… {scanProgress.found > 0 ? `${scanProgress.scanned}/${scanProgress.found}` : 'scanning folder'}
         </p>
       )}
+    </div>
+  );
+}
+
+function WrappedBanner(): JSX.Element {
+  const navigate = useUI((s) => s.navigate);
+  const playCounts = usePlayer((s) => s.playCounts);
+  const hasData = Object.values(playCounts).some((c) => c > 0);
+  if (!hasData) return <div />;
+  return (
+    <div style={{ padding: '4px 16px 12px' }}>
+      <button
+        onClick={() => navigate({ type: 'wrapped' })}
+        style={{
+          width: '100%',
+          padding: '16px 20px',
+          borderRadius: 16,
+          background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#fff',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{
+          position: 'absolute',
+          width: 120,
+          height: 120,
+          borderRadius: '50%',
+          background: '#a78bfa',
+          opacity: 0.15,
+          filter: 'blur(40px)',
+          top: -30,
+          right: -20,
+        }} />
+        <div style={{ textAlign: 'left', position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.5)', letterSpacing: 2 }}>
+            YOUR MUSIC YEAR
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>
+            Wrapped {new Date().getFullYear()} ✨
+          </div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+            See your top artists, songs & more
+          </div>
+        </div>
+        <ChevronRightIcon size={20} />
+      </button>
     </div>
   );
 }

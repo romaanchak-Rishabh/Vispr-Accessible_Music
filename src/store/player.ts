@@ -20,6 +20,9 @@ interface PlayerState {
   contextName: string | null;
   recentlyPlayed: HistoryEntry[];
   playCounts: Record<string, number>;
+  listenTime: Record<string, number>;
+  totalListeningTime: number;
+  firstPlayedAt: Record<string, number>;
 
   playTracks: (tracks: Track[], startIndex?: number, contextName?: string) => void;
   playTrackNext: (track: Track) => void;
@@ -41,6 +44,7 @@ interface PlayerState {
   removeFromQueue: (queueIndex: number) => void;
   moveInQueue: (from: number, to: number) => void;
   clearUpNext: () => void;
+  addListenSeconds: (trackId: string, seconds: number) => void;
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -69,6 +73,9 @@ export const usePlayer = create<PlayerState>()(
       contextName: null,
       recentlyPlayed: [],
       playCounts: {},
+      listenTime: {},
+      totalListeningTime: 0,
+      firstPlayedAt: {},
 
       playTracks: (tracks, startIndex = 0, contextName = undefined) => {
         if (tracks.length === 0) return;
@@ -247,6 +254,16 @@ export const usePlayer = create<PlayerState>()(
       clearUpNext: () => {
         const { queue, index } = get();
         set({ queue: queue.slice(0, index + 1) });
+      },
+
+      addListenSeconds: (trackId, seconds) => {
+        if (!trackId || seconds <= 0) return;
+        const { listenTime, totalListeningTime, firstPlayedAt } = get();
+        set({
+          listenTime: { ...listenTime, [trackId]: (listenTime[trackId] ?? 0) + seconds },
+          totalListeningTime: totalListeningTime + seconds,
+          firstPlayedAt: firstPlayedAt[trackId] ? firstPlayedAt : { ...firstPlayedAt, [trackId]: Date.now() }
+        });
       }
     }),
     {
@@ -262,7 +279,10 @@ export const usePlayer = create<PlayerState>()(
         volume: s.volume,
         contextName: s.contextName,
         recentlyPlayed: s.recentlyPlayed,
-        playCounts: s.playCounts
+        playCounts: s.playCounts,
+        listenTime: s.listenTime,
+        totalListeningTime: s.totalListeningTime,
+        firstPlayedAt: s.firstPlayedAt
       })
     }
   )
@@ -281,5 +301,6 @@ function recordPlay(set: SetFn, get: () => PlayerState, track: Track): void {
   const recent = [entry, ...state.recentlyPlayed.filter((e) => e.track.id !== track.id)].slice(0, 100);
   const counts = { ...state.playCounts };
   counts[track.id] = (counts[track.id] ?? 0) + 1;
-  set({ recentlyPlayed: recent, playCounts: counts });
+  const firstPlayed = state.firstPlayedAt[track.id] ? state.firstPlayedAt : { ...state.firstPlayedAt, [track.id]: Date.now() };
+  set({ recentlyPlayed: recent, playCounts: counts, firstPlayedAt: firstPlayed });
 }

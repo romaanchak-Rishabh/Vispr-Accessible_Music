@@ -63,14 +63,24 @@ export function PageRouter(): JSX.Element {
       return <MixDetailView mix={page} />;
     case 'settings':
       return <SettingsPage />;
+    case 'wrapped':
+      return <WrappedLazy />;
+    case 'stats':
+      return <StatsView />;
   }
 }
 
 // Listen Now lives in Views.tsx (exported as ListenNowView)
 import { ListenNowView } from './Views';
 import { SettingsPage } from './SettingsPage';
+import { StatsView } from './StatsView';
+import { WrappedView } from './WrappedView';
 function ListenNowLazy(): JSX.Element {
   return <ListenNowView />;
+}
+
+function WrappedLazy(): JSX.Element {
+  return <WrappedView />;
 }
 
 const LIB_SECTIONS = [

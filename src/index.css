@@ -2124,3 +2124,31 @@ html[data-theme='dark'] .enhanced-album-card:hover {
     padding: 8px 10px 16px;
   }
 }
+
+/* ============================================================
+   Wrapped — story animations
+   ============================================================ */
+@keyframes wrappedCardIn {
+  from { opacity: 0; transform: scale(0.96) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes wrappedFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes wrappedScaleIn {
+  from { opacity: 0; transform: scale(0.7); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes wrappedSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes wrappedBarGrow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}

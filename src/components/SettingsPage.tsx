@@ -7,6 +7,7 @@ import type { AccentId, ThemeMode } from '../store/settings';
 import { exportLibrary, importLibrary, type ImportProgress } from '../lib/backup';
 import { ReceiveSheet } from './ReceiveSheet';
 import { SpinnerIcon } from './Icons';
+import { useUI } from '../store/ui';
 
 function SectionTitle({ children }: { children: string }): JSX.Element {
   return (
@@ -58,6 +59,7 @@ export function SettingsPage(): JSX.Element {
   const setAccent = useSettings((s) => s.setAccent);
   const confirmImport = useSettings((s) => s.confirmImport);
   const setConfirmImport = useSettings((s) => s.setConfirmImport);
+  const navigate = useUI((s) => s.navigate);
   const ytdlpServer = useSettings((s) => s.ytdlpServer);
   const ytdlpToken = useSettings((s) => s.ytdlpToken);
   const youtubeApiKey = useSettings((s) => s.youtubeApiKey);
@@ -258,6 +260,15 @@ export function SettingsPage(): JSX.Element {
 
       <SectionTitle>Backup</SectionTitle>
       <div className="group" style={{ marginTop: 0 }}>
+        <Row label="Listening Stats">
+          <button
+            className="pill-btn primary"
+            style={{ padding: '5px 14px', fontSize: 13 }}
+            onClick={() => navigate({ type: 'stats' })}
+          >
+            View
+          </button>
+        </Row>
         <Row label="Export library">
           <button
             className="pill-btn primary"

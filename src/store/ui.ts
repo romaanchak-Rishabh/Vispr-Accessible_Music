@@ -11,7 +11,9 @@ export type Page =
   | { type: 'artist'; name: string }
   | { type: 'playlist'; id: string }
   | { type: 'mix-detail'; id: string; title: string; subtitle: string; icon: React.ReactNode; gradient: string; tracks: Track[] }
-  | { type: 'settings' };
+  | { type: 'settings' }
+  | { type: 'wrapped' }
+  | { type: 'stats' };
 
 interface UIState {
   tab: 'listen' | 'forYou' | 'browse' | 'library' | 'search' | 'settings';
