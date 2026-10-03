@@ -99,7 +99,7 @@ export function StatsView(): JSX.Element {
         const t = byId.get(id);
         if (!t) return null;
         const secs = listenTime[id] ?? 0;
-        const minutes = secs > 0 ? secs / 60 : ((t.duration ?? 0) * plays) / 60;
+        const minutes = secs / 60;
         return { track: t, plays, minutes };
       })
       .filter(Boolean)
@@ -108,7 +108,7 @@ export function StatsView(): JSX.Element {
   }, [playCounts, listenTime]);
 
   return (
-    <div className="fade-page" style={{ paddingBottom: 40 }}>
+    <div className="fade-page" style={{ paddingBottom: 40, paddingLeft: 16, paddingRight: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0 4px' }}>
         <button
           onClick={goBack}

@@ -139,8 +139,8 @@ export function MonthlyRecapView(): JSX.Element {
 
   if (monthKeys.length === 0 || !recap) {
     return (
-      <div className="fade-page" style={{ paddingBottom: 40, paddingTop: 'calc(env(safe-area-inset-top) + 8px)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 4px' }}>
+      <div className="fade-page" style={{ paddingBottom: 40, paddingLeft: 16, paddingRight: 16, paddingTop: 'calc(env(safe-area-inset-top) + 8px)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0 4px' }}>
           <button onClick={goBack} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 16, cursor: 'pointer', fontWeight: 600 }}>
             ‹ Back
           </button>
@@ -155,7 +155,7 @@ export function MonthlyRecapView(): JSX.Element {
   }
 
   return (
-    <div className="fade-page" style={{ paddingBottom: 40, paddingTop: 'calc(env(safe-area-inset-top) + 8px)' }}>
+      <div className="fade-page" style={{ paddingBottom: 40, paddingLeft: 16, paddingRight: 16, paddingTop: 'calc(env(safe-area-inset-top) + 8px)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 4px' }}>
         <button onClick={goBack} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 16, cursor: 'pointer', fontWeight: 600 }}>
