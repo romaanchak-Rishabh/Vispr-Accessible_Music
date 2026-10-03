@@ -74,7 +74,20 @@ export function useAudioEngine(): void {
 
     const flushListenTime = (): void => {
       if (listenAccumulator > 0 && lastListenTrackId) {
-        usePlayer.getState().addListenSeconds(lastListenTrackId, Math.round(listenAccumulator));
+        const secs = Math.round(listenAccumulator);
+        usePlayer.getState().addListenSeconds(lastListenTrackId, secs);
+        // Also stamp the seconds onto the matching recentlyPlayed entry so
+        // stats can use real listen time even before the listenTime map has data.
+        const st = usePlayer.getState();
+        const idx = st.recentlyPlayed.findIndex((e) => e.track.id === lastListenTrackId);
+        if (idx !== -1) {
+          const updated = [...st.recentlyPlayed];
+          updated[idx] = {
+            ...updated[idx],
+            listenedSeconds: (updated[idx].listenedSeconds ?? 0) + secs
+          };
+          usePlayer.setState({ recentlyPlayed: updated });
+        }
         listenAccumulator = 0;
       }
     };

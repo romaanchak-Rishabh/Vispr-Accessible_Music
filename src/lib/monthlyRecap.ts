@@ -100,8 +100,9 @@ export function computeMonthlyRecap(
   for (const [trackId, plays] of Object.entries(playsBucket)) {
     const t = byId.get(trackId);
     if (!t || plays <= 0) continue;
+    // Real listen time only — no duration × plays estimate (skips inflate playCounts)
     const secs = timeBucket[trackId] ?? 0;
-    const minutes = secs > 0 ? secs / 60 : ((t.duration ?? 0) * plays) / 60;
+    const minutes = secs / 60;
 
     totalPlays += plays;
     totalMinutes += minutes;

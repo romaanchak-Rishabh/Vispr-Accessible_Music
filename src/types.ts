@@ -64,6 +64,7 @@ export interface Playlist {
 export interface HistoryEntry {
   track: Track;
   playedAt: number;
+  listenedSeconds?: number;
 }
 
 export const AUDIO_EXTENSIONS = ['.mp3', '.m4a', '.mp4', '.aac', '.flac', '.wav', '.ogg', '.oga', '.opus', '.webm'];

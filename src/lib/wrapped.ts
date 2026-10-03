@@ -107,21 +107,38 @@ export function computeWrappedStats(
 ): WrappedStats {
   const byId = new Map(tracks.map((t) => [t.id, t]));
 
+  // Per-track listen seconds from the listenTime map
+  const listenSecondsFor = (id: string): number => listenTime[id] ?? 0;
+
+  // Per-track listen seconds from recentlyPlayed history entries (covers
+  // the gap between the 5s flushes and any pre-flush listening).
+  const historySeconds = new Map<string, number>();
+  for (const entry of recentlyPlayed) {
+    if (!entry.listenedSeconds) continue;
+    historySeconds.set(entry.track.id, (historySeconds.get(entry.track.id) ?? 0) + entry.listenedSeconds);
+  }
+
+  // Combined: prefer the authoritative listenTime map, add any extra from history
+  // (history entries are the source of truth for a single play session; the map
+  // accumulates the same seconds, so we take the max of the two to avoid double-counting)
+  const effectiveSeconds = (id: string): number => {
+    const fromMap = listenSecondsFor(id);
+    const fromHistory = historySeconds.get(id) ?? 0;
+    // listenTime map is cumulative across all sessions; history is per recent play.
+    // Use the larger value to avoid double-counting the same listening.
+    return Math.max(fromMap, fromHistory);
+  };
+
   // --- Minutes & plays ---
   const totalPlays = Object.values(playCounts).reduce((s, v) => s + v, 0);
   const playedIds = Object.keys(playCounts).filter((id) => (playCounts[id] ?? 0) > 0);
   const uniqueTracksPlayed = playedIds.length;
 
-  // --- Per-track aggregation ---
-  const trackMinutes = (id: string): number => {
-    const secs = listenTime[id] ?? 0;
-    const t = byId.get(id);
-    // If no listenTime tracked yet, estimate from duration × plays
-    if (secs === 0 && t?.duration) return (t.duration * (playCounts[id] ?? 0)) / 60;
-    return secs / 60;
-  };
+  // Per-track minutes — real listen time only, never duration × plays
+  // (skips inflate playCounts, so that estimate is wrong).
+  const trackMinutes = (id: string): number => effectiveSeconds(id) / 60;
 
-  // Sum per-track minutes (uses duration×plays fallback when listenTime is empty)
+  // Sum real listen minutes
   const totalMinutes = Math.round(playedIds.reduce((s, id) => s + trackMinutes(id), 0));
 
   // --- Top artists by minutes ---
