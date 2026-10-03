@@ -231,6 +231,8 @@ export default function App(): JSX.Element {
 
   const title = pageTitle();
   const canGoBack = pageStack.length > 1;
+  const currentPage = pageStack[pageStack.length - 1];
+  const isImmersive = currentPage?.type === 'wrapped' || currentPage?.type === 'monthly-recap';
 
   if (isDesktop) {
     return (
@@ -265,25 +267,31 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app-mobile">
-      <div className="content-scroll" style={{ paddingBottom: hasQueue ? 150 : 80 }}>
-        <header className="navbar">
-          <div className="navbar-inner">
-            {canGoBack ? (
-              <button className="navbar-btn" onClick={goBack} aria-label="Back">
-                <ChevronLeftIcon size={24} />
-              </button>
-            ) : (
-              <span style={{ width: 44 }} />
-            )}
-            <span className="navbar-title">{title}</span>
-            <span style={{ width: 44 }} />
-          </div>
-        </header>
+      {isImmersive ? (
         <PageRouter />
-      </div>
+      ) : (
+        <>
+          <div className="content-scroll" style={{ paddingBottom: hasQueue ? 150 : 80 }}>
+            <header className="navbar">
+              <div className="navbar-inner">
+                {canGoBack ? (
+                  <button className="navbar-btn" onClick={goBack} aria-label="Back">
+                    <ChevronLeftIcon size={24} />
+                  </button>
+                ) : (
+                  <span style={{ width: 44 }} />
+                )}
+                <span className="navbar-title">{title}</span>
+                <span style={{ width: 44 }} />
+              </div>
+            </header>
+            <PageRouter />
+          </div>
 
-      <MiniPlayer />
-      <TabBar />
+          <MiniPlayer />
+          <TabBar />
+        </>
+      )}
 
       <NowPlayingSheet />
       <QueueSheet />

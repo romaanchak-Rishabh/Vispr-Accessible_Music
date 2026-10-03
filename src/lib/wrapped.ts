@@ -1,4 +1,4 @@
-import type { Track } from '../types';
+import type { Track, HistoryEntry } from '../types';
 
 export interface WrappedStats {
   totalMinutes: number;
@@ -80,13 +80,20 @@ function classifyPersonality(
 
 function listeningAgeOf(years: { year?: number; plays: number }[]): number {
   const totalPlays = years.reduce((s, y) => s + y.plays, 0);
-  if (totalPlays === 0) return 25;
-  const weightedSum = years.reduce((s, y) => s + (y.year ?? 2015) * y.plays, 0);
-  const avgYear = weightedSum / totalPlays;
-  // Map release year to a "listening age" personality
-  // Newer music → younger personality, older music → mature personality
-  const age = Math.round(70 - (avgYear - 1970) * 0.55);
-  return Math.max(13, Math.min(75, age));
+  if (totalPlays === 0) return 22;
+  // Only average over tracks that actually have a year — otherwise missing
+  // metadata drags the average toward the default and skews the result.
+  const withYear = years.filter((y) => y.year && y.year >= 1950);
+  if (withYear.length === 0) return 22;
+  const yearTotal = withYear.reduce((s, y) => s + y.plays, 0);
+  if (yearTotal === 0) return 22;
+  const weightedSum = withYear.reduce((s, y) => s + (y.year ?? 2015) * y.plays, 0);
+  const avgYear = weightedSum / yearTotal;
+  // Newer music → younger listening personality, older music → mature.
+  // Reference: currentYear (2026) ≈ age 16; each decade back adds ~9 years.
+  const currentYear = new Date().getFullYear();
+  const age = Math.round(16 + (currentYear - avgYear) * 0.9);
+  return Math.max(14, Math.min(78, age));
 }
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -95,15 +102,12 @@ export function computeWrappedStats(
   tracks: Track[],
   playCounts: Record<string, number>,
   listenTime: Record<string, number>,
-  recentlyPlayed: { track: Track; playedAt: number }[],
+  recentlyPlayed: HistoryEntry[],
   _firstPlayedAt: Record<string, number>
 ): WrappedStats {
   const byId = new Map(tracks.map((t) => [t.id, t]));
 
   // --- Minutes & plays ---
-  const totalMinutes = Math.round(
-    Object.values(listenTime).reduce((s, v) => s + v, 0) / 60
-  );
   const totalPlays = Object.values(playCounts).reduce((s, v) => s + v, 0);
   const playedIds = Object.keys(playCounts).filter((id) => (playCounts[id] ?? 0) > 0);
   const uniqueTracksPlayed = playedIds.length;
@@ -116,6 +120,9 @@ export function computeWrappedStats(
     if (secs === 0 && t?.duration) return (t.duration * (playCounts[id] ?? 0)) / 60;
     return secs / 60;
   };
+
+  // Sum per-track minutes (uses duration×plays fallback when listenTime is empty)
+  const totalMinutes = Math.round(playedIds.reduce((s, id) => s + trackMinutes(id), 0));
 
   // --- Top artists by minutes ---
   const artistAgg = new Map<string, { minutes: number; plays: number; artwork?: string }>();

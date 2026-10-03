@@ -390,9 +390,16 @@ export function WrappedView(): JSX.Element {
     switch (step) {
       case 0: // Welcome
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 14 }}>
             <div style={{
-              fontSize: 'clamp(14px, 3vw, 18px)',
+              fontSize: 'clamp(40px, 10vw, 56px)',
+              animation: 'wrappedWiggle 2s ease-in-out infinite',
+              filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.15))',
+            }}>
+              🎧
+            </div>
+            <div style={{
+              fontSize: 'clamp(13px, 3vw, 16px)',
               color: 'rgba(255,255,255,0.5)',
               letterSpacing: '4px',
               fontWeight: 600,
@@ -418,13 +425,13 @@ export function WrappedView(): JSX.Element {
               lineHeight: 1.5,
               animation: 'wrappedFadeIn 0.8s ease 0.4s both',
             }}>
-              A look back at every beat, every artist, and every moment.
+              A look back at every beat, every artist, and every moment. 🎶
             </div>
             <div style={{
-              marginTop: 30,
-              fontSize: 13,
+              marginTop: 24,
+              fontSize: 14,
               color: 'rgba(255,255,255,0.35)',
-              animation: 'wrappedFadeIn 0.8s ease 0.8s both',
+              animation: 'wrappedFadeIn 0.8s ease 0.8s both, wrappedBounce 1.5s ease 1.5s infinite',
             }}>
               tap to explore →
             </div>
@@ -434,26 +441,41 @@ export function WrappedView(): JSX.Element {
       case 1: // Total minutes
         return (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-            <div style={{ fontSize: 'clamp(16px, 3.5vw, 20px)', color: 'rgba(255,255,255,0.5)', marginBottom: 8, animation: 'wrappedFadeIn 0.6s ease both' }}>
+            <div style={{
+              fontSize: 'clamp(30px, 7vw, 40px)',
+              animation: 'wrappedBounce 2s ease-in-out infinite',
+              marginBottom: 4,
+            }}>
+              ⏱️
+            </div>
+            <div style={{ fontSize: 'clamp(16px, 3.5vw, 20px)', color: 'rgba(255,255,255,0.5)', marginBottom: 4, animation: 'wrappedFadeIn 0.6s ease both' }}>
               You spent
             </div>
             <BigNumber value={stats.totalMinutes} suffix=" min" label="listening to music" accent={theme.accent} />
             <div style={{ fontSize: 'clamp(14px, 3vw, 17px)', color: 'rgba(255,255,255,0.45)', animation: 'wrappedFadeIn 0.8s ease 0.3s both' }}>
-              That's {formatMinutesLong(stats.totalMinutes)} of pure vibes
+              That's {formatMinutesLong(stats.totalMinutes)} of pure vibes ✨
             </div>
           </div>
         );
 
       case 2: // Top artist
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 20, padding: '0 24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16, padding: '0 24px' }}>
             <div style={{ fontSize: 'clamp(16px, 3.5vw, 20px)', color: 'rgba(255,255,255,0.5)', animation: 'wrappedFadeIn 0.6s ease both' }}>
-              Your #1 artist
+              🏆 Your #1 artist
             </div>
             {stats.topArtists[0] && (
               <>
-                <div style={{ animation: 'wrappedScaleIn 0.7s ease 0.2s both' }}>
-                  <Artwork src={stats.topArtists[0].artwork} style={{ width: 160, height: 160, borderRadius: '50%' }} placeholderSize={60} alt="" />
+                <div style={{ animation: 'wrappedScaleIn 0.7s ease 0.2s both', position: 'relative' }}>
+                  <div style={{
+                    position: 'absolute',
+                    inset: -8,
+                    borderRadius: '50%',
+                    background: `conic-gradient(${theme.accent}, transparent, ${theme.accent})`,
+                    opacity: 0.4,
+                    animation: 'wrappedPulse 2s ease-in-out infinite',
+                  }} />
+                  <Artwork src={stats.topArtists[0].artwork} style={{ width: 160, height: 160, borderRadius: '50%', position: 'relative', zIndex: 1 }} placeholderSize={60} alt="" />
                 </div>
                 <div style={{
                   fontSize: 'clamp(28px, 7vw, 42px)',
@@ -465,7 +487,7 @@ export function WrappedView(): JSX.Element {
                   {stats.topArtists[0].name}
                 </div>
                 <div style={{ fontSize: 'clamp(15px, 3.5vw, 18px)', color: theme.accent, fontWeight: 600, animation: 'wrappedFadeIn 0.6s ease 0.6s both' }}>
-                  {formatMinutes(Math.round(stats.topArtists[0].minutes))} · {stats.topArtists[0].plays} plays
+                  {formatMinutes(Math.round(stats.topArtists[0].minutes))} · {stats.topArtists[0].plays} plays 🎵
                 </div>
               </>
             )}
@@ -500,14 +522,14 @@ export function WrappedView(): JSX.Element {
 
       case 4: // Top song
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 18, padding: '0 24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 14, padding: '0 24px' }}>
             <div style={{ fontSize: 'clamp(16px, 3.5vw, 20px)', color: 'rgba(255,255,255,0.5)', animation: 'wrappedFadeIn 0.6s ease both' }}>
-              Your most played song
+              🔥 Your most played song
             </div>
             {stats.favouriteSong && (
               <>
-                <div style={{ animation: 'wrappedScaleIn 0.7s ease 0.2s both' }}>
-                  <Artwork src={stats.favouriteSong.artwork} style={{ width: 150, height: 150, borderRadius: 16 }} placeholderSize={50} alt="" />
+                <div style={{ animation: 'wrappedScaleIn 0.7s ease 0.2s both', position: 'relative' }}>
+                  <Artwork src={stats.favouriteSong.artwork} style={{ width: 150, height: 150, borderRadius: 16, boxShadow: `0 12px 40px ${theme.accent}33` }} placeholderSize={50} alt="" />
                 </div>
                 <div style={{
                   fontSize: 'clamp(22px, 5.5vw, 32px)',
@@ -522,8 +544,13 @@ export function WrappedView(): JSX.Element {
                 <div style={{ fontSize: 'clamp(15px, 3.5vw, 18px)', color: 'rgba(255,255,255,0.6)', animation: 'wrappedFadeIn 0.6s ease 0.6s both' }}>
                   {stats.favouriteSong.artist}
                 </div>
-                <div style={{ fontSize: 'clamp(15px, 3.5vw, 18px)', color: theme.accent, fontWeight: 700, animation: 'wrappedFadeIn 0.6s ease 0.8s both' }}>
-                  {stats.topSongs[0]?.plays ?? 0} plays
+                <div style={{
+                  fontSize: 'clamp(15px, 3.5vw, 18px)',
+                  color: theme.accent,
+                  fontWeight: 700,
+                  animation: 'wrappedFadeIn 0.6s ease 0.8s both, wrappedBounce 1.8s ease 1.2s infinite',
+                }}>
+                  {stats.topSongs[0]?.plays ?? 0} plays 🎧
                 </div>
               </>
             )}
@@ -574,7 +601,13 @@ export function WrappedView(): JSX.Element {
 
       case 7: // Listening age
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
+            <div style={{
+              fontSize: 'clamp(30px, 7vw, 40px)',
+              animation: 'wrappedBounce 2s ease-in-out infinite',
+            }}>
+              🎂
+            </div>
             <div style={{ fontSize: 'clamp(16px, 3.5vw, 20px)', color: 'rgba(255,255,255,0.5)', animation: 'wrappedFadeIn 0.6s ease both' }}>
               Based on your taste, your listening age is
             </div>
@@ -583,29 +616,30 @@ export function WrappedView(): JSX.Element {
               fontWeight: 900,
               color: theme.accent,
               textShadow: `0 0 80px ${theme.accent}55`,
-              animation: 'wrappedScaleIn 0.8s ease 0.2s both',
+              animation: 'wrappedScaleIn 0.8s ease 0.2s both, wrappedPulse 2.5s ease 1s infinite',
+              lineHeight: 1,
             }}>
               {stats.listeningAge}
             </div>
             <div style={{ fontSize: 'clamp(14px, 3vw, 17px)', color: 'rgba(255,255,255,0.45)', textAlign: 'center', maxWidth: 280, animation: 'wrappedFadeIn 0.6s ease 0.5s both' }}>
               {stats.listeningAge < 20 ? 'Born in the future 🚀' :
-                stats.listeningAge < 30 ? 'Young at heart ✨' :
-                  stats.listeningAge < 45 ? 'Perfectly timeless 🎵' :
-                    stats.listeningAge < 60 ? 'Classic soul 🎻' : 'Timeless wisdom 📜'}
+                stats.listeningAge < 28 ? 'Young at heart ✨' :
+                  stats.listeningAge < 40 ? 'Perfectly timeless 🎵' :
+                    stats.listeningAge < 55 ? 'Classic soul 🎻' : 'Timeless wisdom 📜'}
             </div>
           </div>
         );
 
       case 8: // Personality club
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16, padding: '0 24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, padding: '0 24px' }}>
             <div style={{ fontSize: 'clamp(16px, 3.5vw, 20px)', color: 'rgba(255,255,255,0.5)', animation: 'wrappedFadeIn 0.6s ease both' }}>
               You belong to the
             </div>
             <div style={{
-              fontSize: 'clamp(40px, 10vw, 60px)',
-              animation: 'wrappedScaleIn 0.7s ease 0.2s both',
-              filter: 'drop-shadow(0 0 30px rgba(255,255,255,0.2))',
+              fontSize: 'clamp(48px, 12vw, 72px)',
+              animation: 'wrappedScaleIn 0.7s ease 0.2s both, wrappedWiggle 2.5s ease 0.9s infinite',
+              filter: `drop-shadow(0 0 30px ${stats.personality.color}66)`,
             }}>
               {stats.personality.emoji}
             </div>
@@ -615,6 +649,7 @@ export function WrappedView(): JSX.Element {
               color: stats.personality.color,
               textAlign: 'center',
               animation: 'wrappedSlideUp 0.6s ease 0.4s both',
+              textShadow: `0 0 30px ${stats.personality.color}44`,
             }}>
               {stats.personality.name}
             </div>
@@ -696,28 +731,35 @@ export function WrappedView(): JSX.Element {
 
       case 11: // Summary + share
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 20, padding: '0 24px' }}>
-            <div style={{ fontSize: 'clamp(22px, 5vw, 28px)', fontWeight: 700, color: '#fff', textAlign: 'center', animation: 'wrappedFadeIn 0.6s ease both' }}>
-              That's your year in music
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16, padding: '0 24px' }}>
+            <div style={{
+              fontSize: 'clamp(30px, 7vw, 40px)',
+              animation: 'wrappedBounce 2s ease-in-out infinite',
+            }}>
+              🎉
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, width: '100%', maxWidth: 340 }}>
+            <div style={{ fontSize: 'clamp(22px, 5vw, 28px)', fontWeight: 700, color: '#fff', textAlign: 'center', animation: 'wrappedFadeIn 0.6s ease both' }}>
+              That's your year in music!
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, width: '100%', maxWidth: 340 }}>
               {[
-                { value: formatMinutes(stats.totalMinutes), label: 'Minutes' },
-                { value: stats.totalPlays.toLocaleString(), label: 'Plays' },
-                { value: stats.uniqueTracksPlayed.toLocaleString(), label: 'Songs' },
+                { value: formatMinutes(stats.totalMinutes), label: 'Minutes', emoji: '⏱️' },
+                { value: stats.totalPlays.toLocaleString(), label: 'Plays', emoji: '▶️' },
+                { value: stats.uniqueTracksPlayed.toLocaleString(), label: 'Songs', emoji: '🎵' },
               ].map((s, i) => (
                 <div key={i} style={{
                   textAlign: 'center',
-                  padding: '16px 8px',
+                  padding: '14px 8px',
                   borderRadius: 14,
                   background: 'rgba(255,255,255,0.07)',
                   border: '1px solid rgba(255,255,255,0.08)',
                   animation: `wrappedSlideUp 0.5s ease ${i * 0.1}s both`,
                 }}>
-                  <div style={{ fontSize: 'clamp(18px, 4.5vw, 24px)', fontWeight: 800, color: theme.accent }}>
+                  <div style={{ fontSize: 20 }}>{s.emoji}</div>
+                  <div style={{ fontSize: 'clamp(16px, 4vw, 22px)', fontWeight: 800, color: theme.accent, marginTop: 4 }}>
                     {s.value}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 }}>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
                     {s.label}
                   </div>
                 </div>
@@ -779,7 +821,7 @@ export function WrappedView(): JSX.Element {
                 animation: 'wrappedFadeIn 0.6s ease 0.6s both',
               }}
             >
-              Done
+              Done ✌️
             </button>
           </div>
         );
@@ -802,6 +844,8 @@ export function WrappedView(): JSX.Element {
         userSelect: 'none',
         overflow: 'hidden',
         transition: 'background 0.6s ease',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
       {/* Decorative background orbs */}
@@ -811,7 +855,7 @@ export function WrappedView(): JSX.Element {
         height: 400,
         borderRadius: '50%',
         background: theme.accent,
-        opacity: 0.04,
+        opacity: 0.06,
         filter: 'blur(80px)',
         top: '-10%',
         right: '-10%',
@@ -823,36 +867,68 @@ export function WrappedView(): JSX.Element {
         height: 300,
         borderRadius: '50%',
         background: theme.accent,
-        opacity: 0.03,
+        opacity: 0.04,
         filter: 'blur(60px)',
         bottom: '10%',
         left: '-10%',
         pointerEvents: 'none',
       }} />
+      {/* Floating confetti particles */}
+      {step > 0 && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+          {Array.from({ length: 14 }).map((_, i) => {
+            const colors = [theme.accent, '#fbbf24', '#34d399', '#f472b6', '#60a5fa'];
+            const c = colors[i % colors.length];
+            const size = 4 + (i % 4) * 2;
+            const left = (i * 7.3 + 3) % 90;
+            const delay = (i % 7) * 0.6;
+            const dur = 4 + (i % 5) * 0.8;
+            return (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute',
+                  width: size,
+                  height: size * (i % 2 === 0 ? 1 : 1.6),
+                  borderRadius: i % 3 === 0 ? '50%' : 2,
+                  background: c,
+                  opacity: 0.35,
+                  left: `${left}%`,
+                  top: '-5%',
+                  animation: `confettiFall ${dur}s linear ${delay}s infinite`,
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {/* Progress bars */}
-      <StoryProgress total={totalSteps} current={step + 1} />
+      <div style={{ paddingTop: 6 }}>
+        <StoryProgress total={totalSteps} current={step + 1} />
+      </div>
 
-      {/* Close button */}
+      {/* Close button — below the status bar / notch */}
       <button
         onClick={(e) => { e.stopPropagation(); goBack(); }}
         style={{
           position: 'absolute',
-          top: 20,
+          top: 'calc(env(safe-area-inset-top) + 48px)',
           right: 16,
           zIndex: 10,
-          background: 'rgba(255,255,255,0.1)',
+          background: 'rgba(255,255,255,0.12)',
           border: 'none',
           color: '#fff',
           fontSize: 22,
-          width: 36,
-          height: 36,
+          width: 38,
+          height: 38,
           borderRadius: '50%',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           backdropFilter: 'blur(10px)',
+          lineHeight: 1,
         }}
       >
         ×
@@ -861,11 +937,11 @@ export function WrappedView(): JSX.Element {
       {/* Navigation zones */}
       <div
         onClick={(e) => { e.stopPropagation(); prev(); }}
-        style={{ position: 'absolute', left: 0, top: 50, bottom: 50, width: '30%', cursor: 'pointer', zIndex: 5 }}
+        style={{ position: 'absolute', left: 0, top: 80, bottom: 50, width: '30%', cursor: 'pointer', zIndex: 5 }}
       />
 
       {/* Card content */}
-      <div style={{ position: 'relative', zIndex: 4, height: 'calc(100% - 40px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ position: 'relative', zIndex: 4, height: 'calc(100% - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 'env(safe-area-inset-top)' }}>
         <div key={step} style={{ width: '100%', animation: 'wrappedCardIn 0.45s ease both' }}>
           {renderCard()}
         </div>
@@ -874,7 +950,7 @@ export function WrappedView(): JSX.Element {
       {/* Step indicator */}
       <div style={{
         position: 'absolute',
-        bottom: 16,
+        bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
         left: 0,
         right: 0,
         textAlign: 'center',
