@@ -5,7 +5,7 @@ import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import { computeWrappedStats, formatMinutes, formatMinutesLong, type WrappedStats } from '../lib/wrapped';
 import { Artwork } from './Artwork';
-import { ShareIcon } from './Icons';
+import { ShareIcon, PlayIcon } from './Icons';
 
 /* ── Animated counter hook ─────────────────────────────────────────── */
 function useCountUp(target: number, duration = 1200, start = true): number {
@@ -297,6 +297,10 @@ export function WrappedView(): JSX.Element {
   const recentlyPlayed = usePlayer((s) => s.recentlyPlayed);
   const firstPlayedAt = usePlayer((s) => s.firstPlayedAt);
   const goBack = useUI((s) => s.goBack);
+  const playTracks = usePlayer((s) => s.playTracks);
+  const createPlaylist = useLibrary((s) => s.createPlaylist);
+  const addToPlaylist = useLibrary((s) => s.addToPlaylist);
+  const playlists = useLibrary((s) => s.playlists);
   const [step, setStep] = useState(0);
   const [sharing, setSharing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -356,6 +360,28 @@ export function WrappedView(): JSX.Element {
     } catch { /* user cancelled */ }
     setSharing(false);
   }, [stats]);
+
+  const topTrackIds = useMemo(() => {
+    return stats.topSongs.map((s) => s.track.id).slice(0, 25);
+  }, [stats]);
+
+  const topTracks = useMemo(() => {
+    const byId = new Map(tracks.map((t) => [t.id, t]));
+    return topTrackIds.map((id) => byId.get(id)).filter((t): t is NonNullable<typeof t> => !!t);
+  }, [topTrackIds, tracks]);
+
+  const handlePlayTop = useCallback(() => {
+    if (topTracks.length === 0) return;
+    const name = `Wrapped ${new Date().getFullYear()}`;
+    let playlist = playlists.find((p) => p.name === name);
+    if (!playlist) {
+      const id = createPlaylist(name);
+      addToPlaylist(id, topTracks.map((t) => t.id));
+    } else {
+      addToPlaylist(playlist.id, topTracks.map((t) => t.id));
+    }
+    playTracks(topTracks, 0, name);
+  }, [topTracks, playlists, createPlaylist, addToPlaylist, playTracks]);
 
   const theme = CARD_THEMES[step % CARD_THEMES.length];
 
@@ -697,6 +723,29 @@ export function WrappedView(): JSX.Element {
                 </div>
               ))}
             </div>
+            {topTracks.length > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handlePlayTop(); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '14px 28px',
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.12)',
+                  color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(10px)',
+                  animation: 'wrappedFadeIn 0.6s ease 0.3s both',
+                }}
+              >
+                <PlayIcon size={16} />
+                Play Top Songs
+              </button>
+            )}
             <button
               onClick={(e) => { e.stopPropagation(); void handleShare(); }}
               disabled={sharing}

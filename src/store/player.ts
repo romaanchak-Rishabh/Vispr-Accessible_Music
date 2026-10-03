@@ -5,6 +5,13 @@ import { useUI } from './ui';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
+export type MonthlyBucket = Record<string, number>; // trackId -> count/seconds
+
+export function monthKey(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 interface PlayerState {
   queue: Track[];
   originalQueue: Track[];
@@ -23,6 +30,8 @@ interface PlayerState {
   listenTime: Record<string, number>;
   totalListeningTime: number;
   firstPlayedAt: Record<string, number>;
+  monthlyPlays: Record<string, MonthlyBucket>;
+  monthlyListenTime: Record<string, MonthlyBucket>;
 
   playTracks: (tracks: Track[], startIndex?: number, contextName?: string) => void;
   playTrackNext: (track: Track) => void;
@@ -76,6 +85,8 @@ export const usePlayer = create<PlayerState>()(
       listenTime: {},
       totalListeningTime: 0,
       firstPlayedAt: {},
+      monthlyPlays: {},
+      monthlyListenTime: {},
 
       playTracks: (tracks, startIndex = 0, contextName = undefined) => {
         if (tracks.length === 0) return;
@@ -258,11 +269,15 @@ export const usePlayer = create<PlayerState>()(
 
       addListenSeconds: (trackId, seconds) => {
         if (!trackId || seconds <= 0) return;
-        const { listenTime, totalListeningTime, firstPlayedAt } = get();
+        const { listenTime, totalListeningTime, firstPlayedAt, monthlyListenTime } = get();
+        const key = monthKey(Date.now());
+        const monthBucket = { ...(monthlyListenTime[key] ?? {}) };
+        monthBucket[trackId] = (monthBucket[trackId] ?? 0) + seconds;
         set({
           listenTime: { ...listenTime, [trackId]: (listenTime[trackId] ?? 0) + seconds },
           totalListeningTime: totalListeningTime + seconds,
-          firstPlayedAt: firstPlayedAt[trackId] ? firstPlayedAt : { ...firstPlayedAt, [trackId]: Date.now() }
+          firstPlayedAt: firstPlayedAt[trackId] ? firstPlayedAt : { ...firstPlayedAt, [trackId]: Date.now() },
+          monthlyListenTime: { ...monthlyListenTime, [key]: monthBucket }
         });
       }
     }),
@@ -282,7 +297,9 @@ export const usePlayer = create<PlayerState>()(
         playCounts: s.playCounts,
         listenTime: s.listenTime,
         totalListeningTime: s.totalListeningTime,
-        firstPlayedAt: s.firstPlayedAt
+        firstPlayedAt: s.firstPlayedAt,
+        monthlyPlays: s.monthlyPlays,
+        monthlyListenTime: s.monthlyListenTime
       })
     }
   )
@@ -302,5 +319,13 @@ function recordPlay(set: SetFn, get: () => PlayerState, track: Track): void {
   const counts = { ...state.playCounts };
   counts[track.id] = (counts[track.id] ?? 0) + 1;
   const firstPlayed = state.firstPlayedAt[track.id] ? state.firstPlayedAt : { ...state.firstPlayedAt, [track.id]: Date.now() };
-  set({ recentlyPlayed: recent, playCounts: counts, firstPlayedAt: firstPlayed });
+  const key = monthKey(Date.now());
+  const monthBucket = { ...(state.monthlyPlays[key] ?? {}) };
+  monthBucket[track.id] = (monthBucket[track.id] ?? 0) + 1;
+  set({
+    recentlyPlayed: recent,
+    playCounts: counts,
+    firstPlayedAt: firstPlayed,
+    monthlyPlays: { ...state.monthlyPlays, [key]: monthBucket }
+  });
 }

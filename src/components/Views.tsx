@@ -82,10 +82,12 @@ export function ListenNowView(): JSX.Element {
 function WrappedBanner(): JSX.Element {
   const navigate = useUI((s) => s.navigate);
   const playCounts = usePlayer((s) => s.playCounts);
+  const monthlyPlays = usePlayer((s) => s.monthlyPlays);
   const hasData = Object.values(playCounts).some((c) => c > 0);
+  const hasMonthly = Object.keys(monthlyPlays).length > 0;
   if (!hasData) return <div />;
   return (
-    <div style={{ padding: '4px 16px 12px' }}>
+    <div style={{ padding: '4px 16px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <button
         onClick={() => navigate({ type: 'wrapped' })}
         style={{
@@ -127,6 +129,46 @@ function WrappedBanner(): JSX.Element {
         </div>
         <ChevronRightIcon size={20} />
       </button>
+      {hasMonthly && (
+        <button
+          onClick={() => navigate({ type: 'monthly-recap' })}
+          style={{
+            width: '100%',
+            padding: '12px 20px',
+            borderRadius: 14,
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            color: '#fff',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{
+            position: 'absolute',
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            background: '#34c759',
+            opacity: 0.12,
+            filter: 'blur(30px)',
+            top: -20,
+            right: 10,
+          }} />
+          <div style={{ textAlign: 'left', position: 'relative', zIndex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>
+              Monthly Recap 📅
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>
+              Your month in music — play it on the go
+            </div>
+          </div>
+          <ChevronRightIcon size={18} />
+        </button>
+      )}
     </div>
   );
 }

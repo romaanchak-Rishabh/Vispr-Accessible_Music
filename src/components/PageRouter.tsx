@@ -67,6 +67,8 @@ export function PageRouter(): JSX.Element {
       return <WrappedLazy />;
     case 'stats':
       return <StatsView />;
+    case 'monthly-recap':
+      return <MonthlyRecapView />;
   }
 }
 
@@ -75,6 +77,7 @@ import { ListenNowView } from './Views';
 import { SettingsPage } from './SettingsPage';
 import { StatsView } from './StatsView';
 import { WrappedView } from './WrappedView';
+import { MonthlyRecapView } from './MonthlyRecapView';
 function ListenNowLazy(): JSX.Element {
   return <ListenNowView />;
 }

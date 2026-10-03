@@ -269,6 +269,24 @@ export function SettingsPage(): JSX.Element {
             View
           </button>
         </Row>
+        <Row label="Monthly Recap">
+          <button
+            className="pill-btn primary"
+            style={{ padding: '5px 14px', fontSize: 13 }}
+            onClick={() => navigate({ type: 'monthly-recap' })}
+          >
+            View
+          </button>
+        </Row>
+        <Row label="Wrapped">
+          <button
+            className="pill-btn primary"
+            style={{ padding: '5px 14px', fontSize: 13 }}
+            onClick={() => navigate({ type: 'wrapped' })}
+          >
+            View
+          </button>
+        </Row>
         <Row label="Export library">
           <button
             className="pill-btn primary"

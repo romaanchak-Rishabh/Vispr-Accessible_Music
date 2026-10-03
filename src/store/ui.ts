@@ -13,7 +13,8 @@ export type Page =
   | { type: 'mix-detail'; id: string; title: string; subtitle: string; icon: React.ReactNode; gradient: string; tracks: Track[] }
   | { type: 'settings' }
   | { type: 'wrapped' }
-  | { type: 'stats' };
+  | { type: 'stats' }
+  | { type: 'monthly-recap' };
 
 interface UIState {
   tab: 'listen' | 'forYou' | 'browse' | 'library' | 'search' | 'settings';

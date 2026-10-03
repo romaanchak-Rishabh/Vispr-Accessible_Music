@@ -97,6 +97,8 @@ function pageTitle(): string {
       return 'Wrapped';
     case 'stats':
       return 'Listening Stats';
+    case 'monthly-recap':
+      return 'Monthly Recap';
     default:
       return 'Vispr';
   }
