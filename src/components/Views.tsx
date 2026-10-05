@@ -713,11 +713,19 @@ return (
 // Stations Section
 export function StationsSection(): JSX.Element | null {
   const tracks = useLibrary((s) => s.tracks);
+  const playCounts = usePlayer((s) => s.playCounts);
   const playTracks = usePlayer((s) => s.playTracks);
 
-  if (tracks.length === 0) return null;
-
-  const yourStationTracks = [...tracks].sort(() => Math.random() - 0.5).slice(0, 50);
+  // Memoize Your Station — reshuffle only when the library actually changes
+  const yourStationTracks = useMemo(() => {
+    if (tracks.length === 0) return [];
+    // Prefer played tracks first (they're likely favourites), then fill randomly
+    const played = tracks.filter((t) => (playCounts[t.id] ?? 0) > 0);
+    const unplayed = tracks.filter((t) => (playCounts[t.id] ?? 0) === 0);
+    const shuffledPlayed = [...played].sort(() => Math.random() - 0.5);
+    const shuffledUnplayed = [...unplayed].sort(() => Math.random() - 0.5);
+    return [...shuffledPlayed, ...shuffledUnplayed].slice(0, 50);
+  }, [tracks, playCounts]);
 
   const genreStations: { name: string; icon: JSX.Element; gradient: string; genres: GenreTag[] }[] = [
     { name: 'Bollywood Radio', icon: <MusicMixIcon size={28} />, gradient: 'linear-gradient(135deg, #fa233b, #fb5c74)', genres: ['bollywood', 'hindi', 'punjabi', 'tamil', 'telugu', 'malayalam', 'kannada', 'marathi', 'bengali'] },
@@ -731,6 +739,20 @@ export function StationsSection(): JSX.Element | null {
       const profile = getTrackProfile(t);
       return genres.includes(profile.genre1) || genres.includes(profile.genre2);
     }).slice(0, 50);
+  };
+
+  // Station-specific fallback: if no genre match, use mood matching instead of a shared random list
+  const getStationTracks = async (station: { genres: GenreTag[]; name: string }): Promise<Track[]> => {
+    const matched = getGenreTracks(station.genres);
+    if (matched.length > 0) return matched;
+    // Fall back to mood matching based on station vibe
+    const { getMoodTracks } = await import('../lib/moodMatcher');
+    const moodKey = station.name.includes('Chill') ? 'chill'
+      : station.name.includes('Party') ? 'party'
+        : station.name.includes('Rock') ? 'workout'
+          : 'commute'; // Bollywood → commute-ish
+    const moodMatched = getMoodTracks(tracks, moodKey, 50);
+    return moodMatched.length > 0 ? moodMatched : yourStationTracks;
   };
 
   const cardWidth = useResponsiveCardWidth();
@@ -764,12 +786,7 @@ export function StationsSection(): JSX.Element | null {
             className="station-card"
             style={{ width: cardWidth, background: station.gradient, borderRadius: 16, padding: 16, minHeight: 160, overflow: 'hidden', position: 'relative', flexShrink: 0 }}
             onClick={() => {
-              const matched = getGenreTracks(station.genres);
-              if (matched.length > 0) {
-                playTracks(matched, 0, station.name);
-              } else {
-                playTracks(yourStationTracks, 0, station.name);
-              }
+              void getStationTracks(station).then((list) => playTracks(list, 0, station.name));
             }}
           >
             <div style={{ position: 'absolute', inset: 0, zIndex: 0, opacity: 0.15, background: station.gradient }} />
@@ -783,12 +800,7 @@ export function StationsSection(): JSX.Element | null {
               <div style={{ flex: 1 }} />
               <button className="pill-btn primary" style={{ alignSelf: 'flex-start', padding: '8px 16px', fontSize: 13 }} onClick={(e) => {
                 e.stopPropagation();
-                const matched = getGenreTracks(station.genres);
-                if (matched.length > 0) {
-                  playTracks(matched, 0, station.name);
-                } else {
-                  playTracks(yourStationTracks, 0, station.name);
-                }
+                void getStationTracks(station).then((list) => playTracks(list, 0, station.name));
               }}>
                 <PlayIcon size={14} /> Play
               </button>
@@ -804,33 +816,45 @@ export function StationsSection(): JSX.Element | null {
 export function MoodGenreChips(): JSX.Element | null {
   const tracks = useLibrary((s) => s.tracks);
   const navigate = useUI((s) => s.navigate);
+  const [moodCounts, setMoodCounts] = useState<Record<string, number>>({});
+
+  // Compute mood matches once per tracks change
+  useEffect(() => {
+    if (tracks.length === 0) { setMoodCounts({}); return; }
+    let cancelled = false;
+    void (async () => {
+      const { getMoodTracks } = await import('../lib/moodMatcher');
+      if (cancelled) return;
+      const counts: Record<string, number> = {};
+      for (const key of ['chill', 'focus', 'workout', 'party', 'commute', 'sleep', 'sad']) {
+        counts[key] = getMoodTracks(tracks, key, 50).length;
+      }
+      if (!cancelled) setMoodCounts(counts);
+    })();
+    return () => { cancelled = true; };
+  }, [tracks]);
 
   if (tracks.length === 0) return null;
 
   const moods = [
-    { name: 'Chill', icon: <MoodIcon size={16} />, gradient: 'linear-gradient(135deg, #30d158, #63e284)' },
-    { name: 'Focus', icon: <StarIcon size={16} />, gradient: 'linear-gradient(135deg, #0a84ff, #409cff)' },
-    { name: 'Workout', icon: <WaveformIcon size={16} />, gradient: 'linear-gradient(135deg, #ff9f0a, #ffb84d)' },
-    { name: 'Party', icon: <SparklesIcon size={16} />, gradient: 'linear-gradient(135deg, #fa233b, #fb5c74)' },
-    { name: 'Commute', icon: <RadioIcon size={16} />, gradient: 'linear-gradient(135deg, #bf5af2, #d18cf5)' },
-    { name: 'Sleep', icon: <MoodIcon size={16} />, gradient: 'linear-gradient(135deg, #5856d6, #7a77e8)' },
+    { key: 'chill', name: 'Chill', icon: <MoodIcon size={16} />, gradient: 'linear-gradient(135deg, #30d158, #63e284)' },
+    { key: 'focus', name: 'Focus', icon: <StarIcon size={16} />, gradient: 'linear-gradient(135deg, #0a84ff, #409cff)' },
+    { key: 'workout', name: 'Workout', icon: <WaveformIcon size={16} />, gradient: 'linear-gradient(135deg, #ff9f0a, #ffb84d)' },
+    { key: 'party', name: 'Party', icon: <SparklesIcon size={16} />, gradient: 'linear-gradient(135deg, #fa233b, #fb5c74)' },
+    { key: 'sad', name: 'Sad', icon: <MoodIcon size={16} />, gradient: 'linear-gradient(135deg, #64748b, #94a3b8)' },
+    { key: 'commute', name: 'Commute', icon: <RadioIcon size={16} />, gradient: 'linear-gradient(135deg, #bf5af2, #d18cf5)' },
+    { key: 'sleep', name: 'Sleep', icon: <MoodIcon size={16} />, gradient: 'linear-gradient(135deg, #5856d6, #7a77e8)' },
   ];
 
   return (
     <div style={{ padding: '0 16px 16px' }}>
       <h2 className="section-header">By Mood</h2>
       <div className="hscroll" style={{ gap: 10 }}>
-{moods.map((mood) => {
-            const moodTracks = tracks.filter((t) => {
-              const genre = (t.genre1 ?? t.genre2 ?? '').toLowerCase();
-              return genre.includes(mood.name.toLowerCase());
-            }).slice(0, 50);
-
-            const finalTracks = moodTracks.length > 0 ? moodTracks : tracks.slice(0, 50);
-
-            return (
+        {moods.map((mood) => {
+          const count = moodCounts[mood.key] ?? 0;
+          return (
             <button
-              key={mood.name}
+              key={mood.key}
               className="mood-chip"
               style={{
                 padding: '14px 22px',
@@ -845,9 +869,17 @@ export function MoodGenreChips(): JSX.Element | null {
                 boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
                 border: 'none',
                 whiteSpace: 'nowrap',
+                opacity: count === 0 ? 0.45 : 1,
               }}
-              onClick={() => {
-                navigate({ type: 'mix-detail', id: `mood-${mood.name}`, title: mood.name, subtitle: `${moodTracks.length} songs`, icon: mood.icon, gradient: mood.gradient, tracks: finalTracks });
+              onClick={async () => {
+                const { getMoodTracks } = await import('../lib/moodMatcher');
+                const moodTracks = getMoodTracks(tracks, mood.key, 50);
+                if (moodTracks.length === 0) return;
+                navigate({
+                  type: 'mix-detail', id: `mood-${mood.key}`, title: mood.name,
+                  subtitle: `${moodTracks.length} songs`, icon: mood.icon, gradient: mood.gradient,
+                  tracks: moodTracks,
+                });
               }}
             >
               {mood.icon}
