@@ -43,7 +43,12 @@ async function isTunnelAlive(url: string): Promise<boolean> {
  */
 export async function syncTunnelUrl(): Promise<void> {
   try {
-    const { ytdlpServer, setYtdlpServer } = useSettings.getState();
+    const { ytdlpServer, serverMode, setYtdlpServer } = useSettings.getState();
+
+    // Friend/self-hosted mode: the user pasted their own backend URL — never
+    // auto-replace it with the repo-published tunnel.
+    if (serverMode === 'manual') return;
+
     const cur = (ytdlpServer ?? '').trim().replace(/\/+$/, '');
     const curHost = hostOf(cur);
     const isManaged = !!curHost && curHost.endsWith('.trycloudflare.com');

@@ -27,17 +27,48 @@ set LOCAL_IP=%LOCAL_IP: =%
 echo  Local IP: %LOCAL_IP%
 echo.
 
+REM Find Python (owner's known path first, then PATH, then the py launcher)
+set "PY=C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe"
+if not exist "%PY%" (
+    set "PY="
+    for /f "delims=" %%i in ('where python.exe 2^>nul') do (
+        if not defined PY (
+            "%%i" -c "import sys" >nul 2>&1 && set "PY=%%i"
+        )
+    )
+)
+if not defined PY (
+    for /f "delims=" %%i in ('py.exe -3 -c "import sys; print(sys.executable)" 2^>nul') do (
+        if not defined PY set "PY=%%i"
+    )
+)
+if not defined PY (
+    echo  Python not found.
+    echo  Install Python 3.12 from https://www.python.org/downloads/
+    echo  and TICK "Add python.exe to PATH" in the installer.
+    pause
+    exit /b 1
+)
+echo  Python: %PY%
+echo.
+
+REM First run: install server dependencies if missing
+"%PY%" -c "import yt_dlp" >nul 2>&1
+if errorlevel 1 (
+    echo  Installing server dependencies - first run, one time...
+    "%PY%" -m pip install -r server\requirements.txt -q
+    "%PY%" -c "import yt_dlp" >nul 2>&1
+    if errorlevel 1 (
+        echo  Dependency install failed. Check your internet and re-run.
+        pause
+        exit /b 1
+    )
+)
+
 REM Start Python backend in background
 echo  Starting yt-dlp backend on :8080...
-start /b "" "C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe" server\app.py
+start /b "" "%PY%" server\app.py
 timeout /t 2 /nobreak >nul
-
-REM Install push notification deps (silently, if not present)
-"C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe" -c "import pywebpush" 2>nul
-if errorlevel 1 (
-    echo  Installing push notification dependencies...
-    "C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe" -m pip install py-vapid pywebpush ecdsa -q 2>nul
-)
 
 REM Start Cloudflare tunnel in background.
 REM --protocol http2: QUIC silently dies on this network (28k control-stream
@@ -107,7 +138,7 @@ if "%HAVE_CURL%"=="1" (
 if "%CODE%"=="200" goto :publish
 
 set /a MOD=VWAIT %% 15
-if %MOD%==0 echo    not reachable yet (HTTP %CODE%) - waited %VWAIT%s...
+if %MOD%==0 echo    not reachable yet - HTTP %CODE%, waited %VWAIT%s...
 set /a VWAIT+=3
 timeout /t 3 /nobreak >nul
 goto :verify_loop
@@ -121,9 +152,16 @@ echo.
 :publish
 echo.
 echo  Tunnel URL: %TUNNEL_URL% (reachable check: HTTP %CODE%)
-echo  Publishing to GitHub...
 
-REM Write tunnel.txt without BOM and git push
+REM Publish only when this is a real git checkout with push access
+REM (a downloaded ZIP or a clone without credentials just skips this).
+git rev-parse --is-inside-work-tree >nul 2>&1
+if errorlevel 1 (
+    echo  Not a git checkout - skipping URL publish.
+    goto :run
+)
+
+echo  Publishing to GitHub...
 powershell -NoProfile -Command "[System.IO.File]::WriteAllText('tunnel.txt', '%TUNNEL_URL%', (New-Object System.Text.UTF8Encoding $false))"
 git add tunnel.txt 2>nul
 git commit -m "Update tunnel url to %TUNNEL_URL%" 2>nul
@@ -136,6 +174,10 @@ echo.
 :run
 echo  Server running on http://localhost:8080
 echo  Tunnel: %TUNNEL_URL%
+echo.
+echo  Running your OWN copy? Open the Vispr app - Settings - Import,
+echo  paste the Tunnel URL above into "yt-dlp server URL".
+echo  (See MULTI-USER-SETUP.txt for the full friend/multi-user guide.)
 echo.
 echo  Press Ctrl+C to stop.
 pause >nul

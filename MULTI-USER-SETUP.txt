@@ -1,0 +1,116 @@
+VISPR - MULTI-USER SETUP
+========================
+
+HOW IT WORKS (read this once, it makes everything else obvious)
+----------------------------------------------------------------
+The app (the web page) plays music. To IMPORT/DOWNLOAD songs it needs a small
+"backend" program running somewhere with internet.
+
+Right now that backend runs on ONE person's Windows PC and everyone's app finds
+it through a file called tunnel.txt in the GitHub repo. That is why friends are
+dependent on the owner's computer.
+
+Multi-user fix: every friend runs THEIR OWN backend and points their app at it.
+Nobody depends on anyone. It is free, takes ~5 minutes, and needs no accounts.
+
+
+OPTION A - EACH FRIEND RUNS THEIR OWN SERVER (recommended)
+----------------------------------------------------------
+Do this ONCE on the Windows PC you listen from.
+
+1) INSTALL PYTHON (one time)
+   - Go to https://www.python.org/downloads/ and download Python 3.12.
+   - Run the installer.
+   - IMPORTANT: tick "Add python.exe to PATH" on the very first screen,
+     then click Install Now.
+
+2) GET THE FILES (one time)
+   - Open the GitHub repo page -> green "Code" button -> "Download ZIP".
+   - Unzip it anywhere, e.g. Desktop\Vispr.
+   (Cloning with git also works, but ZIP is simpler. Git is NOT required.)
+
+3) START YOUR SERVER (every time you want to download songs)
+   - Double-click  start-server.bat
+   - First run only: it installs its own dependencies (wait for it).
+   - After ~1 minute you will see a line like:
+        Tunnel: https://some-words-here.trycloudflare.com
+   - COPY that URL.
+   - KEEP THE BLACK WINDOW OPEN (just minimize it). Closing the window =
+     your server is off. Ctrl+C in the window = stop.
+
+4) POINT THE APP AT YOUR SERVER (once per server start)
+   - Open the Vispr app -> Settings -> Import section.
+   - Paste your URL into the "yt-dlp server URL" box.
+   - The line under it should now say "Your own server".
+   - Press "Check" next to "Server:" -> should say "Reachable".
+
+5) USE IT
+   - Import songs / search / download as usual.
+   - Downloads now go through YOUR internet, not the owner's.
+
+6) RESTARTS
+   - Every restart of the bat gives a NEW https URL (that is normal for free
+     Cloudflare tunnels). Just repeat steps 3 and 4 - paste the new URL.
+   - Your library, settings and everything else are remembered by the app.
+
+That is the whole setup. Friends do NOT need GitHub accounts, do NOT push
+anything, and do NOT touch the owner's tunnel.txt.
+
+
+TROUBLESHOOTING
+---------------
+- "Python not found" when running the bat
+    -> Reinstall Python and make sure "Add python.exe to PATH" was ticked.
+- App says server unreachable / downloads fail
+    -> Is the black window still open? Is the URL in Settings the one
+       currently printed in that window (restarts change it)?
+- Downloads are slow
+    -> It is your own internet connection now - check your bandwidth.
+- Windows firewall / antivirus prompt
+    -> Allow it, or ignore it; the tunnel only makes OUTBOUND connections.
+- The bat opened and closed instantly
+    -> It pauses on errors, so this usually means the ZIP was moved while
+       running - keep the folder in one place and double-click again.
+
+
+OPTION B - ONE SHARED BACKEND IN THE CLOUD (nobody keeps a PC on)
+-----------------------------------------------------------------
+Advanced. If someone has any always-free cloud VM (Oracle Cloud free tier,
+an old laptop with a public IP, a small VPS) and Docker installed:
+
+    docker build -t vispr-server ./server
+    docker run -d -p 8080:8080 --restart unless-stopped vispr-server
+
+Then give every friend the address:
+    - plain  http://VPS_IP:8080   (open the port in the firewall/security list)
+    - or put HTTPS in front with a Cloudflare named tunnel / proxied DNS.
+
+Each friend pastes that address in Settings -> "yt-dlp server URL" exactly
+like step 4 above (it will show "Your own server").
+
+Warning: that machine then carries EVERYONE's download traffic and must stay
+on - it becomes the single server again, just not your laptop. Option A is
+more resilient: every person's music only needs their own PC.
+
+
+SECURITY NOTES
+--------------
+- The backend can require a shared secret: create a file named .env next to
+  server\app.py containing:
+      YTDLP_SECRET=some-long-random-word
+  Then every user puts the same word in the app's "yt-dlp secret" box.
+  Recommended if your tunnel URL could leak - otherwise anyone who finds the
+  URL can use your backend and your bandwidth.
+- Never post your live tunnel URL in public places.
+- Your own server downloads only what YOU ask it to - same as before.
+
+
+IF YOU ARE THE REPO OWNER
+-------------------------
+- Your own setup keeps working exactly as today: start-server.bat still
+  publishes your URL to tunnel.txt for anyone who has NOT set their own server.
+- Friends following Option A never interact with tunnel.txt - their bat
+  silently skips the publish step (no git / no push permission).
+- The app change behind this: Settings shows "Backend: Shared (auto)" or
+  "Your own server". Pasting a URL switches to manual mode, and auto-sync
+  stops touching it. "Use shared server" button switches back.

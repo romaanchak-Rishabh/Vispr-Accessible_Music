@@ -17,11 +17,14 @@ export type AccentId = (typeof ACCENTS)[number]['id'];
 interface SettingsState {
   ytdlpServer: string;
   ytdlpToken: string;
+  /** 'auto' = follow the shared tunnel.txt published by the repo; 'manual' = user pasted their own server and auto-sync must not touch it. */
+  serverMode: 'auto' | 'manual';
   confirmImport: boolean;
   youtubeApiKey: string;
   theme: ThemeMode;
   accent: AccentId;
   setYtdlpServer: (url: string) => void;
+  setServerMode: (mode: 'auto' | 'manual') => void;
   setYtdlpToken: (token: string) => void;
   setConfirmImport: (confirm: boolean) => void;
   setYoutubeApiKey: (key: string) => void;
@@ -34,11 +37,13 @@ export const useSettings = create<SettingsState>()(
     (set) => ({
       ytdlpServer: '',
       ytdlpToken: '',
+      serverMode: 'auto',
       confirmImport: true,
       youtubeApiKey: '',
       theme: 'system',
       accent: 'red',
       setYtdlpServer: (ytdlpServer) => set({ ytdlpServer: ytdlpServer.trim().replace(/\/+$/, '') }),
+      setServerMode: (serverMode) => set({ serverMode }),
       setYtdlpToken: (ytdlpToken) => set({ ytdlpToken: ytdlpToken.trim() }),
       setConfirmImport: (confirmImport) => set({ confirmImport }),
       setYoutubeApiKey: (youtubeApiKey) => set({ youtubeApiKey: youtubeApiKey.trim() }),

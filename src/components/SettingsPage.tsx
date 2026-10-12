@@ -64,6 +64,8 @@ export function SettingsPage(): JSX.Element {
   const ytdlpToken = useSettings((s) => s.ytdlpToken);
   const youtubeApiKey = useSettings((s) => s.youtubeApiKey);
   const setYtdlpServer = useSettings((s) => s.setYtdlpServer);
+  const serverMode = useSettings((s) => s.serverMode);
+  const setServerMode = useSettings((s) => s.setServerMode);
   const setYtdlpToken = useSettings((s) => s.setYtdlpToken);
   const setYoutubeApiKey = useSettings((s) => s.setYoutubeApiKey);
 
@@ -164,7 +166,10 @@ export function SettingsPage(): JSX.Element {
             style={{ paddingLeft: 12, fontSize: 14 }}
             placeholder="yt-dlp server URL (optional)"
             value={ytdlpServer}
-            onChange={(e) => setYtdlpServer(e.target.value)}
+            onChange={(e) => {
+              setYtdlpServer(e.target.value);
+              if (e.target.value.trim()) setServerMode('manual');
+            }}
             autoCorrect="off"
             autoCapitalize="off"
           />
@@ -190,6 +195,25 @@ export function SettingsPage(): JSX.Element {
           <span style={{ fontSize: 12, color: 'var(--label-secondary)', lineHeight: 1.4 }}>
             Empty server uses this deployment's built-in yt-dlp API. AI metadata enrichment is enabled via environment key. Manual Song mode needs none of these.
           </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, color: 'var(--label-secondary)' }}>Backend:</span>
+            <span style={{ fontSize: 13, color: serverMode === 'manual' ? '#30d158' : 'var(--label-secondary)', fontWeight: serverMode === 'manual' ? 500 : 400 }}>
+              {serverMode === 'manual' ? '● Your own server' : 'Shared (auto)'}
+            </span>
+            {serverMode === 'manual' && (
+              <button
+                className="pill-btn"
+                style={{ fontSize: 12, padding: '3px 10px' }}
+                onClick={() => {
+                  setServerMode('auto');
+                  setYtdlpServer('');
+                  useUI.getState().showToast('Using shared server again');
+                }}
+              >
+                Use shared server
+              </button>
+            )}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
             <span style={{ fontSize: 13, color: 'var(--label-secondary)' }}>Server:</span>
             {serverStatus === 'idle' && (
@@ -231,11 +255,7 @@ export function SettingsPage(): JSX.Element {
             </div>
           )}
           <div style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-bg)', padding: '8px 10px', borderRadius: 8, lineHeight: 1.5 }}>
-            <strong>Run your own server?</strong> Start the Python backend on a laptop with internet, then expose it with Cloudflare Tunnel:
-            <code style={{ display: 'block', marginTop: 4, fontSize: 11, fontFamily: 'monospace', wordBreak: 'break-all' }}>
-              cloudflared tunnel --url http://localhost:8080
-            </code>
-            Paste the <code>https://…trycloudflare.com</code> URL above. Works from anywhere.
+            <strong>Run your own server?</strong> On a Windows PC, get the repo, double-click <code>start-server.bat</code>, copy the printed <code>https://…trycloudflare.com</code> URL and paste it above — it flips to “Your own server” and auto-sync leaves it alone. Full steps in <code>MULTI-USER-SETUP.txt</code>.
           </div>
         </div>
       </div>
