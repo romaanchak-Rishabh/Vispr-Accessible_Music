@@ -69,7 +69,7 @@ function Stop-Cloudflared {
 function Start-Cloudflared {
   Log "Starting cloudflared..."
   Remove-Item $CfLog, "$env:TEMP\opencode\cf-managed.err.log" -ErrorAction SilentlyContinue
-  Start-Process -FilePath $CfExe -ArgumentList "tunnel","--url","http://localhost:8080","--no-autoupdate" `
+  Start-Process -FilePath $CfExe -ArgumentList "tunnel","--url","http://localhost:8080","--no-autoupdate","--protocol","http2" `
     -WorkingDirectory $Root -RedirectStandardOutput $CfLog -RedirectStandardError "$env:TEMP\opencode\cf-managed.err.log" -WindowStyle Hidden
   $deadline = (Get-Date).AddSeconds(45)
   while ((Get-Date) -lt $deadline) {
