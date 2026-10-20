@@ -51,10 +51,11 @@ A fully offline-capable Progressive Web App (React + TypeScript + Vite) with an 
 - **Full metadata editor** — title, multiple artists, album, year/era, two genre slots, song type (Lofi/Remix/Mashup/…), mood, language, free-form tags, and cover art (from photos or a YouTube URL).
 
 ### Smart Features
-- **Smart recommender** — "Made For You" and "Top Picks" on Listen Now use USE embeddings + cosine similarity over your listening patterns, play counts, and recency.
-- **Stations for You** — a personal shuffle station plus genre stations (Bollywood, Rock, Chill, Party) matched via the built-in classifier + mood matching.
+- **NLP-powered recommender** — "Made For You" (Favorites Mix), Top Picks, and Discovery Mix run a TensorFlow.js **Universal Sentence Encoder** model fully on-device: every track's title/artists/album/genres/mood/tags are embedded into a semantic vector, and songs are ranked by **cosine similarity to the centroid of your favourites**, blended with play-count artist/genre/era affinity, playlist co-occurrence, recency penalties, and a small exploration bonus. If the model can't load, it falls back to the heuristic ranking. No listening data ever leaves your device.
+- **Mix refresh cadence** — mixes are recomputed automatically **every time you open the app** (each Listen Now session), re-ranked against your latest plays and favourites — there is no fixed weekly timer; the "updated weekly" subtitle is Apple-Music-style copy.
+- **Mood & Genre chips** — horizontal filters on Listen Now backed by a **mood-matching engine** that scores each track's mood/genre tags (mood tags are themselves AI-assigned by Gemini at import time) against the chip's mood — Chill, Focus, Workout, Party, Commute, Sleep, and more.
+- **Stations for You** — a personal shuffle station plus genre stations (Bollywood, Rock, Chill, Party) matched via the built-in keyword classifier + the same mood-matching engine (no network needed).
 - **Recently Played / Jump Back In / Recently Added** — artwork-forward sections on Listen Now.
-- **Mood & Genre chips** — horizontal filters on Listen Now.
 - **Year/Era metadata** — era badges (2020s, 2010s, 90s…) everywhere; year is editable.
 
 ### Organization
@@ -193,6 +194,7 @@ Files named `Song - Artist.mp3` or plain titles also work — tags always win wh
 - **Metadata parsing**: hand-rolled and dependency-free (ID3v2.2/2.3/2.4, MP4 `ilst` atoms incl. `covr`, FLAC Vorbis comments + pictures). Duration from TLEN (MP3), `©dur` (MP4), DURATION (FLAC).
 - **AI enrichment**: Google Gemini (`gemini-3.5-flash-lite`) returns structured JSON (artists/album/genres/year/mood/language/mashup-remix flags) which is mapped onto the app's genre taxonomy.
 - **Classifier**: keyword-based genre classification (Bollywood, Rock, Pop, Classical, …) with era inference from year. Used for stations and recommendations.
+- **Recommendation NLP**: TensorFlow.js Universal Sentence Encoder (on-device, cached in IndexedDB) embeds track text for semantic similarity; `moodMatcher.ts` provides lexical mood scoring for chips/stations using mood/genre tags (Gemini-assigned at import where available).
 - **Sharing**: LZ-compressed share payloads (text or `.vispr.json` file) with conflict detection/resolution. Audio transferred directly via Web Share API.
 - **Backend**: `server/app.py` — threaded Python bridge around yt-dlp (+ optional RapidAPI v2 providers, mutagen tagging, web push). Exposed via Cloudflare quick tunnels; Vercel serverless mirrors exist for zero-infra demos.
 - **PWA**: `vite-plugin-pwa` (Workbox generateSW, auto-update, precached app shell). Share target configured for Android/Chrome.
