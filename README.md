@@ -156,6 +156,28 @@ node scripts/gen-docs-shots.mjs
 
 Nobody is tied to one machine: every user can run their own yt-dlp bridge + Cloudflare quick tunnel by double-clicking `start-server.bat`, then pasting the URL into the app's **Settings → Import**. The app health-checks the server and falls back to the shared URL in `tunnel.txt` when no personal server is set. Full 5-minute guide: [MULTI-USER-SETUP.txt](MULTI-USER-SETUP.txt) (includes a shared Docker backend option).
 
+### Shared tunnel: watcher, URL sync & Telegram alerts (owner only)
+
+Quick-tunnel URLs (`*.trycloudflare.com`) change every time cloudflared restarts, so the repo ships a self-healing loop that keeps the published URL in `tunnel.txt` accurate. This is only for whoever hosts the **shared** backend — friends running their own server never touch it.
+
+**1. The watcher** (`start-watcher.bat` → `watch-tunnel.ps1`, also started by `start-server-saver.bat`) loops every 30 seconds and:
+
+- restarts the Python backend if `http://localhost:8080/api/ping` stops answering
+- reads the **live** hostname from cloudflared's local metrics API (`http://127.0.0.1:20241/quicktunnel`) instead of scraping logs — cloudflared can rotate its URL without the process ever restarting
+- health-checks the public URL and distinguishes *"DNS not propagated yet"* (normal for fresh quick tunnels, can take minutes) from a real edge/HTTP failure
+- holds a newly acquired hostname until it actually answers end-to-end, publishing only once verified; it recycles cloudflared for a fresh hostname only if the candidate stays unreachable for 10+ minutes
+- always launches cloudflared with `--protocol http2` (QUIC drops were silently killing tunnels)
+- writes the verified URL to `tunnel.txt` **without a UTF-8 BOM** (a BOM corrupts the app's `new URL()` parse), then commits and pushes — GitHub raw acts as a tiny free config CDN
+
+**2. Clients follow automatically** (`src/lib/tunnelSync.ts`) — every 10 seconds, and again whenever the tab becomes visible, the app fetches `tunnel.txt` from `raw.githubusercontent.com`, health-checks its current tunnel, and when the published URL changed (or the current one died) switches over and toasts *"Backend tunnel updated"*. Manual / self-hosted URLs are never overwritten.
+
+**3. Telegram alert (optional, owner-only)** — `telegram-notify.cjs` sends you a message whenever the tunnel moves: *"Vispr backend moved (tunnel restarted): … The app updates automatically."* So even if you're not watching the watcher window, you always know the new URL. Setup (one time):
+
+1. In Telegram, message `@BotFather` → `/newbot` → copy the HTTP API token.
+2. Message your new bot anything (so it knows your chat).
+3. `node telegram-notify.cjs test` — auto-detects your chat id and writes it into `tunnel-config.json`.
+4. The watcher calls it automatically on every URL change (`tunnel-config.json` → `telegram.enabled` / `botToken` / `chatId`). End users don't need any of this — they never see or touch `tunnel.txt`.
+
 ### Recommended folder structure for best album grouping
 
 ```
@@ -203,4 +225,7 @@ Files named `Song - Artist.mp3` or plain titles also work — tags always win wh
 - **Recommendation NLP**: TensorFlow.js Universal Sentence Encoder (on-device, cached in IndexedDB) embeds track text for semantic similarity; `moodMatcher.ts` provides lexical mood scoring for chips/stations using mood/genre tags (Gemini-assigned at import where available).
 - **Sharing**: LZ-compressed share payloads (text or `.vispr.json` file) with conflict detection/resolution. Audio transferred directly via Web Share API.
 - **Backend**: `server/app.py` — threaded Python bridge around yt-dlp (+ optional RapidAPI v2 providers, mutagen tagging, web push). Exposed via Cloudflare quick tunnels; Vercel serverless mirrors exist for zero-infra demos.
+- **Tunnel reliability**: `watch-tunnel.ps1` self-healing loop (backend + cloudflared + BOM-free `tunnel.txt` publish), `tunnelSync.ts` client-side URL polling, optional owner alerts via `telegram-notify.cjs` — see [Shared tunnel](#shared-tunnel-watcher-url-sync--telegram-alerts-owner-only).
 - **PWA**: `vite-plugin-pwa` (Workbox generateSW, auto-update, precached app shell). Share target configured for Android/Chrome.
+- **Service-worker freshness**: `vercel.json` pins `sw.js` to `Cache-Control: max-age=0, must-revalidate`, so Workbox picks up new precache manifests immediately instead of serving a stale worker.
+- **Icons & screenshots**: `npm run icons` regenerates the PWA icon set with `sharp` (`scripts/gen-icons.mjs`); docs screenshots are captured headlessly with Playwright (`scripts/gen-docs-shots.mjs`).
