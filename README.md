@@ -41,7 +41,12 @@ A fully offline-capable Progressive Web App (React + TypeScript + Vite) with an 
 - **AI Rescan** — any song's ⋯ menu → **Rescan Metadata** re-fetches its metadata via AI (useful for old imports with wrong tags).
 - **Manual Song mode** — paste a YouTube URL and type the metadata yourself (AI auto-fills blanks if configured). No backend server needed.
 - **Smart review wizard** — review/edit every song before it downloads; bulk answers (album/genre/artist) propagate to the whole playlist.
-- **Download queue** — imports queue up in the background (with a progress bar); pending songs auto-retry when the backend comes back online. Queue is visible under **Library → Downloads**.
+- **Download queue that survives an offline server** — the download backend runs on a tunnel that can drop at any time (sleeping laptop, restarted machine), so the app treats it as optional:
+  - **Search keeps working while the server is down** — search goes through the deployment's own API plus an in-memory/IndexedDB cache, never the tunnel.
+  - **Songs queue up anyway** — each pending track (URL + metadata) is persisted locally in IndexedDB, so nothing is lost if you close the app or restart your device.
+  - **Server-up notification** — when the backend becomes reachable again you get a push notification: *"Server is back online — open the app to resume downloading your music."* (Works while the app is closed; requires **Enable Notifications** in Settings → Import, iOS 16.4+.)
+  - **One tap to resume** — open the app → **Library → Downloads** → **Start Downloads**. As a safety net, while that page is open the app health-checks the server every 10 seconds and auto-starts the queue the moment it comes back.
+  - The queue (pending / failed / completed, with a progress bar) is visible under **Library → Downloads**.
 - **Save downloads to a folder** (optional) — every imported song is also written to a folder you pick on your device (File System Access API).
 
 ### Library Management
@@ -69,6 +74,7 @@ A fully offline-capable Progressive Web App (React + TypeScript + Vite) with an 
 - **Conflict detection** — incoming shares are matched against your library: exact matches, conflicts (same song, different metadata), and new tracks — keep yours or accept theirs, individually or all at once.
 - **Playlist merge** — receiving a playlist share auto-creates or merges into an existing playlist of the same name.
 - **Share Library** — one tap on the Songs page exports your whole library for another device.
+- **Private by design** — share payloads are built entirely on your device. They're compressed locally (LZ-string) and handed straight to your system share sheet or clipboard — nothing is uploaded to any server of ours, and no share data passes through the backend. The recipient receives exactly what you chose to share (the tracks and metadata you included) and nothing else from your library. Any network hop from that point on — AirDrop, WhatsApp, iMessage, an HTTPS link — is encrypted by the channel you picked.
 
 ### Insights & Recap
 - **Listening Stats** — top songs/artists/albums, play counts, listening time.
@@ -88,7 +94,7 @@ A fully offline-capable Progressive Web App (React + TypeScript + Vite) with an 
    - *From YouTube*: **Library → Songs → paste URL → Add**. Pick Auto Download (with review wizard) or Manual Song. AI suggests the metadata — tap the suggestion or confirm each field.
    - *From a friend*: tap **Paste Share** and paste the share text they sent you (or **Receive Share** for a `.vispr.json` file).
 3. **Backend for YouTube imports** — the app follows the shared server published in `tunnel.txt` automatically, or run your own: double-click `start-server.bat`, paste the printed URL into **Settings → Import**. Full guide: [MULTI-USER-SETUP.txt](MULTI-USER-SETUP.txt).
-4. **Notifications** — Settings → Import → **Enable Notifications** to get pinged when the backend is back online and your queued downloads resume.
+4. **Notifications & resuming an offline queue** — Settings → Import → **Enable Notifications**. You can search YouTube and queue songs even while the download backend is offline; when the server comes back you get a *"Server is back online"* notification — just open the app and tap **Start Downloads** in **Library → Downloads** (or let that page's 10-second health check start it for you).
 5. **Backup & Recap** — Settings → Backup: Export/Import your library, view Stats / Monthly Recap / Wrapped.
 
 More screenshots: [`docs/screenshots/`](docs/screenshots) (`02` library, `04` now playing, `05` queue, `06` server settings, `07` backup, `08` paste share, `09` incoming share).
