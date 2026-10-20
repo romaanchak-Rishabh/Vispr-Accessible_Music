@@ -492,7 +492,7 @@ export function ActionSheet(): JSX.Element | null {
                 <button
                   key={a.label}
                   className="action-item"
-                  style={a.sub ? { flexDirection: 'column', alignItems: 'flex-start', gap: 1 } : undefined}
+                  style={a.sub ? { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3 } : undefined}
                   onClick={() => {
                     a.fn();
                   }}
@@ -500,7 +500,7 @@ export function ActionSheet(): JSX.Element | null {
                 >
                   <span>{a.label}</span>
                   {a.sub && (
-                    <span style={{ fontSize: 12, color: 'var(--label-secondary)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--label-secondary)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {a.sub}
                     </span>
                   )}

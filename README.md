@@ -1,6 +1,10 @@
 # Vispr — Liquid Glass Music PWA
 
-A fully offline-capable Progressive Web App (React + TypeScript + Vite) with an Apple Music–inspired Liquid Glass interface that turns your own music files into a beautiful streaming-style experience on phones **and** desktops.
+A fully offline-capable Progressive Web App (React + TypeScript + Vite) with an Apple Music–inspired Liquid Glass interface that turns your own music files into a beautiful streaming-style experience on phones **and** desktops — with AI-assisted metadata and YouTube imports.
+
+| Listen Now | Song Actions | AI Metadata |
+|---|---|---|
+| ![Listen Now](docs/screenshots/01-listen-now.png) | ![Song actions](docs/screenshots/03-song-actions.png) | ![AI analysis](docs/screenshots/10-ai-analysis.png) |
 
 ## ⚠️ Personal & Educational Use Only
 
@@ -17,51 +21,94 @@ A fully offline-capable Progressive Web App (React + TypeScript + Vite) with an 
 ## Features
 
 ### Core Experience
-- **Liquid Glass UI** — Apple Music–style Listen Now / Browse / Library / Search with translucent blurred surfaces over an ambient color field, springy press feedback everywhere, animated tab highlighting, glass sheets & cards; switches to a macOS-style sidebar + player bar on desktop.
+- **Liquid Glass UI** — Apple Music–style Listen Now / Browse / Library / Search with translucent blurred surfaces over an ambient color field, springy press feedback everywhere, glass sheets & cards; switches to a macOS-style sidebar + player bar on desktop.
 - **Your files, your library** — connect your phone's `Music` folder once via the native folder picker (File System Access API). The connection persists across sessions. Individual file picking is also supported as a fallback.
-- **Fully responsive** — optimized layouts for phones (375px–430px), tablets, and desktops. Detail pages stack vertically on small screens, controls resize, and cards reflow on rotation.
-- **Offline artwork** — all cover art is stored as data URLs in IndexedDB, so thumbnails and banners appear fully offline with no network dependency.
+- **Fully responsive** — optimized layouts for phones (375px–430px), tablets, and desktops.
+- **Offline artwork** — all cover art is stored as data URLs in IndexedDB, so thumbnails and banners appear fully offline.
 - **Persistence** — library index, playlists, queue, playback history, play counts, shuffle/repeat/crossfade/volume all survive app restarts. Resumes where you left off.
 - **Installable PWA** — service worker precache, offline shell, install banner (native prompt on Android, "Add to Home Screen" instructions on iOS).
 
 ### Playback
 - **Crossfade** — optional toggle in Now Playing; the next track fades in as the current one fades out (no silence gap).
 - **Lock-screen media controls** — MediaSession integration with artwork, play/pause/next/previous/seek and position scrubber on the Android notification & lock screen.
-- **Queue management** — Play Next / Play Later from any track's ⋯ menu, drag-to-reorder Up Next, remove items.
-- **Loop/Repeat** — toggle repeat from Now Playing.
+- **Queue management** — Play Next / Play Last from any track's ⋯ menu, drag-to-reorder Up Next, remove items.
+- **Shuffle & Repeat** — shuffle toggle and repeat off/all/one from Now Playing.
+- **Keyboard shortcuts** (desktop) — see [Shortcuts](#keyboard-shortcuts).
+
+### YouTube Imports & AI Metadata
+- **Paste any YouTube video or playlist URL** — audio is downloaded server-side (yt-dlp bridge), tagged (title/artist/album + embedded cover art) via mutagen, deduplicated, and stored offline. Radio-mix links (`list=RD…`) import as a single song.
+- **AI metadata analysis (Gemini)** — during import, each song is analyzed by Gemini: genre, era, mood, language, album, featured artists, mashup/remix detection. Suggestions appear as an "AI found metadata" card you can apply with one tap — or the wizard just asks you to confirm each field.
+- **AI Rescan** — any song's ⋯ menu → **Rescan Metadata** re-fetches its metadata via AI (useful for old imports with wrong tags).
+- **Manual Song mode** — paste a YouTube URL and type the metadata yourself (AI auto-fills blanks if configured). No backend server needed.
+- **Smart review wizard** — review/edit every song before it downloads; bulk answers (album/genre/artist) propagate to the whole playlist.
+- **Download queue** — imports queue up in the background (with a progress bar); pending songs auto-retry when the backend comes back online. Queue is visible under **Library → Downloads**.
+- **Save downloads to a folder** (optional) — every imported song is also written to a folder you pick on your device (File System Access API).
 
 ### Library Management
-- **YouTube imports** — paste any video/playlist link; audio is downloaded server-side, tagged (title/artist/album + embedded cover art) via mutagen, deduplicated against your library, and stored offline in the app. Radio-mix links (`list=RD…`) import as a single song.
-- **Library Export/Import (Backup)** — export your entire library as a JSON file (strips artwork, includes YouTube IDs). Import on another device to restore playlists, albums, artists, and settings. YouTube tracks auto-download via yt-dlp if a server is configured.
-- **Library insights** — the Library tab shows total songs/artists/albums/playlists and how much storage the offline library occupies; delete any track from its ⋯ menu to free space instantly.
-- **Supported formats** — `.mp3` `.m4a` `.mp4` `.aac` `.flac` `.wav` `.ogg` `.opus` `.webm`. Metadata (title / artist / album / artwork / year / genre) is read from embedded ID3v2, MP4/iTunes and FLAC Vorbis tags; falls back to parsing `Song - Artist.mp3`-style filenames.
+- **Library insights** — songs/artists/albums/playlists counts + offline storage usage; delete any track from its ⋯ menu.
+- **Multi-select** — ⋯ → Select on a track, then batch-play, batch-favourite, batch-add-to-playlist, or batch-delete.
+- **Supported formats** — `.mp3` `.m4a` `.mp4` `.aac` `.flac` `.wav` `.ogg` `.opus` `.webm`. Metadata is read from embedded ID3v2, MP4/iTunes and FLAC Vorbis tags; falls back to parsing `Song - Artist.mp3`-style filenames.
+- **Full metadata editor** — title, multiple artists, album, year/era, two genre slots, song type (Lofi/Remix/Mashup/…), mood, language, free-form tags, and cover art (from photos or a YouTube URL).
 
 ### Smart Features
-- **Smart recommender** — "Made For You" and "Top Picks" sections on the Listen Now page use USE embeddings and cosine similarity to suggest tracks based on your listening patterns, play counts, and recently played history.
-- **Enhanced Recently Played** — shows album artwork, artist name, and era badge for each recently played track.
-- **Jump Back In** — quick access to recently played albums, playlists, and artists.
-- **Recently Added** — highlights your newest additions with artwork cards.
-- **Stations for You** — genre-based radio stations (Bollywood, Rock, Chill, Party) that use the built-in classifier to match tracks by genre tags, not just filename strings.
-- **Mood & Genre chips** — horizontal scroll of genre/mood filters on the Listen Now page.
-- **Year/Era metadata** — tracks display their era (2020s, 2010s, 90s, etc.) in track lists, Now Playing, and detail pages. Year is editable via the ⋯ menu.
+- **Smart recommender** — "Made For You" and "Top Picks" on Listen Now use USE embeddings + cosine similarity over your listening patterns, play counts, and recency.
+- **Stations for You** — a personal shuffle station plus genre stations (Bollywood, Rock, Chill, Party) matched via the built-in classifier + mood matching.
+- **Recently Played / Jump Back In / Recently Added** — artwork-forward sections on Listen Now.
+- **Mood & Genre chips** — horizontal filters on Listen Now.
+- **Year/Era metadata** — era badges (2020s, 2010s, 90s…) everywhere; year is editable.
 
 ### Organization
-- **Playlists** — create playlists and add songs to them from anywhere.
-- **Album / Artist detail pages** — with Play, Shuffle, and Share buttons.
-- **Mix detail pages** — view and play smart mixes (Made For You, Top Picks) in a dedicated detail view.
+- **Playlists** — create from anywhere; add songs via ⋯ menu or batch select.
+- **Album / Artist detail pages** — with Play, Shuffle, and Share.
+- **Mix detail pages** — smart mixes (Made For You, Top Picks, Stations) open in a dedicated play view.
 
 ### Sharing
-- **Share songs, playlists, albums, artists, and mixes** — tap Share on any detail page or use the ⋯ menu on a track. Creates a `.vispr.json` file with metadata + audio files.
-- **AirDrop & cross-platform** — uses `navigator.share()` on iOS/Android (sends audio files directly via AirDrop or other share sheets). Falls back to file download on desktop.
-- **Conflict detection** — when receiving a share, the app detects exact matches, conflicts (same song, different metadata), and new tracks. You can choose to keep yours or accept incoming for each conflict, or apply to all.
+- **Share songs, playlists, albums, artists, and mixes** — ⋯ menu or Share buttons; uses `navigator.share()` on phones (sends audio via AirDrop/etc.), falls back to a `.vispr.json` file on desktop.
+- **Paste Share (text)** — shares also compress into a copy-pasteable text blob — paste it in any chat; the receiver taps **Paste Share** to import, no file needed.
+- **Conflict detection** — incoming shares are matched against your library: exact matches, conflicts (same song, different metadata), and new tracks — keep yours or accept theirs, individually or all at once.
 - **Playlist merge** — receiving a playlist share auto-creates or merges into an existing playlist of the same name.
-- **Receive Share** — import shared files via the Library > Songs page or the Settings backup section.
+- **Share Library** — one tap on the Songs page exports your whole library for another device.
+
+### Insights & Recap
+- **Listening Stats** — top songs/artists/albums, play counts, listening time.
+- **Monthly Recap** — a monthly recap card of your listening.
+- **Wrapped** — your year-in-review card, shareable as an image ("Share Your Year").
 
 ### Design
-- **No rectangular card backgrounds** — all cards have transparent backgrounds with no borders or inset shadows. Only a subtle hover shadow for depth.
-- **Smooth press interactions** — cards scale on press (0.96–0.98) with no rectangular tap highlights or sticky active states.
-- **Play button on hold** — enhanced album cards show a play overlay button on press/hold with smooth fade transition.
-- **Station cards** — play button always positioned at the bottom regardless of title/description length.
+- **No rectangular card backgrounds** — transparent cards, only a subtle hover shadow for depth.
+- **Smooth press interactions** — cards scale on press (0.96–0.98) with no sticky active states.
+- **Play overlay on hold** — album cards reveal a play button on press/hold.
+
+## How to use (quick)
+
+1. **Install** — see [Install on your phone](#install-on-your-phone) below (iOS needs the manual Add to Home Screen steps; Android gets a one-tap prompt).
+2. **Add music**
+   - *Your files*: **Library → Connect Music Folder** (or **Choose Files**).
+   - *From YouTube*: **Library → Songs → paste URL → Add**. Pick Auto Download (with review wizard) or Manual Song. AI suggests the metadata — tap the suggestion or confirm each field.
+   - *From a friend*: tap **Paste Share** and paste the share text they sent you (or **Receive Share** for a `.vispr.json` file).
+3. **Backend for YouTube imports** — the app follows the shared server published in `tunnel.txt` automatically, or run your own: double-click `start-server.bat`, paste the printed URL into **Settings → Import**. Full guide: [MULTI-USER-SETUP.txt](MULTI-USER-SETUP.txt).
+4. **Notifications** — Settings → Import → **Enable Notifications** to get pinged when the backend is back online and your queued downloads resume.
+5. **Backup & Recap** — Settings → Backup: Export/Import your library, view Stats / Monthly Recap / Wrapped.
+
+More screenshots: [`docs/screenshots/`](docs/screenshots) (`02` library, `04` now playing, `05` queue, `06` server settings, `07` backup, `08` paste share, `09` incoming share).
+
+## Install on your phone
+
+Vispr is a PWA — once installed it gets its own home-screen icon, opens full-screen (no browser bar), and works offline. **Important: on iPhone/iPad you must use Safari** — the Share sheet with "Add to Home Screen" only exists there (Chrome on iOS won't offer it).
+
+### iPhone / iPad (Safari) — step by step
+
+1. Open the deployed Vispr URL **in Safari** (tap the link in Messages/WhatsApp/etc., or paste it into Safari's address bar).
+2. Tap the **Share** button — the square with an upward arrow at the bottom-center of the screen.
+3. In the share sheet, scroll down and tap **Add to Home Screen** (icon: a `+` in a square).
+4. The name defaults to the site title — rename it to **Vispr** if you like — then tap **Add** (top-right).
+5. Done. The Vispr icon is now on your home screen; it opens full-screen like a regular app, remembers your library, and keeps playing offline.
+
+> Notifications (Settings → Import → **Enable Notifications**, to get pinged when the download backend comes back) require **iOS 16.4 or newer**. Everything else works on earlier iOS versions.
+
+### Android (Chrome) — automatic
+
+Just open the URL in Chrome — an **Install app** prompt appears, or use Chrome's ⋮ menu → **Install app / Add to Home screen**. Desktop Chrome/Edge offer the same via the install icon in the address bar.
 
 ## Run locally
 
@@ -74,54 +121,35 @@ npm run preview    # serve the production build
 
 > Note: folder access requires a secure context — use `localhost` or HTTPS (the PWA plugin handles this in production automatically on Vercel).
 
+To regenerate the docs screenshots (needs `npm run dev` running in another terminal):
+
+```bash
+node scripts/gen-docs-shots.mjs
+```
+
 ## Deploy: GitHub → Vercel
 
-1. Create a new GitHub repo and push:
-   ```bash
-   git init
-   git add .
-   git commit -m "Music PWA"
-   git branch -M main
-   git remote add origin https://github.com/<you>/music-pwa.git
-   git push -u origin main
-   ```
+1. Push this repo to GitHub.
 2. On [vercel.com](https://vercel.com): **Add New → Project → Import** the repo.
 3. Framework preset **Vite** is auto-detected. Build command `npm run build`, output dir `dist`. Click **Deploy**.
-4. Open the deployed URL on your phone in Chrome → you'll get the **Install / Add to Home Screen** prompt (or the in-app banner). Install it — it launches full-screen like a native app.
+4. Open the deployed URL on your phone — on iPhone use **Safari** and follow [Install on your phone](#install-on-your-phone); on Android Chrome just accept the install prompt.
+
+### Environment variables (Vercel → Settings → Environment Variables)
+
+| Variable | Purpose |
+|---|---|
+| `GEMINI_LLM_API_KEY` | Google AI Studio key — enables AI metadata analysis during imports and **Rescan Metadata**. Without it, the wizard works but skips AI suggestions. |
+| `RAPIDAPI_KEY` | RapidAPI key for the v2 search/download providers (faster, avoids some YouTube bot-checks). Optional. |
+| `YTDLP_SECRET` | Require clients to send a matching `x-auth-token` on the yt-dlp endpoints (enter it in the app's YT settings panel). |
+| `YTDLP_COOKIES` | Netscape-format cookies.txt content — helps when YouTube shows "confirm you're not a bot" for datacenter IPs. |
+
+> The repo also ships Python serverless functions (`/api/resolve`, `/api/download`, …) that run yt-dlp **on Vercel itself**, so one deployment contains the whole app — frontend + extraction API. Caveats: Vercel caps buffered responses (~4.5 MB) and execution time (~60s on Hobby), and datacenter IPs get bot-checked often — the self-hosted bridge (below) is the reliable path for real use.
 
 ## Self-hosted backend (multi-user)
 
 Nobody is tied to one machine: every user can run their own yt-dlp bridge + Cloudflare quick tunnel by double-clicking `start-server.bat`, then pasting the URL into the app's **Settings → Import**. The app health-checks the server and falls back to the shared URL in `tunnel.txt` when no personal server is set. Full 5-minute guide: [MULTI-USER-SETUP.txt](MULTI-USER-SETUP.txt) (includes a shared Docker backend option).
 
-## Adding music
-
-**Three ways:**
-
-1. **Connect Music Folder** — pick your `Music` folder once; the app indexes everything inside (rescans are incremental — only new/changed files get re-tagged).
-2. **Choose Files** — manually pick songs from anywhere on the device.
-3. **Import from Link** — paste a direct URL to an audio file (`.mp3`, `.m4a`, …). It downloads into your library with tags + artwork. Works great with freely licensed audio hosts.
-
-- **Rescan Folder** picks up anything newly added to your connected folder.
-- **Change Folder** switches to a different source folder anytime.
-- Re-importing an already-present YouTube video is detected and skipped — no duplicate downloads.
-
-> **YouTube imports — built into this deployment:** paste a YouTube video or playlist URL into **Library → Songs → Add**. The repo ships Python serverless functions (`/api/resolve`, `/api/download`) that run yt-dlp **on Vercel itself**, so one deployment contains the whole app — frontend + extraction API. No separate server needed.
->
-> **Deploy (single project):** push to GitHub → import to Vercel → Deploy. That's it.
->
-> Optional environment variables (Vercel → Project → Settings → Environment Variables):
->
-> | Variable | Purpose |
-> |---|---|
-> | `YTDLP_SECRET` | Require clients to send a matching `x-auth-token` (enter it in the app's YT settings panel) |
-> | `YTDLP_COOKIES` | Netscape-format cookies.txt content — helps when YouTube shows "confirm you're not a bot" for datacenter IPs |
->
-> **Caveats:**
-> - Vercel serverless functions buffer responses and cap them around **4.5 MB** — the bundled API therefore prefers ≤130 kbps streams (`YTDLP_AUDIO_FORMAT` overrides this). YouTube also actively blocks many datacenter IPs, so Vercel-hosted extraction can fail with bot-check errors even with cookies. The most reliable option is still running the bridge on your own PC (`pip install yt-dlp mutagen && python server/app.py`, then enter `http://<your-pc-ip>:8080` in the app's YT settings) or any home/VPS box via the included Dockerfile — full-quality audio, no size cap.
-> - Serverless functions have execution limits (~60s on Hobby). Long videos or huge playlists may need the self-hosted route.
-> - Single videos land as one song; playlists import as an album named after the playlist; radio mixes import as a single song.
-
-### Recommended folder structure for best album grouping:
+### Recommended folder structure for best album grouping
 
 ```
 Music/
@@ -143,18 +171,28 @@ Files named `Song - Artist.mp3` or plain titles also work — tags always win wh
 | [archive.org](https://archive.org/search?query=hindi+film+songs) | Huge collections of pre-1970s Hindi film songs (many public domain). Download MP3s directly — direct file URLs can be pasted straight into **Import from Link**. |
 | [Jamendo](https://www.jamendo.com) | Free Creative-Commons music, including Bollywood-inspired artists. |
 | [Free Music Archive](https://freemusicarchive.org) | CC-licensed tracks searchable by genre (`soundtrack`, `world`). |
-| Your own CDs/cassettes → MP3 | Ripping music you own for personal use is the cleanest way to get modern soundtracks. |
+| Your own CDs/cassettes → MP3 | Ripping music you own for personal use is the cleanliest way to get modern soundtracks. |
 
-## Using it on your phone
+## Keyboard shortcuts (desktop)
 
-1. Open the installed app → tap **Connect Music Folder**.
-2. Grant Chrome access to your `Download/Music` (or wherever you keep songs).
-3. Every audio file inside is scanned, tagged and grouped into Albums/Artists automatically. Tap **Reconnect Folder** if your browser ever drops permission (one tap, no rescan needed).
+| Key | Action |
+|---|---|
+| `Space` | Play / pause |
+| `←` / `→` | Seek −10s / +10s (`Ctrl`/`⌘` + `←`/`→`: previous / next track) |
+| `↑` / `↓` | Volume |
+| `N` / `P` | Next / previous track |
+| `S` / `R` | Shuffle / cycle repeat |
+| `M` / `Q` | Open Now Playing / Queue |
+| `F` | Favourite current (or selected) song |
+| `/` | Jump to Search |
+| `Esc` | Close Now Playing / Queue / menu |
 
 ## Tech notes
 
-- **State**: Zustand (+persist), storage: IndexedDB via `idb-keyval` (file handles and picked file blobs live there, so they survive restarts).
-- **Metadata**: hand-rolled and dependency-free (ID3v2.2/2.3/2.4, MP4 `ilst` atoms incl. `covr`, FLAC Vorbis comments + pictures). Duration extracted from TLEN (MP3), `©dur` (MP4), and DURATION (FLAC) frames.
-- **Classifier**: keyword-based genre classification (Bollywood, Rock, Pop, Classical, etc.) with era inference from year. Used for smart recommendations and radio stations.
-- **Sharing**: custom `.vispr.json` format with conflict detection and resolution. Audio files transferred directly via Web Share API.
+- **State**: Zustand (+persist). Storage: IndexedDB via `idb-keyval` (file handles and picked file blobs live there, so they survive restarts).
+- **Metadata parsing**: hand-rolled and dependency-free (ID3v2.2/2.3/2.4, MP4 `ilst` atoms incl. `covr`, FLAC Vorbis comments + pictures). Duration from TLEN (MP3), `©dur` (MP4), DURATION (FLAC).
+- **AI enrichment**: Google Gemini (`gemini-3.5-flash-lite`) returns structured JSON (artists/album/genres/year/mood/language/mashup-remix flags) which is mapped onto the app's genre taxonomy.
+- **Classifier**: keyword-based genre classification (Bollywood, Rock, Pop, Classical, …) with era inference from year. Used for stations and recommendations.
+- **Sharing**: LZ-compressed share payloads (text or `.vispr.json` file) with conflict detection/resolution. Audio transferred directly via Web Share API.
+- **Backend**: `server/app.py` — threaded Python bridge around yt-dlp (+ optional RapidAPI v2 providers, mutagen tagging, web push). Exposed via Cloudflare quick tunnels; Vercel serverless mirrors exist for zero-infra demos.
 - **PWA**: `vite-plugin-pwa` (Workbox generateSW, auto-update, precached app shell). Share target configured for Android/Chrome.
