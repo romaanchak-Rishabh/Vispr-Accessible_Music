@@ -175,8 +175,9 @@ Quick-tunnel URLs (`*.trycloudflare.com`) change every time cloudflared restarts
 
 1. In Telegram, message `@BotFather` → `/newbot` → copy the HTTP API token.
 2. Message your new bot anything (so it knows your chat).
-3. `node telegram-notify.cjs test` — auto-detects your chat id and writes it into `tunnel-config.json`.
-4. The watcher calls it automatically on every URL change (`tunnel-config.json` → `telegram.enabled` / `botToken` / `chatId`). End users don't need any of this — they never see or touch `tunnel.txt`.
+3. Copy the template: `cp tunnel-config.example.json tunnel-config.json` (the real file is gitignored — never commit it), paste your token, set `"enabled": true`.
+4. `node telegram-notify.cjs test` — auto-detects your chat id and writes it into `tunnel-config.json`.
+5. The watcher calls it automatically on every URL change (`tunnel-config.json` → `telegram.enabled` / `botToken` / `chatId`). End users don't need any of this — they never see or touch `tunnel.txt`.
 
 ### Recommended folder structure for best album grouping
 

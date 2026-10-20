@@ -1,0 +1,7 @@
+{
+  "telegram": {
+    "enabled": false,
+    "botToken": "PASTE_YOUR_BOT_TOKEN_FROM_BOTFATHER",
+    "chatId": "PASTE_YOUR_CHAT_ID"
+  }
+}
