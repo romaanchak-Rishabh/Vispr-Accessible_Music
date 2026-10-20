@@ -1,5 +1,5 @@
 ﻿param(
-  [string]$Root = "C:\Users\user\Desktop\opencode\apple-music-clone",
+  [string]$Root = "",
   [int]$IntervalSec = 30,
   [string]$RecycleMin = 10,
   [switch]$Once
@@ -8,14 +8,18 @@
 $ErrorActionPreference = 'SilentlyContinue'
 $LogTimestamp = { Get-Date -Format "yyyy-MM-dd HH:mm:ss" }
 
+if (-not $Root) { $Root = $PSScriptRoot }
+
 $CfExe       = Join-Path $Root "cloudflared.exe"
-$Python      = "C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe"
+# Prefer whatever python is on PATH (works on any machine); fall back to the py launcher.
+$Python      = if (Get-Command python -ErrorAction SilentlyContinue) { (Get-Command python).Source }
+               elseif (Get-Command py -ErrorAction SilentlyContinue) { 'py' }
+               else { 'python' }
 $TunnelFile  = Join-Path $Root "tunnel.txt"
 $CfLog       = Join-Path $env:TEMP "opencode\cf-managed.log"
 $BackendOut  = Join-Path $env:TEMP "opencode\backend.log"
 $BackendErr  = Join-Path $env:TEMP "opencode\backend.err.log"
 $ConfigFile  = Join-Path $Root "tunnel-config.json"
-$NodeScript  = Join-Path $Root "whatsapp-notify.cjs"
 $TgScript    = Join-Path $Root "telegram-notify.cjs"
 $WatcherLog  = Join-Path $Root "watch-tunnel.log"
 
@@ -121,14 +125,6 @@ function Send-Notify([string]$u) {
         Log "Notifying Telegram..."
         Start-Process -FilePath "node" -ArgumentList "`"$TgScript`" `"$u`"" -WorkingDirectory $Root `
           -RedirectStandardOutput "$env:TEMP\opencode\tg.log" -RedirectStandardError "$env:TEMP\opencode\tg.err.log" -WindowStyle Hidden
-      }
-      return
-    }
-    if ($cfg.whatsappEnabled -and $cfg.whatsappNumber) {
-      if (Get-Command node -ErrorAction SilentlyContinue) {
-        Log "Notifying WhatsApp..."
-        Start-Process -FilePath "node" -ArgumentList "`"$NodeScript`" `"$u`"" -WorkingDirectory $Root `
-          -RedirectStandardOutput "$env:TEMP\opencode\wa.log" -RedirectStandardError "$env:TEMP\opencode\wa.err.log" -WindowStyle Hidden
       }
     }
   } catch { Log "notify skip: $_" }

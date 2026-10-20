@@ -27,14 +27,11 @@ set LOCAL_IP=%LOCAL_IP: =%
 echo  Local IP: %LOCAL_IP%
 echo.
 
-REM Find Python (owner's known path first, then PATH, then the py launcher)
-set "PY=C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe"
-if not exist "%PY%" (
-    set "PY="
-    for /f "delims=" %%i in ('where python.exe 2^>nul') do (
-        if not defined PY (
-            "%%i" -c "import sys" >nul 2>&1 && set "PY=%%i"
-        )
+REM Find Python (PATH first, then the py launcher)
+set "PY="
+for /f "delims=" %%i in ('where python.exe 2^>nul') do (
+    if not defined PY (
+        "%%i" -c "import sys" >nul 2>&1 && set "PY=%%i"
     )
 )
 if not defined PY (

@@ -89,6 +89,10 @@ npm run preview    # serve the production build
 3. Framework preset **Vite** is auto-detected. Build command `npm run build`, output dir `dist`. Click **Deploy**.
 4. Open the deployed URL on your phone in Chrome → you'll get the **Install / Add to Home Screen** prompt (or the in-app banner). Install it — it launches full-screen like a native app.
 
+## Self-hosted backend (multi-user)
+
+Nobody is tied to one machine: every user can run their own yt-dlp bridge + Cloudflare quick tunnel by double-clicking `start-server.bat`, then pasting the URL into the app's **Settings → Import**. The app health-checks the server and falls back to the shared URL in `tunnel.txt` when no personal server is set. Full 5-minute guide: [MULTI-USER-SETUP.txt](MULTI-USER-SETUP.txt) (includes a shared Docker backend option).
+
 ## Adding music
 
 **Three ways:**

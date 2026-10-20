@@ -1,11 +1,15 @@
-"""Regenerate C:\\Users\\user\\Downloads\\cookies_env_value.txt from a fresh cookies.txt export.
+"""Regenerate cookies_env_value.txt from a fresh cookies.txt export.
 
-Usage: python scripts/make_cookie_env.py [path-to-cookies.txt]
+Usage: python scripts/make_cookie_env.py <path-to-cookies.txt>
 """
 import os
 import sys
 
-src = sys.argv[1] if len(sys.argv) > 1 else r"C:\Users\user\Downloads\cookies.txt"
+if len(sys.argv) < 2:
+    print(__doc__)
+    sys.exit(1)
+
+src = sys.argv[1]
 out = os.path.join(os.path.dirname(os.path.abspath(src)), "cookies_env_value.txt")
 
 essential = (
